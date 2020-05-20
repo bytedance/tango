@@ -1,6 +1,9 @@
 // Copyright 2011 The Go Authors. All rights reserved.
+// Copyright (c) 2020 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2020-05-20.
 
 //go:generate go test cmd/go -v -run=^TestDocsUpToDate$ -fixdocs
 
@@ -45,6 +48,8 @@ import (
 	"cmd/go/internal/workcmd"
 	"cmd/internal/telemetry"
 	"cmd/internal/telemetry/counter"
+
+	"cmd/go/internal/byted/bversion"
 )
 
 func init() {
@@ -88,6 +93,8 @@ func init() {
 		test.HelpTestflag,
 		test.HelpTestfunc,
 		modget.HelpVCS,
+
+		bversion.CmdBVersion,
 	}
 }
 

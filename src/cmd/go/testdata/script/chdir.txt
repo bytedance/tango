@@ -37,3 +37,6 @@ stderr '^invalid value "../strings" for flag -C: -C flag must be first flag on c
 
 -- custom/go.mod --
 module m
+
+# go bversion
+skip go bversion

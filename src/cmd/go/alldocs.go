@@ -32,6 +32,7 @@
 //	tool        run specified go tool
 //	version     print Go version
 //	vet         report likely mistakes in packages
+//	bversion    print Bytedance Go version
 //
 // Use "go help <command>" for more information about a command.
 //
@@ -3698,4 +3699,12 @@
 //
 // The 'go env -w' command (see 'go help env') can be used to set the GOVCS
 // variable for future go command invocations.
+//
+// # Print Bytedance Go version
+//
+// Usage:
+//
+//	go bversion
+//
+// BVersion prints the Bytedance Go version.
 package main
