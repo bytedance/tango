@@ -1,6 +1,9 @@
 // Copyright 2014 The Go Authors. All rights reserved.
+// Copyright (c) 2021 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2021-03-10.
 
 package runtime
 
@@ -4525,6 +4528,7 @@ func gdestroy(gp *g) {
 	gp.bubble = nil
 	gp.fipsOnlyBypass = false
 	gp.secret = 0
+	gp.ab.clear()
 
 	if gcBlackenEnabled != 0 && gp.gcAssistBytes > 0 {
 		// Flush assist credit to the global pool. This gives
@@ -5355,6 +5359,7 @@ func newproc1(fn *funcval, callergp *g, callerpc uintptr, parked bool, waitreaso
 	newg.ancestors = saveAncestors(callergp)
 	newg.startpc = fn.fn
 	newg.runningCleanups.Store(false)
+	newg.ab.clear()
 	if isSystemGoroutine(newg, false) {
 		sched.ngsys.Add(1)
 	} else {

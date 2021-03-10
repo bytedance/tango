@@ -10,6 +10,7 @@ import "unsafe"
 var ptrGCPercent *int32 = (*int32)(unsafe.Pointer(&gcController.gcPercent))
 
 var rtCfgMap = map[string]any{
+	"runtime.gab,ro":             &debug.gab,
 	"runtime.gctrace,rw":         &debug.gctrace,
 	"runtime.buildVersion,ro":    &buildVersion,
 	"runtime.tangoVersion,ro":    &tangoVersion,

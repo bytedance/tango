@@ -1,6 +1,9 @@
 // Copyright 2009 The Go Authors. All rights reserved.
+// Copyright (c) 2021 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2021-03-10.
 
 // Malloc profiling.
 // Patterned after tcmalloc's algorithms; shorter code.
@@ -10,6 +13,7 @@ package runtime
 import (
 	"internal/abi"
 	"internal/goarch"
+	"internal/goexperiment"
 	"internal/profilerecord"
 	"internal/runtime/atomic"
 	"internal/runtime/sys"
@@ -444,7 +448,22 @@ func mProf_Malloc(mp *m, p unsafe.Pointer, size uintptr) {
 	}
 	// Only use the part of mp.profStack we need and ignore the extra space
 	// reserved for delayed inline expansion with frame pointer unwinding.
-	nstk := callers(3, mp.profStack[:debug.profstackdepth+2])
+	//
+	// goroutine-allocation-buffer feature splits runtime.mallocgc into two calls
+	// (but in-gab allocation will not trigger memory profiling), adding an extra
+	// wrapper frame (mallocgc1) on the conventional allocation path. Skip one
+	// additional frame (callers(4, ...)) to avoid counting it against the stack
+	// depth limit.
+	//
+	// But if size-specialized malloc is enabled, allocations may not go through
+	// mallocgc1, so skipping 4 would overshoot and could drop a user frame; use
+	// callers(3, ...) in that case.
+	var nstk int
+	if goexperiment.SizeSpecializedMalloc {
+		nstk = callers(3, mp.profStack[:debug.profstackdepth+2])
+	} else {
+		nstk = callers(4, mp.profStack[:debug.profstackdepth+2])
+	}
 	index := (mProfCycle.read() + 2) % uint32(len(memRecord{}.future))
 
 	b := stkbucket(memProfile, size, mp.profStack[:nstk], true)

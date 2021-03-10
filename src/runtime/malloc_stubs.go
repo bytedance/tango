@@ -1,6 +1,9 @@
 // Copyright 2025 The Go Authors. All rights reserved.
+// Copyright (c) 2021 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2021-03-10.
 
 // This file contains stub functions that are not meant to be called directly,
 // but that will be assembled together using the inlining logic in runtime/_mkmalloc
@@ -73,6 +76,24 @@ func mallocStub(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 		if gcphase == _GCmarktermination {
 			throw("mallocgc called with gcphase == _GCmarktermination")
 		}
+	}
+	// fast path of allocation when using a goroutine-alloc-buffer
+	// for small and noscan objects
+	//
+	// GC may feel free to preempt this operation, because its buffer memory
+	// was allocated from conventional mallocgc. GC tasks just see in-gab-allocation
+	// as content changes of byte slice.
+	//
+	// gabMaxAllocSize should always be aligned to goarch.PtrSize
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
 	}
 
 	// It's possible for any malloc to trigger sweeping, which may in

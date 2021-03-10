@@ -1,6 +1,9 @@
 // Copyright 2009 The Go Authors. All rights reserved.
+// Copyright (c) 2021 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2021-03-10.
 
 package runtime
 
@@ -348,6 +351,7 @@ var debug struct {
 	// The value of traceallocfree can be changed any time in response
 	// to os.Setenv("GODEBUG").
 	traceallocfree atomic.Int32
+	gab            int32
 
 	panicnil atomic.Int32
 
@@ -401,6 +405,7 @@ var dbgvars = []*dbgVar{
 	{name: "tracebacklabels", atomic: &debug.tracebacklabels, def: 0},
 	{name: "tracefpunwindoff", value: &debug.tracefpunwindoff},
 	{name: "updatemaxprocs", value: &debug.updatemaxprocs, def: 1},
+	{name: "gab", value: &debug.gab},
 }
 
 func parseRuntimeDebugVars(godebug string) {
@@ -463,6 +468,13 @@ func finishDebugVarsSetup() {
 	p := new(string)
 	*p = gogetenv("GODEBUG")
 	godebugEnv.Store(p)
+	// Disable GAB under address sanitizer flow.
+	if asanenabled {
+		debug.gab = 0
+	}
+	if debug.gab != 0 {
+		configGabMaxCap()
+	}
 
 	setTraceback(gogetenv("GOTRACEBACK"))
 	traceback_env = traceback_cache
@@ -553,6 +565,17 @@ func parsegodebug(godebug string, seen map[string]bool) {
 
 	if debug.cgocheck > 1 {
 		throw("cgocheck > 1 mode is no longer supported at runtime. Use GOEXPERIMENT=cgocheck2 at build time instead.")
+	}
+}
+
+func configGabMaxCap() {
+	if debug.gab < 0 {
+		debug.gab = 0
+		gabCapMax = 0
+	} else if debug.gab == 1 || debug.gab > maxSmallSize || debug.gab < gabCapInitial {
+		gabCapMax = gabCapMaxDefault
+	} else {
+		gabCapMax = uintptr(debug.gab >> gabCapShift << gabCapShift)
 	}
 }
 

@@ -1,6 +1,9 @@
 // Copyright 2009 The Go Authors. All rights reserved.
+// Copyright (c) 2021 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2021-03-10.
 
 package runtime
 
@@ -595,6 +598,7 @@ type g struct {
 	// valgrindStackID is used to track what memory is used for stacks when a program is
 	// built with the "valgrind" build tag, otherwise it is unused.
 	valgrindStackID uintptr
+	ab              gab // goroutine allocation buffer
 }
 
 // gTrackingPeriod is the number of transitions out of _Grunning between

@@ -1,6 +1,9 @@
 // Copyright 2010 The Go Authors. All rights reserved.
+// Copyright (c) 2021 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2021-03-10.
 
 // Export guts for testing.
 
@@ -2105,3 +2108,22 @@ var (
 	Complex128Bytes = complex128Bytes
 	Complex64Bytes  = complex64Bytes
 )
+
+// SetGAB turns on/off goroutine allocation buffer
+func SetGAB(enable bool) {
+	if enable {
+		debug.gab = 1
+	} else {
+		debug.gab = 0
+	}
+}
+
+// GetGABInfo retrieves information of current g's goroutine allocation buffer
+func GetGABInfo() (base, top, end uintptr) {
+	gp := getg()
+	return uintptr(gp.ab.base), gp.ab.top, gp.ab.end
+}
+
+func GetGabCapMax() uintptr {
+	return gabCapMax
+}

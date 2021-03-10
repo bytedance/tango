@@ -1,6 +1,9 @@
 // Copyright 2009 The Go Authors. All rights reserved.
+// Copyright (c) 2021 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2021-03-10.
 
 // Garbage collector: finalizers and block profiling.
 
@@ -470,7 +473,8 @@ func SetFinalizer(obj any, finalizer any) {
 	if uintptr(e.data) != base {
 		// As an implementation detail we allow to set finalizers for an inner byte
 		// of an object if it could come from tiny alloc (see mallocgc for details).
-		if ot.Elem == nil || ot.Elem.Pointers() || ot.Elem.Size_ >= maxTinySize {
+		// or gab enabled and alloc size > gabMaxAllocSize.
+		if ot.Elem == nil || ot.Elem.Pointers() || (ot.Elem.Size_ >= maxTinySize && (debug.gab == 0 || ot.Elem.Size_ > gabMaxAllocSize)) {
 			throw("runtime.SetFinalizer: pointer not at beginning of allocated block")
 		}
 	}

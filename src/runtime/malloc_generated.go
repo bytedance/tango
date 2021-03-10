@@ -18,6 +18,17 @@ func mallocgcSmallScanNoHeaderSC1(size uintptr, typ *_type, needzero bool) unsaf
 		}
 	}
 
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
+	}
+
 	lockRankMayQueueFinalizer()
 
 	if debug.malloc {
@@ -181,6 +192,17 @@ func mallocgcSmallScanNoHeaderSC2(size uintptr, typ *_type, needzero bool) unsaf
 		if gcphase == _GCmarktermination {
 			throw("mallocgc called with gcphase == _GCmarktermination")
 		}
+	}
+
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -348,6 +370,17 @@ func mallocgcSmallScanNoHeaderSC3(size uintptr, typ *_type, needzero bool) unsaf
 		}
 	}
 
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
+	}
+
 	lockRankMayQueueFinalizer()
 
 	if debug.malloc {
@@ -511,6 +544,17 @@ func mallocgcSmallScanNoHeaderSC4(size uintptr, typ *_type, needzero bool) unsaf
 		if gcphase == _GCmarktermination {
 			throw("mallocgc called with gcphase == _GCmarktermination")
 		}
+	}
+
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -678,6 +722,17 @@ func mallocgcSmallScanNoHeaderSC5(size uintptr, typ *_type, needzero bool) unsaf
 		}
 	}
 
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
+	}
+
 	lockRankMayQueueFinalizer()
 
 	if debug.malloc {
@@ -841,6 +896,17 @@ func mallocgcSmallScanNoHeaderSC6(size uintptr, typ *_type, needzero bool) unsaf
 		if gcphase == _GCmarktermination {
 			throw("mallocgc called with gcphase == _GCmarktermination")
 		}
+	}
+
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -1008,6 +1074,17 @@ func mallocgcSmallScanNoHeaderSC7(size uintptr, typ *_type, needzero bool) unsaf
 		}
 	}
 
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
+	}
+
 	lockRankMayQueueFinalizer()
 
 	if debug.malloc {
@@ -1171,6 +1248,17 @@ func mallocgcSmallScanNoHeaderSC8(size uintptr, typ *_type, needzero bool) unsaf
 		if gcphase == _GCmarktermination {
 			throw("mallocgc called with gcphase == _GCmarktermination")
 		}
+	}
+
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -1338,6 +1426,17 @@ func mallocgcSmallScanNoHeaderSC9(size uintptr, typ *_type, needzero bool) unsaf
 		}
 	}
 
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
+	}
+
 	lockRankMayQueueFinalizer()
 
 	if debug.malloc {
@@ -1501,6 +1600,17 @@ func mallocgcSmallScanNoHeaderSC10(size uintptr, typ *_type, needzero bool) unsa
 		if gcphase == _GCmarktermination {
 			throw("mallocgc called with gcphase == _GCmarktermination")
 		}
+	}
+
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -1668,6 +1778,17 @@ func mallocgcSmallScanNoHeaderSC11(size uintptr, typ *_type, needzero bool) unsa
 		}
 	}
 
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
+	}
+
 	lockRankMayQueueFinalizer()
 
 	if debug.malloc {
@@ -1831,6 +1952,17 @@ func mallocgcSmallScanNoHeaderSC12(size uintptr, typ *_type, needzero bool) unsa
 		if gcphase == _GCmarktermination {
 			throw("mallocgc called with gcphase == _GCmarktermination")
 		}
+	}
+
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -1998,6 +2130,17 @@ func mallocgcSmallScanNoHeaderSC13(size uintptr, typ *_type, needzero bool) unsa
 		}
 	}
 
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
+	}
+
 	lockRankMayQueueFinalizer()
 
 	if debug.malloc {
@@ -2161,6 +2304,17 @@ func mallocgcSmallScanNoHeaderSC14(size uintptr, typ *_type, needzero bool) unsa
 		if gcphase == _GCmarktermination {
 			throw("mallocgc called with gcphase == _GCmarktermination")
 		}
+	}
+
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -2328,6 +2482,17 @@ func mallocgcSmallScanNoHeaderSC15(size uintptr, typ *_type, needzero bool) unsa
 		}
 	}
 
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
+	}
+
 	lockRankMayQueueFinalizer()
 
 	if debug.malloc {
@@ -2491,6 +2656,17 @@ func mallocgcSmallScanNoHeaderSC16(size uintptr, typ *_type, needzero bool) unsa
 		if gcphase == _GCmarktermination {
 			throw("mallocgc called with gcphase == _GCmarktermination")
 		}
+	}
+
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -2658,6 +2834,17 @@ func mallocgcSmallScanNoHeaderSC17(size uintptr, typ *_type, needzero bool) unsa
 		}
 	}
 
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
+	}
+
 	lockRankMayQueueFinalizer()
 
 	if debug.malloc {
@@ -2821,6 +3008,17 @@ func mallocgcSmallScanNoHeaderSC18(size uintptr, typ *_type, needzero bool) unsa
 		if gcphase == _GCmarktermination {
 			throw("mallocgc called with gcphase == _GCmarktermination")
 		}
+	}
+
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -2988,6 +3186,17 @@ func mallocgcSmallScanNoHeaderSC19(size uintptr, typ *_type, needzero bool) unsa
 		}
 	}
 
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
+	}
+
 	lockRankMayQueueFinalizer()
 
 	if debug.malloc {
@@ -3151,6 +3360,17 @@ func mallocgcSmallScanNoHeaderSC20(size uintptr, typ *_type, needzero bool) unsa
 		if gcphase == _GCmarktermination {
 			throw("mallocgc called with gcphase == _GCmarktermination")
 		}
+	}
+
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -3318,6 +3538,17 @@ func mallocgcSmallScanNoHeaderSC21(size uintptr, typ *_type, needzero bool) unsa
 		}
 	}
 
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
+	}
+
 	lockRankMayQueueFinalizer()
 
 	if debug.malloc {
@@ -3481,6 +3712,17 @@ func mallocgcSmallScanNoHeaderSC22(size uintptr, typ *_type, needzero bool) unsa
 		if gcphase == _GCmarktermination {
 			throw("mallocgc called with gcphase == _GCmarktermination")
 		}
+	}
+
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -3648,6 +3890,17 @@ func mallocgcSmallScanNoHeaderSC23(size uintptr, typ *_type, needzero bool) unsa
 		}
 	}
 
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
+	}
+
 	lockRankMayQueueFinalizer()
 
 	if debug.malloc {
@@ -3811,6 +4064,17 @@ func mallocgcSmallScanNoHeaderSC24(size uintptr, typ *_type, needzero bool) unsa
 		if gcphase == _GCmarktermination {
 			throw("mallocgc called with gcphase == _GCmarktermination")
 		}
+	}
+
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -3978,6 +4242,17 @@ func mallocgcSmallScanNoHeaderSC25(size uintptr, typ *_type, needzero bool) unsa
 		}
 	}
 
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
+	}
+
 	lockRankMayQueueFinalizer()
 
 	if debug.malloc {
@@ -4141,6 +4416,17 @@ func mallocgcSmallScanNoHeaderSC26(size uintptr, typ *_type, needzero bool) unsa
 		if gcphase == _GCmarktermination {
 			throw("mallocgc called with gcphase == _GCmarktermination")
 		}
+	}
+
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -4313,6 +4599,17 @@ func mallocgcTinySize1(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 		}
 	}
 
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
+	}
+
 	lockRankMayQueueFinalizer()
 
 	if debug.malloc {
@@ -4467,6 +4764,17 @@ func mallocgcTinySize2(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 		if gcphase == _GCmarktermination {
 			throw("mallocgc called with gcphase == _GCmarktermination")
 		}
+	}
+
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -4625,6 +4933,17 @@ func mallocgcTinySize3(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 		}
 	}
 
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
+	}
+
 	lockRankMayQueueFinalizer()
 
 	if debug.malloc {
@@ -4779,6 +5098,17 @@ func mallocgcTinySize4(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 		if gcphase == _GCmarktermination {
 			throw("mallocgc called with gcphase == _GCmarktermination")
 		}
+	}
+
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -4937,6 +5267,17 @@ func mallocgcTinySize5(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 		}
 	}
 
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
+	}
+
 	lockRankMayQueueFinalizer()
 
 	if debug.malloc {
@@ -5091,6 +5432,17 @@ func mallocgcTinySize6(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 		if gcphase == _GCmarktermination {
 			throw("mallocgc called with gcphase == _GCmarktermination")
 		}
+	}
+
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -5249,6 +5601,17 @@ func mallocgcTinySize7(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 		}
 	}
 
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
+	}
+
 	lockRankMayQueueFinalizer()
 
 	if debug.malloc {
@@ -5403,6 +5766,17 @@ func mallocgcTinySize8(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 		if gcphase == _GCmarktermination {
 			throw("mallocgc called with gcphase == _GCmarktermination")
 		}
+	}
+
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -5561,6 +5935,17 @@ func mallocgcTinySize9(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 		}
 	}
 
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
+	}
+
 	lockRankMayQueueFinalizer()
 
 	if debug.malloc {
@@ -5715,6 +6100,17 @@ func mallocgcTinySize10(size uintptr, typ *_type, needzero bool) unsafe.Pointer 
 		if gcphase == _GCmarktermination {
 			throw("mallocgc called with gcphase == _GCmarktermination")
 		}
+	}
+
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -5873,6 +6269,17 @@ func mallocgcTinySize11(size uintptr, typ *_type, needzero bool) unsafe.Pointer 
 		}
 	}
 
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
+	}
+
 	lockRankMayQueueFinalizer()
 
 	if debug.malloc {
@@ -6027,6 +6434,17 @@ func mallocgcTinySize12(size uintptr, typ *_type, needzero bool) unsafe.Pointer 
 		if gcphase == _GCmarktermination {
 			throw("mallocgc called with gcphase == _GCmarktermination")
 		}
+	}
+
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -6185,6 +6603,17 @@ func mallocgcTinySize13(size uintptr, typ *_type, needzero bool) unsafe.Pointer 
 		}
 	}
 
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
+	}
+
 	lockRankMayQueueFinalizer()
 
 	if debug.malloc {
@@ -6339,6 +6768,17 @@ func mallocgcTinySize14(size uintptr, typ *_type, needzero bool) unsafe.Pointer 
 		if gcphase == _GCmarktermination {
 			throw("mallocgc called with gcphase == _GCmarktermination")
 		}
+	}
+
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -6497,6 +6937,17 @@ func mallocgcTinySize15(size uintptr, typ *_type, needzero bool) unsafe.Pointer 
 		}
 	}
 
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
+	}
+
 	lockRankMayQueueFinalizer()
 
 	if debug.malloc {
@@ -6648,6 +7099,17 @@ func mallocgcSmallNoScanSC2(size uintptr, typ *_type, needzero bool) unsafe.Poin
 		}
 	}
 
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
+	}
+
 	lockRankMayQueueFinalizer()
 
 	if debug.malloc {
@@ -6782,6 +7244,17 @@ func mallocgcSmallNoScanSC3(size uintptr, typ *_type, needzero bool) unsafe.Poin
 		if gcphase == _GCmarktermination {
 			throw("mallocgc called with gcphase == _GCmarktermination")
 		}
+	}
+
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -6920,6 +7393,17 @@ func mallocgcSmallNoScanSC4(size uintptr, typ *_type, needzero bool) unsafe.Poin
 		}
 	}
 
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
+	}
+
 	lockRankMayQueueFinalizer()
 
 	if debug.malloc {
@@ -7054,6 +7538,17 @@ func mallocgcSmallNoScanSC5(size uintptr, typ *_type, needzero bool) unsafe.Poin
 		if gcphase == _GCmarktermination {
 			throw("mallocgc called with gcphase == _GCmarktermination")
 		}
+	}
+
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -7192,6 +7687,17 @@ func mallocgcSmallNoScanSC6(size uintptr, typ *_type, needzero bool) unsafe.Poin
 		}
 	}
 
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
+	}
+
 	lockRankMayQueueFinalizer()
 
 	if debug.malloc {
@@ -7326,6 +7832,17 @@ func mallocgcSmallNoScanSC7(size uintptr, typ *_type, needzero bool) unsafe.Poin
 		if gcphase == _GCmarktermination {
 			throw("mallocgc called with gcphase == _GCmarktermination")
 		}
+	}
+
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -7464,6 +7981,17 @@ func mallocgcSmallNoScanSC8(size uintptr, typ *_type, needzero bool) unsafe.Poin
 		}
 	}
 
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
+	}
+
 	lockRankMayQueueFinalizer()
 
 	if debug.malloc {
@@ -7598,6 +8126,17 @@ func mallocgcSmallNoScanSC9(size uintptr, typ *_type, needzero bool) unsafe.Poin
 		if gcphase == _GCmarktermination {
 			throw("mallocgc called with gcphase == _GCmarktermination")
 		}
+	}
+
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -7736,6 +8275,17 @@ func mallocgcSmallNoScanSC10(size uintptr, typ *_type, needzero bool) unsafe.Poi
 		}
 	}
 
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
+	}
+
 	lockRankMayQueueFinalizer()
 
 	if debug.malloc {
@@ -7870,6 +8420,17 @@ func mallocgcSmallNoScanSC11(size uintptr, typ *_type, needzero bool) unsafe.Poi
 		if gcphase == _GCmarktermination {
 			throw("mallocgc called with gcphase == _GCmarktermination")
 		}
+	}
+
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -8008,6 +8569,17 @@ func mallocgcSmallNoScanSC12(size uintptr, typ *_type, needzero bool) unsafe.Poi
 		}
 	}
 
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
+	}
+
 	lockRankMayQueueFinalizer()
 
 	if debug.malloc {
@@ -8142,6 +8714,17 @@ func mallocgcSmallNoScanSC13(size uintptr, typ *_type, needzero bool) unsafe.Poi
 		if gcphase == _GCmarktermination {
 			throw("mallocgc called with gcphase == _GCmarktermination")
 		}
+	}
+
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -8280,6 +8863,17 @@ func mallocgcSmallNoScanSC14(size uintptr, typ *_type, needzero bool) unsafe.Poi
 		}
 	}
 
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
+	}
+
 	lockRankMayQueueFinalizer()
 
 	if debug.malloc {
@@ -8414,6 +9008,17 @@ func mallocgcSmallNoScanSC15(size uintptr, typ *_type, needzero bool) unsafe.Poi
 		if gcphase == _GCmarktermination {
 			throw("mallocgc called with gcphase == _GCmarktermination")
 		}
+	}
+
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -8552,6 +9157,17 @@ func mallocgcSmallNoScanSC16(size uintptr, typ *_type, needzero bool) unsafe.Poi
 		}
 	}
 
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
+	}
+
 	lockRankMayQueueFinalizer()
 
 	if debug.malloc {
@@ -8686,6 +9302,17 @@ func mallocgcSmallNoScanSC17(size uintptr, typ *_type, needzero bool) unsafe.Poi
 		if gcphase == _GCmarktermination {
 			throw("mallocgc called with gcphase == _GCmarktermination")
 		}
+	}
+
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -8824,6 +9451,17 @@ func mallocgcSmallNoScanSC18(size uintptr, typ *_type, needzero bool) unsafe.Poi
 		}
 	}
 
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
+	}
+
 	lockRankMayQueueFinalizer()
 
 	if debug.malloc {
@@ -8958,6 +9596,17 @@ func mallocgcSmallNoScanSC19(size uintptr, typ *_type, needzero bool) unsafe.Poi
 		if gcphase == _GCmarktermination {
 			throw("mallocgc called with gcphase == _GCmarktermination")
 		}
+	}
+
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -9096,6 +9745,17 @@ func mallocgcSmallNoScanSC20(size uintptr, typ *_type, needzero bool) unsafe.Poi
 		}
 	}
 
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
+	}
+
 	lockRankMayQueueFinalizer()
 
 	if debug.malloc {
@@ -9230,6 +9890,17 @@ func mallocgcSmallNoScanSC21(size uintptr, typ *_type, needzero bool) unsafe.Poi
 		if gcphase == _GCmarktermination {
 			throw("mallocgc called with gcphase == _GCmarktermination")
 		}
+	}
+
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -9368,6 +10039,17 @@ func mallocgcSmallNoScanSC22(size uintptr, typ *_type, needzero bool) unsafe.Poi
 		}
 	}
 
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
+	}
+
 	lockRankMayQueueFinalizer()
 
 	if debug.malloc {
@@ -9502,6 +10184,17 @@ func mallocgcSmallNoScanSC23(size uintptr, typ *_type, needzero bool) unsafe.Poi
 		if gcphase == _GCmarktermination {
 			throw("mallocgc called with gcphase == _GCmarktermination")
 		}
+	}
+
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -9640,6 +10333,17 @@ func mallocgcSmallNoScanSC24(size uintptr, typ *_type, needzero bool) unsafe.Poi
 		}
 	}
 
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
+	}
+
 	lockRankMayQueueFinalizer()
 
 	if debug.malloc {
@@ -9776,6 +10480,17 @@ func mallocgcSmallNoScanSC25(size uintptr, typ *_type, needzero bool) unsafe.Poi
 		}
 	}
 
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
+	}
+
 	lockRankMayQueueFinalizer()
 
 	if debug.malloc {
@@ -9910,6 +10625,17 @@ func mallocgcSmallNoScanSC26(size uintptr, typ *_type, needzero bool) unsafe.Poi
 		if gcphase == _GCmarktermination {
 			throw("mallocgc called with gcphase == _GCmarktermination")
 		}
+	}
+
+	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
+		gp := getg()
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
 	}
 
 	lockRankMayQueueFinalizer()

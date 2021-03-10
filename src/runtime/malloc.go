@@ -1,6 +1,9 @@
 // Copyright 2014 The Go Authors. All rights reserved.
+// Copyright (c) 2021 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2021-03-10.
 
 // Memory allocator.
 //
@@ -721,6 +724,10 @@ func mallocinit() {
 	// Initialize the memory limit here because the allocator is going to look at it
 	// but we haven't called gcinit yet and we're definitely going to allocate memory before then.
 	gcController.memoryLimit.Store(math.MaxInt64)
+
+	if debug.gab != 0 && gabMaxAllocSize&(goarch.PtrSize-1) != 0 {
+		throw("gabMaxAllocSize must always align to goarch.PtrSize")
+	}
 }
 
 // sysAlloc allocates heap arena space for at least n bytes. The
@@ -1076,6 +1083,27 @@ func mallocgc(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 		return unsafe.Pointer(&zerobase)
 	}
 
+	gp := getg()
+	noscan := typ == nil || !typ.Pointers()
+
+	// fast path of allocation when using a goroutine-alloc-buffer
+	// for small and noscan objects
+	//
+	// GC may feel free to preempt this operation, because its buffer memory
+	// was allocated from conventional mallocgc. GC tasks just see in-gab-allocation
+	// as content changes of byte slice.
+	//
+	// gabMaxAllocSize should always be aligned to goarch.PtrSize
+	if debug.gab != 0 && noscan && size <= gabMaxAllocSize {
+		size := alignUp(size, goarch.PtrSize)
+		if gp.ab.remaining() < size {
+			gp.ab.refill()
+		}
+		x := unsafe.Pointer(gp.ab.top)
+		gp.ab.top += size
+		return x
+	}
+
 	if sizeSpecializedMallocEnabled && heapBitsInSpan(size) {
 		if typ == nil || !typ.Pointers() {
 			return mallocNoScanTable[size](size, typ, needzero)
@@ -1087,6 +1115,11 @@ func mallocgc(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 		}
 	}
 
+	return mallocgc1(size, typ, needzero)
+}
+
+// conventional, slow path of allocation
+func mallocgc1(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 	// It's possible for any malloc to trigger sweeping, which may in
 	// turn queue finalizers. Record this dynamic lock edge.
 	// N.B. Compiled away if lockrank experiment is not enabled.

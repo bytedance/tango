@@ -66,6 +66,7 @@ func TestPprofDynconf(t *testing.T) {
 // retrieve the default expected values of dynconf
 func getExpectedCfgs(local bool) map[string]any {
 	expectedCfgs := map[string]any{
+		"runtime.gab":             int32(0),
 		"runtime.gctrace":         int32(0),
 		"runtime.gcPercent":       int32(100),
 		"runtime.asyncpreemptoff": int32(0),
@@ -111,6 +112,7 @@ func testList(t *testing.T) {
 		t.Fatalf("Failed to postCmd 'list', error=%v\n", err)
 	}
 	expectedStrings := []string{
+		"config(ro): runtime.gab=0",
 		"config(rw): runtime.gctrace=0",
 		"config(ro): runtime.buildVersion=",
 		"config(ro): runtime.tangoVersion=bm.1.",
