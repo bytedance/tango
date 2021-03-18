@@ -1,6 +1,9 @@
 // Copyright 2010 The Go Authors. All rights reserved.
+// Copyright (c) 2021 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2021-03-18.
 
 // Package pprof serves via its HTTP server runtime profiling data
 // in the format expected by the pprof visualization tool.
@@ -90,6 +93,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	_ "tango/dynconf" // append tango/dynconf handlers
 	"time"
 )
 
@@ -459,6 +463,8 @@ Types of profiles available:
 
 	b.WriteString(`</table>
 <a href="goroutine?debug=2">full goroutine stack dump</a>
+<br>
+<a href="/debug/pprof/dynconf?cmd=list">all dynamic configs</a>
 <br>
 <p>
 Profile Descriptions:

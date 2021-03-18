@@ -1,6 +1,9 @@
 // Copyright 2022 The Go Authors. All rights reserved.
+// Copyright (c) 2021 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2021-03-18.
 
 // This file exercises the import parser but also checks that
 // some low-level packages do not have new dependencies added.
@@ -677,6 +680,10 @@ var depsRules = `
 	< net/http/cgi
 	< net/http/fcgi;
 
+	# DynConf
+	net/http
+	< tango/dynconf;
+
 	# Profiling
 	internal/runtime/pprof/label, runtime, context < internal/runtime/pprof;
 	FMT, compress/gzip, encoding/binary, sort, text/tabwriter, internal/runtime/pprof, internal/runtime/pprof/label
@@ -685,7 +692,7 @@ var depsRules = `
 	OS, compress/gzip, internal/lazyregexp
 	< internal/profile;
 
-	html, internal/profile, net/http, runtime/pprof, runtime/trace
+	html, internal/profile, net/http, runtime/pprof, runtime/trace, tango/dynconf
 	< net/http/pprof;
 
 	# RPC
