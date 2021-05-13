@@ -705,6 +705,19 @@ func (sl *sweepLocked) sweep(preserve bool) bool {
 		s.refreshPinnerBits()
 	}
 
+	// memory of s.gabBits is same as s.allocBits, both reside in the gcBitsArenas
+	// and will be swapped at finishsweep_m
+	// so here we allocate new gabBits in current arena, and record intersected
+	// bits with s.allocBits.
+	if debug.gab > 0 && s.gabBits != nil {
+		var cleared uintptr
+		s.gabBits, cleared = s.gabBits.intersect(s.allocBits, uintptr(s.nelems))
+		if cleared > 0 {
+			cleared *= size
+			atomic.Xadduintptr(&gabUsedBytes, -cleared)
+		}
+	}
+
 	// Initialize alloc bits cache.
 	s.refillAllocCache(0)
 

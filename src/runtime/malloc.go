@@ -1094,7 +1094,7 @@ func mallocgc(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 	// as content changes of byte slice.
 	//
 	// gabMaxAllocSize should always be aligned to goarch.PtrSize
-	if debug.gab != 0 && noscan && size <= gabMaxAllocSize {
+	if gabEnabled && noscan && size <= gabMaxAllocSize {
 		size := alignUp(size, goarch.PtrSize)
 		if gp.ab.remaining() < size {
 			gp.ab.refill()
@@ -1115,11 +1115,11 @@ func mallocgc(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 		}
 	}
 
-	return mallocgc1(size, typ, needzero)
+	return mallocgc1(size, typ, needzero, false)
 }
 
 // conventional, slow path of allocation
-func mallocgc1(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
+func mallocgc1(size uintptr, typ *_type, needzero bool, isgab bool) unsafe.Pointer {
 	// It's possible for any malloc to trigger sweeping, which may in
 	// turn queue finalizers. Record this dynamic lock edge.
 	// N.B. Compiled away if lockrank experiment is not enabled.
@@ -1153,7 +1153,7 @@ func mallocgc1(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 		// we know that heapBitsInSpan is false.
 		if size <= maxSmallSize-gc.MallocHeaderSize {
 			if typ == nil || !typ.Pointers() {
-				x, elemsize = mallocgcSmallNoscan(size, typ, needzero)
+				x, elemsize = mallocgcSmallNoscan(size, typ, needzero, isgab)
 			} else {
 				if !needzero {
 					throw("objects with pointers must be zeroed")
@@ -1173,7 +1173,7 @@ func mallocgc1(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 				if size < maxTinySize && gp.secret == 0 {
 					x, elemsize = mallocgcTiny(size, typ)
 				} else {
-					x, elemsize = mallocgcSmallNoscan(size, typ, needzero)
+					x, elemsize = mallocgcSmallNoscan(size, typ, needzero, isgab)
 				}
 			} else {
 				if !needzero {
@@ -1388,7 +1388,7 @@ func mallocgcTiny(size uintptr, typ *_type) (unsafe.Pointer, uintptr) {
 	return x, span.elemsize
 }
 
-func mallocgcSmallNoscan(size uintptr, typ *_type, needzero bool) (unsafe.Pointer, uintptr) {
+func mallocgcSmallNoscan(size uintptr, typ *_type, needzero, isgab bool) (unsafe.Pointer, uintptr) {
 	// Set mp.mallocing to keep from being preempted by GC.
 	mp := acquirem()
 	if doubleCheckMalloc {
@@ -1428,6 +1428,17 @@ func mallocgcSmallNoscan(size uintptr, typ *_type, needzero bool) (unsafe.Pointe
 	v := nextFreeFast(span)
 	if v == 0 {
 		v, span, checkGCTrigger = c.nextFree(spc)
+	}
+	if isgab {
+		// Has to do span.markGab in mallocgc because
+		// span.gabBits will be re-allocated at GC sweep, if span.markGab is moved
+		// to other places, STW sweep or concurrent sweep may happen between
+		// getting span.gabBits and setting corresponding bit in span.markGab,
+		// thus cause failure of marking or even writing to invalid memory.
+		// (STW sweep may preempt span.markGab if no acquirem/releasem guard;
+		//  and concurrent sweep may happen because after mallocgc this span will
+		//  not be guaranteed to be alive and associated to mcache)
+		span.markGab(uintptr(v), size)
 	}
 	x := unsafe.Pointer(v)
 	if needzero && span.needzero != 0 {

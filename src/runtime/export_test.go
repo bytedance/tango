@@ -2109,21 +2109,27 @@ var (
 	Complex64Bytes  = complex64Bytes
 )
 
+const (
+	GabInitCap = gabCapInitial
+)
+
+var (
+	GabMaxCap        = &gabCapMax
+	GabUsedBytes     = &gabUsedBytes
+	GabEnabled       = &gabEnabled
+	GabMemoryPercent = &gabMemoryPercent
+	GabVerbose       = &gabVerbose
+	GabPolicyEnabled = &gabPolicyEnabled
+)
+
 // SetGAB turns on/off goroutine allocation buffer
-func SetGAB(enable bool) {
-	if enable {
-		debug.gab = 1
-	} else {
-		debug.gab = 0
-	}
+func SetGAB(v int32) {
+	debug.gab = v
+	gabConfigInit()
 }
 
 // GetGABInfo retrieves information of current g's goroutine allocation buffer
 func GetGABInfo() (base, top, end uintptr) {
 	gp := getg()
 	return uintptr(gp.ab.base), gp.ab.top, gp.ab.end
-}
-
-func GetGabCapMax() uintptr {
-	return gabCapMax
 }

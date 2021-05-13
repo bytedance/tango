@@ -1,6 +1,9 @@
 // Copyright 2009 The Go Authors. All rights reserved.
+// Copyright (c) 2021 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2021-05-13.
 
 // Garbage collector (GC).
 //
@@ -1489,6 +1492,10 @@ func gcMarkTermination(stw worldStop) {
 		throw("failed to set sweep barrier")
 	} else if stwSwept && sl.valid {
 		throw("non-concurrent sweep failed to drain all sweep queues")
+	}
+
+	if debug.gab > 0 {
+		gabNoteGCEnd()
 	}
 
 	if work.goroutineLeak.enabled {

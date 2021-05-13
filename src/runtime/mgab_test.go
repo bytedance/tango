@@ -7,119 +7,88 @@ package runtime_test
 import (
 	"fmt"
 	"internal/testenv"
-	"io/ioutil"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
+	"strconv"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
-	"time"
 	"unsafe"
 )
 
-// to make references escape
-var refs1 []unsafe.Pointer
-
 func TestGabAllocBasic(t *testing.T) {
-	refs1 = make([]unsafe.Pointer, 2)
-
-	// turn on gab (assuming always started with GAB off)
-	runtime.SetGAB(true)
-	defer runtime.SetGAB(false)
-
-	// sequentially allocate two objects with different size classes
-	// both beneath GAB threshold, thus
-	// - in conventional mallocgc() impl, they will be in different mspan;
-	// - in gab-enabled mallocgc() impl, the will be allocated continuously
-	//   within the same buffer/mspan;
-	refs1[0] = unsafe.Pointer(&(make([]byte, 16)[0]))
-	refs1[1] = unsafe.Pointer(&(make([]byte, 64)[0]))
-
-	addr1 := uintptr(refs1[0])
-	addr2 := uintptr(refs1[1])
-	// addr1 must reside before addr2
-	if addr1 > addr2 || addr2-addr1 > 16 {
-		t.Fatalf("addr1 (0x%x) addr2 (0x%x) should be in same GAB\n", addr1, addr2)
+	output := runTestProg(t, "testproggab", "AllocBasic", "GODEBUG=gab=1")
+	want := "OK\n"
+	if output != want {
+		t.Errorf("expected %q got %v", want, output)
 	}
 }
 
-var refs2 []unsafe.Pointer
-
 func TestGabObjFinalizer(t *testing.T) {
-	refs2 = make([]unsafe.Pointer, 1)
-	var cnt uintptr
-	var wg sync.WaitGroup
-	wg.Add(1)
-
-	// do GC firstly to prevent an about-to-GC state
-	runtime.GC()
-
-	// turn on gab
-	runtime.SetGAB(true)
-	defer runtime.SetGAB(false)
-
-	go func() {
-		defer wg.Done()
-		bytes := new([15]byte) // bytes is supposedd to escape and allocated in gab
-		refs2[0] = unsafe.Pointer(bytes)
-		runtime.SetFinalizer(bytes, func(v *[15]byte) {
-			runtime.Xadduintptr(&cnt, 1)
-		})
-	}()
-	wg.Wait()
-
-	// since we have triggered GC manually at the beginning,
-	// so it is unlikely to have another GC right here
-	if cnt != 0 || refs2[0] == nil {
-		t.Fatalf("incorrect state: cnt=%d, refs2[0]=%p\n", cnt, refs2[0])
+	output := runTestProg(t, "testproggab", "ObjFinalizer", "GODEBUG=gab=1")
+	want := "OK\n"
+	if output != want {
+		t.Errorf("expected %q got %v", want, output)
 	}
-	refs2[0] = nil // clear the ref
+}
 
-	// trigger GC to collect the dead object and trigger finalizer
-	runtime.GC()
-	runtime.GC()
-	// sleep for a while to wait for finalizer to finish
-	time.Sleep(3 * time.Second)
-
-	if cnt != 1 {
-		t.Fatalf("cnt must have been incremented by finalizer")
+func testGabInChildProc(t *testing.T, name string) bool {
+	if os.Getenv("GAB_TEST") != "" {
+		return true
 	}
+	testenv.MustHaveGoBuild(t)
+	cmd := exec.Command(testenv.GoToolPath(t), "test", fmt.Sprintf("-run=%s", name))
+	cmd.Env = os.Environ()
+	cmd.Env = append(cmd.Env, "GAB_TEST=true")
+
+	if out, er := cmd.CombinedOutput(); er != nil {
+		t.Fatalf("Failed to test %s:%s", name, out)
+	}
+	return false
 }
 
 // help objs to escape
 var refs3 []unsafe.Pointer
 
 func TestGabGrowing(t *testing.T) {
+	if !testGabInChildProc(t, "GabGrowing") {
+		return
+	}
+
 	refs3 = make([]unsafe.Pointer, 1)
-	var failed bool
-	var failMsg string
+	var failures int64
+	var lastFailMsg string
 	var wg sync.WaitGroup
 	wg.Add(1)
 
+	// called from another goroutine
+	failed := func(msg string) {
+		atomic.AddInt64(&failures, 1)
+		lastFailMsg = msg
+	}
+
 	go func() {
-		runtime.SetGAB(true)
-		defer runtime.SetGAB(false)
+		runtime.SetGAB(1)
+		defer runtime.SetGAB(0)
 		defer wg.Done()
 		base, top, end := runtime.GetGABInfo()
 		if base != 0 || top != 0 || end != 0 {
-			failed = true
-			failMsg = "Should all be nil"
+			failed("Should all be nil")
 			return
 		}
 
 		const grain int = 125
-		const gabInit uintptr = 4 * 1024
-		var gabMax uintptr = runtime.GetGabCapMax() // current upper bound
+		const gabInit uintptr = runtime.GabInitCap
+		var gabMax uintptr = *runtime.GabMaxCap // current upper bound
 		if gabMax > 32*1024 {
-			failed = true
-			failMsg = "gabMaxCap cannot exceed maxSmallSize"
+			failed("gabMaxCap cannot exceed maxSmallSize")
 			return
 		}
 
 		if gabMax < gabInit {
-			failed = true
-			failMsg = "gabMaxCap cannot less than gabInitCap"
+			failed("gabMaxCap cannot less than gabInitCap")
 			return
 		}
 
@@ -127,8 +96,7 @@ func TestGabGrowing(t *testing.T) {
 		refs3[0] = unsafe.Pointer(&[grain]byte{})
 		base, top, end = runtime.GetGABInfo()
 		if base == 0 || top < base || top >= end || end-base != gabInit {
-			failed = true
-			failMsg = fmt.Sprintf("Should be 4096KB after first initialization, but got [%d-%d-%d)\n", base, top, end)
+			failed(fmt.Sprintf("Should be 4096KB after first initialization, but got [%d-%d-%d)\n", base, top, end))
 			return
 		}
 
@@ -145,16 +113,14 @@ func TestGabGrowing(t *testing.T) {
 				base, top, end = runtime.GetGABInfo()
 				nCap := end - base
 				if nCap > gabMax || nCap%gabInit != 0 {
-					failed = true
-					failMsg = fmt.Sprintf("Cannot exceed gab limit, %d", nCap)
+					failed(fmt.Sprintf("Cannot exceed gab limit, %d", nCap))
 					return
 				}
 				if nCap == gabMax {
 					break
 				}
 				if nCap != nextThresh {
-					failed = true
-					failMsg = fmt.Sprintf("Should have been doubled!, expect=%d, actual=%d\n", nextThresh, nCap)
+					failed(fmt.Sprintf("Should have been doubled!, expect=%d, actual=%d\n", nextThresh, nCap))
 					return
 				}
 				allocated = 0
@@ -170,16 +136,18 @@ func TestGabGrowing(t *testing.T) {
 			}
 			base, top, end = runtime.GetGABInfo()
 			if end-base != gabMax {
-				failed = true
-				failMsg = fmt.Sprintf("Should always be gabMax, expected=%d, actual=%d\n", gabMax, end-base)
+				failed(fmt.Sprintf("Should always be gabMax, expected=%d, actual=%d\n", gabMax, end-base))
 				return
 			}
 		}
 	}()
 	wg.Wait()
 
-	if failed {
-		t.Fatalf("Should have passed!%s", failMsg)
+	if failures != 0 {
+		if lastFailMsg != "" {
+			t.Logf("%s\n", lastFailMsg)
+		}
+		t.Fatalf("Failures from sub-goroutines!")
 	}
 }
 
@@ -200,65 +168,120 @@ func BenchmarkSmallGarbage(b *testing.B) {
 	b.StopTimer()
 }
 
-// prepare source directory for testing
-func prepareSource(dest string) (func(), error) {
-	pwd, err := os.Getwd()
-
-	content := `
-package runtime_test
-
-import (
-	"flag"
-	"runtime"
-	"testing"
-)
-
-var cap1 = flag.Int64("cap", 0, "expected cap")
-
-func TestSetGabToGetCap(t *testing.T) {
-        np := runtime.GetGabCapMax()
-        if uintptr(*cap1) != np {
-                t.Fatalf("setting debug.gab expected =%d but get %d\n ", *cap1, np)
-        }
-}
-`
-
-	fullPath := filepath.Join(pwd, dest)
-	err = ioutil.WriteFile(fullPath, []byte(content), 0644)
-	cleanup := func() {
-		os.RemoveAll(fullPath)
-	}
-	return cleanup, err
-}
-
 func TestGabMaxCap(t *testing.T) {
-
-	// prepare source
-	testenv.MustHaveGoBuild(t)
-
-	//execute and get output
-	fname := "temp_test.go"
-	cleanup, err := prepareSource(fname)
-	if cleanup != nil {
-		defer cleanup()
-	}
-
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	gabToCap := map[int]int{-1: 0, 0: 16384, 1: 16384, 2: 16384, 4095: 16384, 4096: 4096, 8191: 4096, 8192: 8192, 8193: 8192, 12288: 12288, 12289: 12288, 16384: 16384, 16385: 16384, 20480: 20480, 32768: 32768, 32769: 16384}
+	gabToCap := map[int]int{
+		-1:    0,
+		0:     0,
+		1:     16384,
+		2:     16384,
+		1023:  16384,
+		1024:  1024,
+		1025:  1024,
+		8191:  7168,
+		8192:  8192,
+		8193:  8192,
+		12288: 12288,
+		12289: 12288,
+		16384: 16384,
+		16385: 16384,
+		20480: 20480,
+		32768: 32768,
+		32769: 16384}
 
 	for key, val := range gabToCap {
-		arg := fmt.Sprintf("-cap=%d", val)
-		envv := fmt.Sprintf("GODEBUG=gab=%d", key)
-
-		cmd := exec.Command(testenv.GoToolPath(t), "test", "-run=SetGabToGetCap", "-args", arg)
-		cmd.Env = os.Environ()
-		cmd.Env = append(cmd.Env, envv)
-		if out, er := cmd.CombinedOutput(); er != nil {
-			t.Fatalf("Failed to test GODEBUG=gab=%d\n%s\n", key, out)
+		out := runTestProg(t, "testproggab", "EchoMaxCap", fmt.Sprintf("GODEBUG=gab=%d", key))
+		uv, err := strconv.ParseUint(out, 10, 64)
+		if err != nil {
+			t.Fatalf("Failed to parse output for uint64: %s", out)
+		}
+		if uv != uint64(val) {
+			t.Fatalf("Failed to set GODEBUG=gab=%d; actual found gab=%d\n", key, uv)
 		}
 	}
+}
 
+var refsUsedBytes []unsafe.Pointer
+
+func TestGabUsedBytes(t *testing.T) {
+	if !testGabInChildProc(t, "GabUsedBytes") {
+		return
+	}
+
+	refsUsedBytes = make([]unsafe.Pointer, 1)
+	var gabInitSlotSize uintptr = runtime.GabInitCap // TCmalloc slot size for initial GAB capacity
+	var wg sync.WaitGroup
+
+	runtime.SetGAB(2048) // ensure policy disabled, thus runtime.GC will not disturb this testcase
+	defer runtime.SetGAB(0)
+
+	// clear memory to prevent GC right after starting this test
+	runtime.GC()
+	prevBytes := *runtime.GabUsedBytes
+
+	wg.Add(1)
+	go func() {
+		buf := make([]byte, 72)
+		refsUsedBytes[0] = unsafe.Pointer(&buf)
+		wg.Done()
+	}()
+	wg.Wait()
+
+	curBytes := *runtime.GabUsedBytes
+	delta := curBytes - prevBytes
+	if curBytes <= prevBytes || delta != gabInitSlotSize {
+		t.Fatalf("expecting %d bytes allocated in gab, but got %d", gabInitSlotSize, delta)
+	}
+	prevBytes = curBytes
+
+	// clear live refs
+	refsUsedBytes[0] = nil
+	// trigger two GCs, the second GC will definitely sweep what has been
+	// identified as garbage in the first GC, according to current GC impl.
+	// so it can guarantee to reclaim the target GAB garbage memory.
+	runtime.GC()
+	runtime.GC()
+
+	curBytes = *runtime.GabUsedBytes
+	delta = prevBytes - curBytes
+	if prevBytes <= curBytes || delta != gabInitSlotSize {
+		t.Fatalf("expecting 4096 bytes sweeped for gab, but got %d", delta)
+	}
+}
+
+// testing for maximum limit of GAB
+func TestGabPolicyMemPercentLimit(t *testing.T) {
+	output := runTestProg(t, "testproggab", "MemoryPercentLimit", "GODEBUG=gab=1")
+	t.Logf("%s", output)
+}
+
+func TestGabDebugOpt(t *testing.T) {
+	//valid percent values
+	pctToTest := []int64{1, 10, 20, 50, 90, 99}
+	for _, pct := range pctToTest {
+		output := runTestProg(t, "testproggab", "EchoMemoryPercent", fmt.Sprintf("GOGABOPT=gabPercent=%d", pct), "GODEBUG=gab=1")
+		iv, err := strconv.ParseInt(output, 10, 32)
+		if err != nil {
+			t.Fatalf("Failed to parse output for uint64: %s", output)
+		}
+		if iv != pct {
+			t.Log(output)
+			t.Fatalf("Trying to set GOGABOPT=gabPercent=%d, but get %d", pct, iv)
+		}
+	}
+	//invalid percent values
+	pctToTest = []int64{-1, 100, 1024}
+	for _, pct := range pctToTest {
+		// should fail
+		output := runTestProg(t, "testproggab", "EchoMemoryPercent", fmt.Sprintf("GOGABOPT=gabPercent=%d", pct), "GODEBUG=gab=1")
+		if !strings.Contains(output, "fatal error: Illegal gabMemoryPercent") {
+			t.Log(output)
+			t.Fatalf("Should fail with GOGABOPT=gabPercent=%d", pct)
+		}
+		// should pass even for illegal values if GAB off
+		output = runTestProg(t, "testproggab", "EchoMemoryPercent", fmt.Sprintf("GOGABOPT=gabPercent=%d", pct), "GODEBUG=gab=0")
+		if strings.Contains(output, "fatal error: Illegal gabMemoryPercent") {
+			t.Log(output)
+			t.Fatalf("Should fail with GOGABOPT=gabPercent=%d", pct)
+		}
+	}
 }

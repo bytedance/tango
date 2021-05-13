@@ -900,6 +900,7 @@ func schedinit() {
 	}
 	finishDebugVarsSetup()
 	gcinit()
+	gabinit()
 
 	// Allocate stack space that can be used when crashing due to bad stack
 	// conditions, e.g. morestack on g0.

@@ -66,12 +66,15 @@ func TestPprofDynconf(t *testing.T) {
 // retrieve the default expected values of dynconf
 func getExpectedCfgs(local bool) map[string]any {
 	expectedCfgs := map[string]any{
-		"runtime.gab":             int32(0),
-		"runtime.gctrace":         int32(0),
-		"runtime.gcPercent":       int32(100),
-		"runtime.asyncpreemptoff": int32(0),
-		"runtime.madvdontneed":    int32(0),
-		"runtime.harddecommit":    int32(0),
+		"runtime.gab":              int32(0),
+		"runtime.gabUsedBytes":     uintptr(0),
+		"runtime.gabMemoryPercent": int32(20),
+		"runtime.gabEnabled":       false,
+		"runtime.gctrace":          int32(0),
+		"runtime.gcPercent":        int32(100),
+		"runtime.asyncpreemptoff":  int32(0),
+		"runtime.madvdontneed":     int32(0),
+		"runtime.harddecommit":     int32(0),
 	}
 
 	if runtime.GOOS == "linux" {
@@ -113,6 +116,9 @@ func testList(t *testing.T) {
 	}
 	expectedStrings := []string{
 		"config(ro): runtime.gab=0",
+		"config(ro): runtime.gabUsedBytes=0",
+		"config(rw): runtime.gabMemoryPercent=20",
+		"config(ro): runtime.gabEnabled=false",
 		"config(rw): runtime.gctrace=0",
 		"config(ro): runtime.buildVersion=",
 		"config(ro): runtime.tangoVersion=bm.1.",

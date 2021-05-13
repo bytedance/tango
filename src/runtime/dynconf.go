@@ -10,14 +10,17 @@ import "unsafe"
 var ptrGCPercent *int32 = (*int32)(unsafe.Pointer(&gcController.gcPercent))
 
 var rtCfgMap = map[string]any{
-	"runtime.gab,ro":             &debug.gab,
-	"runtime.gctrace,rw":         &debug.gctrace,
-	"runtime.buildVersion,ro":    &buildVersion,
-	"runtime.tangoVersion,ro":    &tangoVersion,
-	"runtime.gcPercent,ro":       ptrGCPercent,
-	"runtime.asyncpreemptoff,ro": &debug.asyncpreemptoff,
-	"runtime.madvdontneed,ro":    &debug.madvdontneed,
-	"runtime.harddecommit,ro":    &debug.harddecommit,
+	"runtime.gab,ro":              &debug.gab,
+	"runtime.gabUsedBytes,ro":     &gabUsedBytes,
+	"runtime.gabMemoryPercent,rw": &gabMemoryPercent,
+	"runtime.gabEnabled,ro":       &gabEnabled,
+	"runtime.gctrace,rw":          &debug.gctrace,
+	"runtime.buildVersion,ro":     &buildVersion,
+	"runtime.tangoVersion,ro":     &tangoVersion,
+	"runtime.gcPercent,ro":        ptrGCPercent,
+	"runtime.asyncpreemptoff,ro":  &debug.asyncpreemptoff,
+	"runtime.madvdontneed,ro":     &debug.madvdontneed,
+	"runtime.harddecommit,ro":     &debug.harddecommit,
 }
 
 //go:linkname rtCfgListAll

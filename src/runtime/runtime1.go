@@ -472,9 +472,6 @@ func finishDebugVarsSetup() {
 	if asanenabled {
 		debug.gab = 0
 	}
-	if debug.gab != 0 {
-		configGabMaxCap()
-	}
 
 	setTraceback(gogetenv("GOTRACEBACK"))
 	traceback_env = traceback_cache
@@ -565,17 +562,6 @@ func parsegodebug(godebug string, seen map[string]bool) {
 
 	if debug.cgocheck > 1 {
 		throw("cgocheck > 1 mode is no longer supported at runtime. Use GOEXPERIMENT=cgocheck2 at build time instead.")
-	}
-}
-
-func configGabMaxCap() {
-	if debug.gab < 0 {
-		debug.gab = 0
-		gabCapMax = 0
-	} else if debug.gab == 1 || debug.gab > maxSmallSize || debug.gab < gabCapInitial {
-		gabCapMax = gabCapMaxDefault
-	} else {
-		gabCapMax = uintptr(debug.gab >> gabCapShift << gabCapShift)
 	}
 }
 

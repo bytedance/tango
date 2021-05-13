@@ -1,6 +1,9 @@
 // Copyright 2009 The Go Authors. All rights reserved.
+// Copyright (c) 2021 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2021-05-13.
 
 // Page heap.
 //
@@ -513,6 +516,7 @@ type mspan struct {
 	specials              *special      // linked list of special records sorted by offset.
 	userArenaChunkFree    addrRange     // interval for managing chunk allocation
 	largeType             *_type        // malloc header for large objects.
+	gabBits               *gcBits       // bitmap of objects allocated through a GAB
 }
 
 func (s *mspan) base() uintptr {
@@ -526,6 +530,19 @@ func (s *mspan) layout() (size, n, total uintptr) {
 		n = total / size
 	}
 	return
+}
+
+func (s *mspan) markGab(addr, size uintptr) {
+	if s.gabBits == nil {
+		// allocate gabBits on demand
+		// safe because: 1, preemption off on this g; 2, g-local operation;
+		s.gabBits = newAllocBits(uintptr(s.nelems))
+	}
+	objIndex := s.objIndex(addr)
+	bytep, mask := s.gabBits.bitp(objIndex)
+	atomic.Or8(bytep, mask)
+	// update the gabUsedBytes here by counting the size of entire small-object slot
+	atomic.Xadduintptr(&gabUsedBytes, size)
 }
 
 // recordspan adds a newly allocated span to h.allspans.
@@ -1835,6 +1852,7 @@ func (span *mspan) init(base uintptr, npages uintptr) {
 	span.allocBits = nil
 	span.gcmarkBits = nil
 	span.pinnerBits = nil
+	span.gabBits = nil
 	span.state.set(mSpanDead)
 	lockInit(&span.speciallock, lockRankMspanSpecial)
 }
@@ -2873,6 +2891,29 @@ func (b *gcBits) bytep(n uintptr) *uint8 {
 // selecting that bit from *bytep.
 func (b *gcBits) bitp(n uintptr) (bytep *uint8, mask uint8) {
 	return b.bytep(n / 8), 1 << (n % 8)
+}
+
+// intersect with another *gcBits, assuming of same size == n
+func (b *gcBits) intersect(gb2 *gcBits, n uintptr) (bits *gcBits, c uintptr) {
+	bits = newMarkBits(n)
+	bytes := divRoundUp(n, 8)
+	// Note that newMarkBits guarantees that gcmarkBits will be
+	// 8-byte aligned, so we don't have to worry about edge cases.
+	for i := uintptr(0); i < bytes; i += 8 {
+		b1 := *(*uint64)(unsafe.Pointer(b.bytep(i)))
+		b2 := *(*uint64)(unsafe.Pointer(gb2.bytep(i)))
+		p := (*uint64)(unsafe.Pointer(bits.bytep(i)))
+		if b1 != 0 {
+			if b1 != b2 {
+				nbits := sys.OnesCount64(b1)
+				b1 &= b2
+				nbitsAfter := sys.OnesCount64(b1)
+				c += uintptr(nbits - nbitsAfter)
+			}
+			*p = b1
+		}
+	}
+	return
 }
 
 const gcBitsChunkBytes = uintptr(64 << 10)
