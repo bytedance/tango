@@ -8525,3 +8525,4 @@ pkg syscall (darwin-arm64-cgo), type WaitStatus uint32
 pkg syscall (darwin-arm64-cgo), var Stderr int
 pkg syscall (darwin-arm64-cgo), var Stdin int
 pkg syscall (darwin-arm64-cgo), var Stdout int
+pkg runtime, func BVersion() string

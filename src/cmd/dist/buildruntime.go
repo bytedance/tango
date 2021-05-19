@@ -1,6 +1,9 @@
 // Copyright 2012 The Go Authors. All rights reserved.
+// Copyright (c) 2021 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2021-05-19.
 
 package main
 
@@ -23,6 +26,9 @@ func mkzversion(dir, file string) {
 	var buf strings.Builder
 	writeHeader(&buf)
 	fmt.Fprintf(&buf, "package sys\n")
+	fmt.Fprintln(&buf)
+	fmt.Fprintf(&buf, "const TangoVersion = `%s`\n", findTangoVersion())
+
 	writefile(buf.String(), file, writeSkipSame)
 }
 

@@ -12,8 +12,6 @@ import (
 	"runtime"
 )
 
-const bVersion = ".bm.0"
-
 var CmdBVersion = &base.Command{
 	UsageLine:   "go bversion",
 	CustomFlags: true,
@@ -26,5 +24,5 @@ func init() {
 }
 
 func runBVersion(ctx context.Context, cmd *base.Command, args []string) {
-	fmt.Printf("go bversion %s %s/%s\n", runtime.Version()+bVersion, runtime.GOOS, runtime.GOARCH)
+	fmt.Printf("Tango bversion %s %s/%s\n", runtime.BVersion(), runtime.GOOS, runtime.GOARCH)
 }

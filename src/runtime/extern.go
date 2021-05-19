@@ -1,6 +1,9 @@
 // Copyright 2009 The Go Authors. All rights reserved.
+// Copyright (c) 2021 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2021-05-19.
 
 /*
 Package runtime contains operations that interact with Go's runtime system,
@@ -297,6 +300,7 @@ package runtime
 import (
 	"internal/goarch"
 	"internal/goos"
+	"internal/runtime/sys"
 )
 
 // Caller reports file and line number information about function invocations on
@@ -366,6 +370,20 @@ func GOROOT() string {
 //
 // This is accessed by "go version <binary>".
 var buildVersion string
+
+var tangoVersion = sys.TangoVersion
+
+var bVersion = Version() + "." + tangoVersion
+
+// BVersion returns the version string of Tango (Bytedance-modified Go)
+func BVersion() string {
+	const dlvPrefix = "devel "
+	// returns Version() in case of development branch
+	if len(bVersion) >= len(dlvPrefix) && bVersion[:len(dlvPrefix)] == dlvPrefix {
+		return Version()
+	}
+	return bVersion
+}
 
 // Version returns the Go tree's version string.
 // It is either the commit hash and date at the time of the build or,

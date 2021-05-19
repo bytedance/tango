@@ -1,6 +1,9 @@
 // Copyright 2012 The Go Authors. All rights reserved.
+// Copyright (c) 2021 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2021-05-19.
 
 package main
 
@@ -475,6 +478,24 @@ func requiredBootstrapVersion(v string) string {
 	// where M is N-2 rounded down to an even number. Example: Go 1.24 and 1.25 require Go 1.22.
 	requiredMinor := minor - 2 - minor%2
 	return "1." + strconv.Itoa(requiredMinor)
+}
+
+// findTangoVersion determines the version to use in Tango version string.
+func findTangoVersion() string {
+	path := pathf("%s/VERSION.tango", goroot)
+	if isfile(path) {
+		b := chomp(readfile(path))
+		if b != "" {
+			s := os.Getenv("TANGO_BUILD_ID")
+			if s != "" {
+				as := strings.Split(b, ".")
+				as[len(as)-1] = s
+				b = strings.Join(as, ".")
+			}
+			return b
+		}
+	}
+	return "tango-dev"
 }
 
 // isGitRepo reports whether the working directory is inside a Git repository.
