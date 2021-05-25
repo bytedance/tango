@@ -1,6 +1,9 @@
 // Copyright 2009 The Go Authors. All rights reserved.
+// Copyright (c) 2021 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2021-05-25.
 
 package runtime
 
@@ -185,6 +188,9 @@ func (c *mcache) refill(spc spanClass) {
 		stats := memstats.heapStats.acquire()
 		slotsUsed := int64(s.allocCount) - int64(s.allocCountBeforeCache)
 		atomic.Xadd64(&stats.smallAllocCount[spc.sizeclass()], slotsUsed)
+		if spc.noscan() {
+			atomic.Xadd64(&stats.ext.smallNoScanAllocCount[spc.sizeclass()], slotsUsed)
+		}
 
 		// Flush tinyAllocs.
 		if spc == tinySpanClass {
@@ -303,6 +309,9 @@ func (c *mcache) releaseAll() {
 			// Adjust smallAllocCount for whatever was allocated.
 			stats := memstats.heapStats.acquire()
 			atomic.Xadd64(&stats.smallAllocCount[spanClass(i).sizeclass()], slotsUsed)
+			if spanClass(i).noscan() {
+				atomic.Xadd64(&stats.ext.smallNoScanAllocCount[spanClass(i).sizeclass()], slotsUsed)
+			}
 			memstats.heapStats.release()
 
 			// Adjust the actual allocs in inconsistent, internal stats.

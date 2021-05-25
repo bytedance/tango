@@ -1,6 +1,9 @@
 // Copyright 2009 The Go Authors. All rights reserved.
+// Copyright (c) 2021 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2021-05-25.
 
 // Garbage collector: sweeping
 
@@ -772,6 +775,9 @@ func (sl *sweepLocked) sweep(preserve bool) bool {
 			s.needzero = 1
 			stats := memstats.heapStats.acquire()
 			atomic.Xadd64(&stats.smallFreeCount[spc.sizeclass()], int64(nfreed))
+			if spc.noscan() {
+				atomic.Xadd64(&stats.ext.smallNoScanFreeCount[spc.sizeclass()], int64(nfreed))
+			}
 			memstats.heapStats.release()
 
 			// Count the frees in the inconsistent, internal stats.

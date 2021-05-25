@@ -1,6 +1,9 @@
 // Copyright 2022 The Go Authors. All rights reserved.
+// Copyright (c) 2021 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2021-05-25.
 
 // This file lives in the runtime package
 // so we can get access to the runtime guts.
@@ -28,6 +31,11 @@ var AtomicFields = []uintptr{
 	unsafe.Offsetof(heapStatsDelta{}.inHeap),
 	unsafe.Offsetof(heapStatsDelta{}.inStacks),
 	unsafe.Offsetof(heapStatsDelta{}.inWorkBufs),
+	unsafe.Offsetof(heapStatsDelta{}.ext),
+	unsafe.Offsetof(heapStatsDeltaEx{}.largeNoScanAllocCount),
+	unsafe.Offsetof(heapStatsDeltaEx{}.largeNoScanFreeCount),
+	unsafe.Offsetof(heapStatsDeltaEx{}.smallNoScanAllocCount),
+	unsafe.Offsetof(heapStatsDeltaEx{}.smallNoScanFreeCount),
 	unsafe.Offsetof(lfnode{}.next),
 	unsafe.Offsetof(mstats{}.last_gc_nanotime),
 	unsafe.Offsetof(mstats{}.last_gc_unix),

@@ -63,3 +63,16 @@ func (buf *gab) refill() {
 func (buf *gab) remaining() uintptr {
 	return buf.end - buf.top
 }
+
+//go:linkname gabGetMaxAllocSize
+func gabGetMaxAllocSize() uint32 {
+	return gabMaxAllocSize
+}
+
+//go:linkname gabStatus
+func gabStatus() string {
+	if debug.gab != 0 {
+		return "on"
+	}
+	return "off"
+}

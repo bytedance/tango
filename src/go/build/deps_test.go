@@ -684,6 +684,9 @@ var depsRules = `
 	net/http
 	< tango/dynconf;
 
+	net/http
+	< tango/memstats;
+
 	# Profiling
 	internal/runtime/pprof/label, runtime, context < internal/runtime/pprof;
 	FMT, compress/gzip, encoding/binary, sort, text/tabwriter, internal/runtime/pprof, internal/runtime/pprof/label
@@ -692,7 +695,7 @@ var depsRules = `
 	OS, compress/gzip, internal/lazyregexp
 	< internal/profile;
 
-	html, internal/profile, net/http, runtime/pprof, runtime/trace, tango/dynconf
+	html, internal/profile, net/http, runtime/pprof, runtime/trace, tango/dynconf, tango/memstats
 	< net/http/pprof;
 
 	# RPC

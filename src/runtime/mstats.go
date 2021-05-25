@@ -1,6 +1,9 @@
 // Copyright 2009 The Go Authors. All rights reserved.
+// Copyright (c) 2021 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2021-05-25.
 
 // Memory statistics
 
@@ -561,6 +564,8 @@ func readmemstats_m(stats *MemStats) {
 	// compatibility issues. copy will copy the minimum amount
 	// of values between the two of them.
 	copy(stats.BySize[:], bySize[:])
+
+	updatememstats2(&consStats)
 }
 
 //go:linkname readGCStats runtime/debug.readGCStats
@@ -686,6 +691,7 @@ type heapStatsDelta struct {
 	largeFree       uint64                    // bytes freed for large objects (>maxSmallSize)
 	largeFreeCount  uint64                    // number of frees for large objects (>maxSmallSize)
 	smallFreeCount  [gc.NumSizeClasses]uint64 // number of frees for small objects (<=maxSmallSize)
+	ext             heapStatsDeltaEx
 
 	// NOTE: This struct must be a multiple of 8 bytes in size because it
 	// is stored in an array. If it's not, atomic accesses to the above
@@ -711,6 +717,7 @@ func (a *heapStatsDelta) merge(b *heapStatsDelta) {
 	for i := range b.smallFreeCount {
 		a.smallFreeCount[i] += b.smallFreeCount[i]
 	}
+	(&a.ext).merge(&b.ext)
 }
 
 // consistentHeapStats represents a set of various memory statistics

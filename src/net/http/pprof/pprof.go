@@ -93,7 +93,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	_ "tango/dynconf" // append tango/dynconf handlers
+	_ "tango/dynconf"  // append tango/dynconf handlers
+	_ "tango/memstats" // append tango/memstats handlers
 	"time"
 )
 
@@ -464,7 +465,9 @@ Types of profiles available:
 	b.WriteString(`</table>
 <a href="goroutine?debug=2">full goroutine stack dump</a>
 <br>
-<a href="/debug/pprof/dynconf?cmd=list">all dynamic configs</a>
+<a href="dynconf?cmd=list">all dynamic configs</a>
+<br>
+<a href="memstats">memory statistics</a>
 <br>
 <p>
 Profile Descriptions:

@@ -1468,6 +1468,7 @@ const (
 	stwForTestReadMemStatsSlow                      // "ReadMemStatsSlow (test)"
 	stwForTestPageCachePagesLeaked                  // "PageCachePagesLeaked (test)"
 	stwForTestResetDebugLog                         // "ResetDebugLog (test)"
+	stwMemStats                                     // "Read tango mem stats"
 )
 
 func (r stwReason) String() string {
@@ -1499,6 +1500,7 @@ var stwReasonStrings = [...]string{
 	stwForTestReadMemStatsSlow:     "ReadMemStatsSlow (test)",
 	stwForTestPageCachePagesLeaked: "PageCachePagesLeaked (test)",
 	stwForTestResetDebugLog:        "ResetDebugLog (test)",
+	stwMemStats:                    "Read tango mem stats",
 }
 
 // worldStop provides context from the stop-the-world required by the
