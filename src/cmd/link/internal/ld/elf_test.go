@@ -1,6 +1,9 @@
 // Copyright 2019 The Go Authors. All rights reserved.
+// Copyright (c) 2021 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2021-05-26.
 
 //go:build cgo
 
@@ -10,6 +13,7 @@ import (
 	"debug/elf"
 	"fmt"
 	"internal/testenv"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -600,4 +604,47 @@ func TestRelroSectionOverlapIssue67261(t *testing.T) {
 		}
 	}
 
+}
+
+func TestBuildidSection(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("skipping for non linux platform")
+	}
+	t.Parallel()
+	testenv.MustHaveGoBuild(t)
+	dir, err := ioutil.TempDir("", "go-build-tempdirforbuildid")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	const prog = `
+package main
+
+import "net"
+
+func main() {
+	net.Dial("", "")
+}
+`
+	src := filepath.Join(dir, "buildid.go")
+	if err := ioutil.WriteFile(src, []byte(prog), 0666); err != nil {
+		t.Fatal(err)
+	}
+
+	binFile := filepath.Join(dir, "buildid")
+	cmd := exec.Command(testenv.GoToolPath(t), "build", "-opt=beast", "-o", binFile, src)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("%v: %v:\n%s", cmd.Args, err, out)
+	}
+
+	checkcmd := exec.Command(testenv.GoToolPath(t), "tool", "buildid", binFile)
+	out, err := checkcmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("%v: %v:\n%s", checkcmd.Args, err, out)
+	}
+
+	if !strings.Contains(string(out), "beastmode") {
+		t.Fatalf("buildid doesn't contain beastmode when -opt=beast is on")
+	}
 }

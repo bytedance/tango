@@ -21,6 +21,7 @@ var rtCfgMap = map[string]any{
 	"runtime.asyncpreemptoff,ro":  &debug.asyncpreemptoff,
 	"runtime.madvdontneed,ro":     &debug.madvdontneed,
 	"runtime.harddecommit,ro":     &debug.harddecommit,
+	"runtime.optMode,ro":          &optMode,
 }
 
 //go:linkname rtCfgListAll

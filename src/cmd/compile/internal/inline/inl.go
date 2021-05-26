@@ -1,6 +1,10 @@
 // Copyright 2011 The Go Authors. All rights reserved.
+// Copyright (c) 2021 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2021-05-26.
+
 //
 // The inlining facility makes 2 passes: first CanInline determines which
 // functions are suitable for inlining, and for those that are it
@@ -47,17 +51,14 @@ import (
 
 // Inlining budget parameters, gathered in one place
 const (
-	inlineMaxBudget       = 80
 	inlineExtraAppendCost = 0
 	// default is to inline if there's at most one call. -l=4 overrides this by using 1 instead.
-	inlineExtraCallCost  = 57              // 57 was benchmarked to provided most benefit with no bad surprises; see https://github.com/golang/go/issues/19348#issuecomment-439370742
-	inlineParamCallCost  = 17              // calling a parameter only costs this much extra (inlining might expose a constant function)
-	inlineExtraPanicCost = 1               // do not penalize inlining panics.
-	inlineExtraThrowCost = inlineMaxBudget // with current (2018-05/1.11) code, inlining runtime.throw does not help.
+	inlineExtraCallCost  = 57 // 57 was benchmarked to provided most benefit with no bad surprises; see https://github.com/golang/go/issues/19348#issuecomment-439370742
+	inlineParamCallCost  = 17 // calling a parameter only costs this much extra (inlining might expose a constant function)
+	inlineExtraPanicCost = 1  // do not penalize inlining panics.
 
-	inlineBigFunctionNodes      = 5000                 // Functions with this many nodes are considered "big".
-	inlineBigFunctionMaxCost    = 20                   // Max cost of inlinee when inlining into a "big" function.
-	inlineClosureCalledOnceCost = 10 * inlineMaxBudget // if a closure is just called once, inline it.
+	inlineBigFunctionNodes   = 5000 // Functions with this many nodes are considered "big".
+	inlineBigFunctionMaxCost = 20   // Max cost of inlinee when inlining into a "big" function.
 )
 
 var (
@@ -83,6 +84,10 @@ var (
 
 	// Budget increased due to hotness.
 	inlineHotMaxBudget int32 = 2000
+
+	inlineMaxBudget             int32 = 80
+	inlineExtraThrowCost              = inlineMaxBudget      // with current (2018-05/1.11) code, inlining runtime.throw does not help.
+	inlineClosureCalledOnceCost       = 10 * inlineMaxBudget // if a closure is just called once, inline it.
 )
 
 func IsPgoHotFunc(fn *ir.Func, profile *pgoir.Profile) bool {
@@ -167,6 +172,12 @@ func CanInlineFuncs(funcs []*ir.Func, profile *pgoir.Profile) {
 
 	if base.Flag.LowerL == 0 {
 		return
+	}
+
+	mxBudget := int32(base.Flag.Cfg.BeastOpt.MaxInlbudget)
+	if !base.Flag.CompilingRuntime && mxBudget > inlineMaxBudget {
+		inlineMaxBudget = mxBudget
+		inlineExtraThrowCost = inlineMaxBudget
 	}
 
 	ir.VisitFuncsBottomUp(funcs, func(funcs []*ir.Func, recursive bool) {
@@ -1350,5 +1361,5 @@ func analyzeFuncProps(fn *ir.Func, p *pgoir.Profile) {
 	budgetForFunc := func(fn *ir.Func) int32 {
 		return inlineBudget(fn, p, true, false)
 	}
-	inlheur.AnalyzeFunc(fn, canInline, budgetForFunc, inlineMaxBudget)
+	inlheur.AnalyzeFunc(fn, canInline, budgetForFunc, int(inlineMaxBudget))
 }

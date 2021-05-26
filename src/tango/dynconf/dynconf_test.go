@@ -56,6 +56,7 @@ func TestPprofDynconf(t *testing.T) {
 
 	t.Run("TestList", testList)
 	t.Run("TestGetAndCheck", testGetAndCheck)
+	t.Run("TestGetOptmode", testGetOptmode)
 	t.Run("TestSet", testSet)
 	t.Run("TestTrySetROConfig", testTrySetROConfg)
 	t.Run("TestIntOverflow", testIntOverflow)
@@ -123,6 +124,7 @@ func testList(t *testing.T) {
 		"config(ro): runtime.buildVersion=",
 		"config(ro): runtime.tangoVersion=bm.1.",
 		"config(ro): runtime.gcPercent=100",
+		"config(ro): runtime.optMode=default",
 		"config(ro): runtime.asyncpreemptoff=",
 		"config(ro): runtime.madvdontneed=",
 		"config(ro): runtime.harddecommit=",
@@ -142,6 +144,13 @@ func testGetAndCheck(t *testing.T) {
 		if err != nil || !strings.Contains(strres, expected) {
 			t.Fatalf("Failed to retrieve 'get' output, err=%v, resp=%s, want=%s", err, strres, expected)
 		}
+	}
+}
+
+func testGetOptmode(t *testing.T) {
+	strres, err := postCmd("get", "runtime.optMode")
+	if err != nil || !strings.Contains(strres, "runtime.optMode=default") {
+		t.Fatalf("Failed to retrieve 'get' output, err=%v, resp=%s", err, strres)
 	}
 }
 

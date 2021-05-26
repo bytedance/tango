@@ -156,6 +156,11 @@ func buildTagsInit() {
 		}
 		cfg.BuildContext.BuildTags = append(cfg.BuildContext.BuildTags, t)
 	}
+	if cfg.Optmode == "beast" {
+		cfg.BuildContext.BuildTags = append(cfg.BuildContext.BuildTags, "compilerbeast")
+	} else if cfg.Optmode != "" {
+		fmt.Fprintf(os.Stderr, "Warning: current opt flag only supports beast, but got -opt=%s\n", cfg.Optmode)
+	}
 }
 
 func instrumentInit() {

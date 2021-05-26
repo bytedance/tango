@@ -155,6 +155,8 @@
 //		coverage analysis to packages in the main Go module. See
 //		'go help packages' for a description of package patterns.
 //		Sets -cover.
+//	-opt mode
+//		enable beast and other compiler mode
 //	-v
 //		print the names of packages as they are compiled.
 //	-work

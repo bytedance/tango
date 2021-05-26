@@ -5280,6 +5280,9 @@ func syscall_runtime_AfterExec() {
 func malg(stacksize int32) *g {
 	newg := new(g)
 	if stacksize >= 0 {
+		if stacksize < stackMin {
+			stacksize = stackMin
+		}
 		stacksize = round2(stackSystem + stacksize)
 		systemstack(func() {
 			newg.stack = stackalloc(uint32(stacksize))

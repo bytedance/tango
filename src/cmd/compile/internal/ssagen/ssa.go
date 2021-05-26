@@ -1,6 +1,9 @@
 // Copyright 2015 The Go Authors. All rights reserved.
+// Copyright (c) 2021 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2021-05-26.
 
 package ssagen
 
@@ -5437,7 +5440,7 @@ func (s *state) nilCheck(ptr *ssa.Value) *ssa.Value {
 func (s *state) boundsCheck(idx, len *ssa.Value, kind ssa.BoundsKind, bounded bool) *ssa.Value {
 	idx = s.extendIndex(idx, len, kind, bounded)
 
-	if bounded || base.Flag.B != 0 {
+	if bounded || base.Flag.B != 0 || skipBCFunc() {
 		// If bounded or bounds checking is flag-disabled, then no check necessary,
 		// just return the extended index.
 		//
@@ -7684,7 +7687,7 @@ func (s *state) extendIndex(idx, len *ssa.Value, kind ssa.BoundsKind, bounded bo
 		} else {
 			lo = s.newValue1(ssa.OpInt64Lo, types.Types[types.TUINT], idx)
 		}
-		if bounded || base.Flag.B != 0 {
+		if bounded || base.Flag.B != 0 || skipBCFunc() {
 			return lo
 		}
 		bNext := s.f.NewBlock(ssa.BlockPlain)
@@ -8112,4 +8115,13 @@ func isStructNotSIMD(t *types.Type) bool {
 	return t.IsStruct() && !t.IsSIMD()
 }
 
-var BoundsCheckFunc [ssa.BoundsKindCount]*obj.LSym
+var (
+	BoundsCheckFunc [ssa.BoundsKindCount]*obj.LSym
+)
+
+func skipBCFunc() bool {
+	if base.Flag.Cfg.BeastOpt.Bce == 0 {
+		return false
+	}
+	return base.Flag.CompilingRuntime
+}

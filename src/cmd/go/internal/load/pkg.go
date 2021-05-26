@@ -1,6 +1,9 @@
 // Copyright 2011 The Go Authors. All rights reserved.
+// Copyright (c) 2021 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2021-05-26.
 
 // Package load loads packages.
 package load
@@ -3232,11 +3235,18 @@ func (e *mainPackageError) ImportPath() string {
 	return e.importPath
 }
 
+const beastInlBudget = 240
+
 func setToolFlags(loaderstate *modload.State, pkgs ...*Package) {
 	for _, p := range PackageList(pkgs) {
 		p.Internal.Asmflags = BuildAsmflags.For(loaderstate, p)
 		p.Internal.Gcflags = BuildGcflags.For(loaderstate, p)
 		p.Internal.Ldflags = BuildLdflags.For(loaderstate, p)
+		if cfg.Optmode == "beast" {
+			beastOptions := fmt.Sprintf("-beast=bce,inlbudget=%d", beastInlBudget)
+			p.Internal.Gcflags = append(p.Internal.Gcflags, beastOptions)
+			p.Internal.Ldflags = append(p.Internal.Ldflags, "-enablebeast")
+		}
 		p.Internal.Gccgoflags = BuildGccgoflags.For(loaderstate, p)
 	}
 }

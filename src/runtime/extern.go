@@ -373,6 +373,8 @@ var buildVersion string
 
 var tangoVersion = sys.TangoVersion
 
+var optMode = optmode
+
 var bVersion = Version() + "." + tangoVersion
 
 // BVersion returns the version string of Tango (Bytedance-modified Go)

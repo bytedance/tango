@@ -1,6 +1,9 @@
 // Copyright 2009 The Go Authors. All rights reserved.
+// Copyright (c) 2021 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2021-05-26.
 
 package base
 
@@ -16,6 +19,7 @@ import (
 	"os"
 	"reflect"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"cmd/internal/obj"
@@ -127,6 +131,7 @@ type CmdFlags struct {
 	WB                 bool         "help:\"enable write barrier\"" // TODO: remove
 	PgoProfile         string       "help:\"read profile or pre-process profile from `file`\""
 	ErrorURL           bool         "help:\"print explanatory URL with error message if applicable\""
+	Beast              string       "help:\"compiler options in beast mode\""
 
 	// Configuration derived from flags; not a flag itself.
 	Cfg struct {
@@ -142,6 +147,42 @@ type CmdFlags struct {
 		// Whether we are adding any sort of code instrumentation, such as
 		// when the race detector is enabled.
 		Instrumenting bool
+
+		// Beast options
+		BeastOpt struct {
+			Bce          int // aggressive boundary check elimination
+			MaxInlbudget int // max inline budget
+		}
+	}
+}
+
+func parseBeastOption(beastStr string) {
+	beastVars := map[string]*int{
+		"bce":       &Flag.Cfg.BeastOpt.Bce,
+		"inlbudget": &Flag.Cfg.BeastOpt.MaxInlbudget,
+	}
+	// parse -beast argument
+	for _, oname := range strings.Split(beastStr, ",") {
+		if oname == "" {
+			continue
+		}
+		val, valstring := 1, ""
+		if i := strings.IndexAny(oname, "=:"); i >= 0 {
+			var err error
+			oname, valstring = oname[:i], oname[i+1:]
+			val, err = strconv.Atoi(valstring)
+			if err != nil {
+				val = 1
+			}
+			if val < 0 {
+				log.Fatalf("illegal option value %d", val)
+			}
+		}
+		if opt, ok := beastVars[oname]; ok {
+			*opt = val
+		} else {
+			log.Fatalf("unknown beast option %s", oname)
+		}
 	}
 }
 
@@ -377,6 +418,11 @@ func ParseFlags() {
 
 	if Debug.Checkptr == -1 { // if not set explicitly
 		Debug.Checkptr = 0
+	}
+
+	// parse -beast argument
+	if Flag.Beast != "" {
+		parseBeastOption(Flag.Beast)
 	}
 
 	// set via a -d flag

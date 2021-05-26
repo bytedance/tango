@@ -9,6 +9,15 @@
 //	Portions Copyright © 2005-2007 C H Forsyth (forsyth@terzarima.net)
 //	Revisions Copyright © 2000-2007 Lucent Technologies Inc. and others
 //	Portions Copyright © 2009 The Go Authors. All rights reserved.
+// Copyright (c) 2021 ByteDance Ltd. and/or its affiliates.
+// SPDX-License-Identifier: MIT
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2021-05-26.
+//
+// Original file was released under the MIT License, with the full license text
+// available below.
+//
+// This modified file is released under the same license.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -111,6 +120,8 @@ var (
 	flagPruneWeakMap  = flag.Bool("pruneweakmap", true, "prune weak mapinit refs")
 	flagRandLayout    = flag.Int64("randlayout", 0, "randomize function layout")
 	flagAllErrors     = flag.Bool("e", false, "no limit on number of errors reported")
+	flagBeast         = flag.Bool("enablebeast", false, "enable beast mode")
+
 	cpuprofile        = flag.String("cpuprofile", "", "write cpu profile to `file`")
 	memprofile        = flag.String("memprofile", "", "write memory profile to `file`")
 	memprofilerate    = flag.Int64("memprofilerate", 0, "set runtime.MemProfileRate to `rate`")
@@ -293,6 +304,10 @@ func Main(arch *sys.Arch, theArch Arch) {
 		if ctxt.HeadType == objabi.Hwindows {
 			*flagOutfile += ".exe"
 		}
+	}
+
+	if *flagBeast && buildcfg.GOOS == "linux" {
+		*flagBuildid = *flagBuildid + "/beastmode"
 	}
 
 	interpreter = *flagInterpreter
