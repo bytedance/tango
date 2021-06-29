@@ -16,6 +16,7 @@ import (
 	"runtime"
 	"sync"
 	"testing"
+	"unsafe"
 )
 
 // create temporary work dir and create a source file with given content
@@ -294,5 +295,128 @@ func BenchmarkBeastStacksize(b *testing.B) {
 func BenchmarkBeastbce(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		runtime.GC()
+	}
+}
+
+var refs []unsafe.Pointer
+
+func BenchmarkStaticSmallGarbage(b *testing.B) {
+	refs = make([]unsafe.Pointer, 7)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		refs[0] = unsafe.Pointer(&[1]byte{})
+		refs[1] = unsafe.Pointer(&[99]byte{})
+		refs[2] = unsafe.Pointer(&[8]int8{})
+		refs[3] = unsafe.Pointer(&[10]uint{})
+		refs[4] = unsafe.Pointer(&[5]uint16{})
+		refs[5] = unsafe.Pointer(&[2]float32{})
+		refs[6] = unsafe.Pointer(&[2]struct {
+			a int
+			c byte
+			d bool
+			e uint16
+		}{})
+	}
+	b.StopTimer()
+}
+
+func TestGabInline(t *testing.T) {
+	testenv.MustHaveGoRun(t)
+
+	source := `package main
+import (
+	"unsafe"
+	"fmt"
+	"os"
+)
+
+var refs []unsafe.Pointer
+
+func main() {
+	refs = make([]unsafe.Pointer, 2)
+
+	if os.Getenv("GODEBUG") != "gab=1" {
+		panic("env doesn't have GODEBUG=gab=1")
+	}
+
+	// newobject should be gab-inlined.
+	refs[0] = unsafe.Pointer(&(new([16]byte)[0]))
+	refs[1] = unsafe.Pointer(&(new([64]byte)[0]))
+
+	addr1 := uintptr(refs[0])
+	addr2 := uintptr(refs[1])
+	if addr1 > addr2 || addr2 - addr1 > 16 {
+		panic(fmt.Sprintf("addr1 (0x%x) addr2 (0x%x) should be in same GAB\n", addr1, addr2))
+	}
+}
+`
+	filename := "gabinline.go"
+	workdir, err := prepareSource(t, filename, []byte(source))
+	if workdir != "" {
+		defer os.RemoveAll(workdir)
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Logf("Created workdir: %s\n", workdir)
+
+	cmd := exec.Command(testenv.GoToolPath(t), "run", "-opt=beast", filename)
+	cmd.Dir = workdir
+	cmd.Env = append(os.Environ(), "GODEBUG=gab=1")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("beast mode compile failed with %s\n", out)
+	}
+}
+
+// TestGabInlineGabDisabled tests the cases where beast.gabInline=1 and gabEnabled=false.
+func TestGabInlineGabDisabled(t *testing.T) {
+	testenv.MustHaveGoRun(t)
+
+	source := `package main
+import (
+	"unsafe"
+	"fmt"
+	"os"
+)
+
+var refs []unsafe.Pointer
+
+func main() {
+	refs = make([]unsafe.Pointer, 2)
+
+	if os.Getenv("GODEBUG") != "gab=0" {
+		panic("env doesn't have GODEBUG=gab=0")
+	}
+
+	refs[0] = unsafe.Pointer(&(new([16]byte)[0]))
+	refs[1] = unsafe.Pointer(&(new([64]byte)[0]))
+
+	addr1 := uintptr(refs[0])
+	addr2 := uintptr(refs[1])
+	if !(addr1 > addr2 || addr2 - addr1 > 16) {
+		panic(fmt.Sprintf("addr1 (0x%x) addr2 (0x%x) should not be in same GAB\n", addr1, addr2))
+	}
+}
+`
+	filename := "gabInlineGabDisabled.go"
+	workdir, err := prepareSource(t, filename, []byte(source))
+	if workdir != "" {
+		defer os.RemoveAll(workdir)
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Logf("Created workdir: %s\n", workdir)
+
+	cmd := exec.Command(testenv.GoToolPath(t), "run", "-opt=beast", filename)
+	cmd.Dir = workdir
+	cmd.Env = append(os.Environ(), "GODEBUG=gab=0")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("beast mode compile failed with %s\n", out)
 	}
 }

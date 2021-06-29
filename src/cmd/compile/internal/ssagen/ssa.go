@@ -118,6 +118,7 @@ func InitConfig() {
 	ir.Syms.Deferreturn = typecheck.LookupRuntimeFunc("deferreturn")
 	ir.Syms.Duffcopy = typecheck.LookupRuntimeFunc("duffcopy")
 	ir.Syms.Duffzero = typecheck.LookupRuntimeFunc("duffzero")
+	ir.Syms.GabEnabled = typecheck.LookupRuntimeVar("gabEnabled")
 	ir.Syms.GCWriteBarrier[0] = typecheck.LookupRuntimeFunc("gcWriteBarrier1")
 	ir.Syms.GCWriteBarrier[1] = typecheck.LookupRuntimeFunc("gcWriteBarrier2")
 	ir.Syms.GCWriteBarrier[2] = typecheck.LookupRuntimeFunc("gcWriteBarrier3")
@@ -3741,6 +3742,12 @@ func (s *state) exprCheckPtr(n ir.Node, checkPtrOK bool) *ssa.Value {
 		if x, ok := n.X.(*ir.DynamicType); ok && x.Op() == ir.ODYNAMICTYPE {
 			return s.newObjectNonSpecialized(n.Type().Elem(), s.expr(x.RType))
 		}
+		et := n.Type().Elem()
+		if n.Type().Size() != 0 {
+			if Arch.LinkArch.Name == "amd64" && base.Flag.Cfg.BeastOpt.GabInline != 0 && !et.HasPointers() && et.Size() > 0 && et.Size() <= rtabi.GabMaxAllocSize {
+				return s.gabInline(n)
+			}
+		}
 		return s.newObject(n.Type().Elem())
 
 	case ir.OUNSAFEADD:
@@ -3782,6 +3789,80 @@ func (s *state) resultAddrOfCall(c *ssa.Value, which int64, t *types.Type) *ssa.
 	rval := s.newValue1I(ssa.OpSelectN, t, which, c)
 	s.vars[memVar] = s.newValue3Apos(ssa.OpStore, types.TypeMem, t, addr, rval, s.mem(), false)
 	return addr
+}
+
+// gabInline generates the following code:
+//
+//	var res unsafe.Pointer [phi]
+//	if gabEnabled {
+//		gp := getg()
+//		if gp.ab.end - gp.ab.top < size {
+//			res = newobject(typ)
+//		}
+//		res = unsafe.Pointer(gp.ab.top)
+//		gp.ab.top += size
+//	} else {
+//		res = newobject(typ)
+//	}
+func (s *state) gabInline(n *ir.UnaryExpr) *ssa.Value {
+	size := s.constInt(types.Types[types.TUINTPTR], s.alignUpByPtrSize(n.Type().Elem().Size()))
+
+	// sanity checking
+	rsize := size.AuxUnsigned()
+	if rsize == 0 || rsize > rtabi.GabMaxAllocSize {
+		s.Fatalf("trying to gab-inline object of size %d\n", rsize)
+	}
+
+	gab := s.f.NewBlock(ssa.BlockPlain)
+	assign := s.f.NewBlock(ssa.BlockPlain)
+	newobj := s.f.NewBlock(ssa.BlockPlain)
+	final := s.f.NewBlock(ssa.BlockPlain)
+
+	enabledaddr := s.newValue1A(ssa.OpAddr, types.Types[types.TBOOL].PtrTo(), ir.Syms.GabEnabled, s.sb)
+	enabled := s.load(types.Types[types.TBOOL], enabledaddr)
+
+	b := s.endBlock()
+	b.Kind = ssa.BlockIf
+	b.Likely = ssa.BranchLikely // gabInline should be fast
+	b.SetControl(enabled)
+	b.AddEdgeTo(gab)
+	b.AddEdgeTo(newobj)
+
+	s.startBlock(gab)
+	g := s.newValue1(ssa.OpGetG, types.Types[types.TUINTPTR], s.mem())
+	topaddr := s.newValue1I(ssa.OpOffPtr, types.Types[types.TUINTPTR], rtabi.GabTopOffset, g) // gp.ab.top
+	top := s.load(types.Types[types.TUINTPTR], topaddr)
+	endaddr := s.newValue1I(ssa.OpOffPtr, types.Types[types.TUINTPTR], rtabi.GabEndOffset, g) // gp.ab.end
+	end := s.load(types.Types[types.TUINTPTR], endaddr)
+	remaining := s.newValue2(s.ssaOp(ir.OSUB, types.Types[types.TUINTPTR]), types.Types[types.TUINTPTR], end, top) // gp.ab.end - gp.ab.top
+	cmp := s.newValue2(s.ssaOp(ir.OLT, types.Types[types.TUINTPTR]), types.Types[types.TBOOL], remaining, size)    // remaining < size
+
+	b = s.endBlock()
+	b.Kind = ssa.BlockIf
+	b.Likely = ssa.BranchUnlikely
+	b.SetControl(cmp)
+	b.AddEdgeTo(newobj)
+	b.AddEdgeTo(assign)
+
+	s.startBlock(assign)
+	s.vars[n] = top                                                                                          // x := unsafe.Pointer(gp.ab.top)
+	top = s.newValue2(s.ssaOp(ir.OADD, types.Types[types.TUINTPTR]), types.Types[types.TUINTPTR], size, top) // gp.ab.top + size
+	s.store(types.Types[types.TUINTPTR], topaddr, top)                                                       // gp.ab.top += size
+	b = s.endBlock()
+	b.AddEdgeTo(final)
+
+	s.startBlock(newobj)
+	s.vars[n] = s.newObject(n.Type().Elem())
+	b = s.endBlock()
+	b.AddEdgeTo(final)
+
+	s.startBlock(final)
+	return s.variable(n, n.Type()) // generate phi for the res
+}
+
+func (s *state) alignUpByPtrSize(size int64) int64 {
+	ptrSize := ssaConfig.PtrSize
+	return (size + ptrSize - 1) &^ (ptrSize - 1)
 }
 
 // Get backing store information for an append call.

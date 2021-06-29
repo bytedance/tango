@@ -152,6 +152,7 @@ type CmdFlags struct {
 		BeastOpt struct {
 			Bce          int // aggressive boundary check elimination
 			MaxInlbudget int // max inline budget
+			GabInline    int
 		}
 	}
 }
@@ -160,6 +161,7 @@ func parseBeastOption(beastStr string) {
 	beastVars := map[string]*int{
 		"bce":       &Flag.Cfg.BeastOpt.Bce,
 		"inlbudget": &Flag.Cfg.BeastOpt.MaxInlbudget,
+		"gabinline": &Flag.Cfg.BeastOpt.GabInline,
 	}
 	// parse -beast argument
 	for _, oname := range strings.Split(beastStr, ",") {

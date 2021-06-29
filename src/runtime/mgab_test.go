@@ -7,8 +7,10 @@ package runtime_test
 import (
 	"fmt"
 	"internal/testenv"
+	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -283,5 +285,47 @@ func TestGabDebugOpt(t *testing.T) {
 			t.Log(output)
 			t.Fatalf("Should fail with GOGABOPT=gabPercent=%d", pct)
 		}
+	}
+}
+
+func TestGabInlineEmptyArray(t *testing.T) {
+	if *flagQuick {
+		t.Skip("-quick")
+	}
+	source := `package main
+
+type encodedKeyValues []encodedKV
+type encodedKV struct {
+	key      string
+	keyValue []byte
+}
+
+var done chan bool
+var g *encodedKeyValues
+
+func alloc() {
+	g = &encodedKeyValues{}
+	done<-true
+}
+
+func main() {
+	done = make(chan bool)
+	go alloc()
+	<-done
+}
+`
+	testenv.MustHaveGoBuild(t)
+
+	dir := t.TempDir()
+	tf := filepath.Join(dir, "test.go")
+	if err := ioutil.WriteFile(tf, []byte(source), 0666); err != nil {
+		t.Fatalf("Failed to create %s: %v\n", tf, err)
+	}
+	cmd := exec.Command(testenv.GoToolPath(t), "run", "-opt=beast", "test.go")
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), "GODEBUG=gab=1")
+
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("Failed to verify gab inlining\n%s", out)
 	}
 }

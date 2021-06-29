@@ -4,6 +4,11 @@
 
 package abi
 
+import "internal/goarch"
+
+// Gab inline related constants.
 const (
-	GabMaxAllocSize = 128 // Maximum allocation request size that GAB supports.
+	GabTopOffset    = 59 * goarch.PtrSize // must match gp.ab.top in runtime/runtime2.go and runtime/mgab.go
+	GabEndOffset    = 60 * goarch.PtrSize // must match gp.ab.end in runtime/runtime2.go and runtime/mgab.go
+	GabMaxAllocSize = 128                 // Maximum allocation request size that GAB supports.
 )

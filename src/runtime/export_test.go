@@ -2133,3 +2133,18 @@ func GetGABInfo() (base, top, end uintptr) {
 	gp := getg()
 	return uintptr(gp.ab.base), gp.ab.top, gp.ab.end
 }
+
+// GetGoidOffset return the offset of goid relative to g.
+func GetGoidOffset() uintptr {
+	return unsafe.Offsetof(G{}.goid)
+}
+
+// GetGABTopOffset return the offset of gab.top relative to g.
+func GetGABTopOffset() uintptr {
+	return unsafe.Offsetof(G{}.ab) + unsafe.Offsetof(G{}.ab.top)
+}
+
+// GetGABTopOffset return the offset of gab.end relative to g.
+func GetGABEndOffset() uintptr {
+	return unsafe.Offsetof(G{}.ab) + unsafe.Offsetof(G{}.ab.end)
+}

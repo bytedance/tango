@@ -598,7 +598,10 @@ type g struct {
 	// valgrindStackID is used to track what memory is used for stacks when a program is
 	// built with the "valgrind" build tag, otherwise it is unused.
 	valgrindStackID uintptr
-	ab              gab // goroutine allocation buffer
+
+	// Note: since some third-party libraries rely on the goid offset to obtain groutine id,
+	// the newly added fields need to be placed behind the goid.
+	ab gab // goroutine allocation buffer; offset known to cmd/compile/internal/gc/ssa.go
 }
 
 // gTrackingPeriod is the number of transitions out of _Grunning between

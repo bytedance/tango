@@ -27,9 +27,10 @@ import (
 //
 
 const (
-	gabCapShift                     = 10
-	gabCapInitial                   = 1 << gabCapShift
-	gabCapMaxDefault                = 1 << (gabCapShift + 4)
+	gabCapShift      = 10
+	gabCapInitial    = 1 << gabCapShift
+	gabCapMaxDefault = 1 << (gabCapShift + 4)
+	// Maximum allocation request size that GAB supports.
 	gabMaxAllocSize                 = abi.GabMaxAllocSize
 	gabUsePolicyThreshold   uintptr = 1 << 25 // threshold that automatic policy starts to take effect, 32MB
 	gabDefaultMemoryPercent         = 20
@@ -124,11 +125,11 @@ func gabGetCap() (capInit, capMax uintptr) {
 }
 
 type gab struct {
-	// this pointer is to keep the in-use buffer memory alive across GC
+	// This pointer is to keep the in-use buffer memory alive across GC
 	// even if no live objects reside in [base, top); so we can continue
 	// to allocate in the remaining space [top, end) after GC.
 	base     unsafe.Pointer
-	top, end uintptr
+	top, end uintptr // offset known to cmd/compile/internal/gc/ssa.go
 }
 
 func (buf *gab) clear() {
