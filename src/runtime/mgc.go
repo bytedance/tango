@@ -1720,6 +1720,13 @@ func gcMarkTermination(stw worldStop) {
 		})
 	}
 
+	// Print adaptive runtime scheduling details.
+	// It's for internal debugging and diagnosing only, we utilize the window of GC pause
+	// to make it light-weight and not bother with locking the global scheduler.
+	if artsTraceEnabled(2) {
+		adaptSchedTrace()
+	}
+
 	semrelease(&worldsema)
 	semrelease(&gcsema)
 	// Careful: another GC cycle may start now.

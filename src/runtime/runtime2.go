@@ -542,6 +542,8 @@ type g struct {
 
 	raceignore      int8  // ignore race detection events
 	nocgocallback   bool  // whether disable callback from C
+	adaptPoller     bool  // goroutine used for polling network events
+	adaptSched      bool  // goroutine under adaptive runtime's scheduling
 	tracking        bool  // whether we're tracking this G for sched latency statistics
 	trackingSeq     uint8 // used to decide whether to track this G
 	trackingStamp   int64 // timestamp of when the G last started being tracked
@@ -949,6 +951,12 @@ type p struct {
 	largeAllocStk      [maxProfStackDepth]uintptr
 	largeAllocStkFrame Frames
 
+	// Available G's with adaptive scheduling attr (status == Gdead)
+	gAdaptFree struct {
+		gList
+		n int32
+	}
+
 	// Padding is no longer needed. False sharing is now not a worry because p is large enough
 	// that its size class is an integer multiple of the cache line size (for any of our architectures).
 }
@@ -1076,6 +1084,13 @@ type schedt struct {
 	// goroutinesCreated (plus the value of goroutinesCreated on each P in allp)
 	// is the sum of all goroutines created by the program.
 	goroutinesCreated atomic.Uint64
+
+	// Global cache of dead G's for adaptive scheduling
+	gAdaptFree struct {
+		lock mutex
+		gList
+		n int32
+	}
 }
 
 // Values for the flags field of a sigTabT.

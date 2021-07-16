@@ -1,6 +1,9 @@
 // Copyright 2013 The Go Authors. All rights reserved.
+// Copyright (c) 2021 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2021-07-16.
 
 //go:build darwin || dragonfly || freebsd || netbsd || openbsd
 
@@ -176,7 +179,7 @@ retry:
 				}
 			}
 			pd.setEventErr(ev.flags == _EV_ERROR, tag)
-			delta += netpollready(&toRun, pd, mode)
+			delta += netpollready(&toRun, nil, pd, mode)
 		}
 	}
 	return toRun, delta

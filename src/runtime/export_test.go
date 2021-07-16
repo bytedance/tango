@@ -2395,3 +2395,13 @@ func ReadGOGCTHPRATIOALPHA() float64 {
 func ReadSIGMOIDKVALUE() float64 {
 	return readSIGMOIDKVALUE()
 }
+
+func SetArtsOpt(opt int32) int32 {
+	old := debug.adapt
+	debug.adapt = opt
+	return old
+}
+
+func ArtsOptEnabled(opt int32) bool {
+	return artsOptEnabled(opt)
+}

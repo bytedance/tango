@@ -1280,6 +1280,10 @@ func shrinkstack(gp *g) {
 	if debug.gcshrinkstackoff > 0 {
 		return
 	}
+	if gp.adaptSched {
+		// TODO: evaluate whether allowing shrink if current size is far larger than _AdaptGStackMax
+		return
+	}
 
 	oldsize := gp.stack.hi - gp.stack.lo
 	newsize := oldsize / 2

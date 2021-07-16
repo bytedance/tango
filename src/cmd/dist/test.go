@@ -1630,6 +1630,10 @@ func isAlpineLinux() bool {
 	return err == nil && fi.Mode().IsRegular()
 }
 
+func (t *tester) isTangoPollSupported() bool {
+	return runtime.GOOS == "linux" && runtime.GOARCH == "amd64"
+}
+
 func (t *tester) registerRaceTests() {
 	hdr := "Testing race detector"
 	t.registerTest(hdr,
@@ -1646,6 +1650,21 @@ func (t *tester) registerRaceTests() {
 			runTests: "TestParse|TestEcho|TestStdinCloseRace|TestClosedPipeRace|TestTypeRace|TestFdRace|TestFdReadRace|TestFileCloseRace",
 			pkgs:     []string{"flag", "net", "os", "os/exec", "encoding/gob"},
 		})
+	if t.isTangoPollSupported() {
+		t.registerTest(hdr,
+			&goTest{
+				variant: "race:tango/poll",
+				race:    true,
+				pkg:     "tango/poll",
+			})
+		t.registerTest(hdr,
+			&goTest{
+				variant:  "race:runtime",
+				race:     true,
+				runTests: "TestAdaptRTSched",
+				pkg:      "runtime",
+			})
+	}
 	// We don't want the following line, because it
 	// slows down all.bash (by 10 seconds on my laptop).
 	// The race builder should catch any error here, but doesn't.

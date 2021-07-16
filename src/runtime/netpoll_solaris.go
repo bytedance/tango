@@ -1,6 +1,9 @@
 // Copyright 2014 The Go Authors. All rights reserved.
+// Copyright (c) 2021 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2021-07-16.
 
 package runtime
 
@@ -328,7 +331,7 @@ retry:
 			// about the event port on SmartOS.
 			//
 			// See golang.org/x/issue/30840.
-			delta += netpollready(&toRun, pd, mode)
+			delta += netpollready(&toRun, nil, pd, mode)
 		}
 	}
 

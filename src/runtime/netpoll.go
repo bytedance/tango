@@ -1,6 +1,9 @@
 // Copyright 2013 The Go Authors. All rights reserved.
+// Copyright (c) 2021 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2021-07-16.
 
 //go:build unix || (js && wasm) || wasip1 || windows
 
@@ -491,7 +494,7 @@ func poll_runtime_pollUnblock(pd *pollDesc) {
 // This may run while the world is stopped, so write barriers are not allowed.
 //
 //go:nowritebarrier
-func netpollready(toRun *gList, pd *pollDesc, mode int32) int32 {
+func netpollready(toRun *gList, pollers *gQueue, pd *pollDesc, mode int32) int32 {
 	delta := int32(0)
 	var rg, wg *g
 	if mode == 'r' || mode == 'r'+'w' {
@@ -501,7 +504,11 @@ func netpollready(toRun *gList, pd *pollDesc, mode int32) int32 {
 		wg = netpollunblock(pd, 'w', true, &delta)
 	}
 	if rg != nil {
-		toRun.push(rg)
+		if rg.adaptPoller && pollers != nil {
+			pollers.push(rg)
+		} else {
+			toRun.push(rg)
+		}
 	}
 	if wg != nil {
 		toRun.push(wg)

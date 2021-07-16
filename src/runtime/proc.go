@@ -902,6 +902,7 @@ func schedinit() {
 	gcinit()
 	memdebuginit()
 	gabinit()
+	artsInit()
 
 	// Allocate stack space that can be used when crashing due to bad stack
 	// conditions, e.g. morestack on g0.
@@ -4549,6 +4550,8 @@ func gdestroy(gp *g) {
 	dropg()
 
 	if GOARCH == "wasm" { // no threads yet on wasm
+		gp.adaptPoller = false
+		gp.adaptSched = false
 		gfput(pp, gp)
 		return
 	}
@@ -4560,7 +4563,12 @@ func gdestroy(gp *g) {
 		}
 		throw("exited a goroutine internally locked to the OS thread")
 	}
-	gfput(pp, gp)
+	if gp.adaptSched {
+		adaptGfput(pp, gp)
+	} else {
+		gfput(pp, gp)
+	}
+
 	if locked {
 		// The goroutine may have locked this thread because
 		// it put it in an unusual kernel state. Kill it
@@ -5330,12 +5338,31 @@ func newproc1(fn *funcval, callergp *g, callerpc uintptr, parked bool, waitreaso
 
 	mp := acquirem() // disable preemption because we hold M and P in local vars.
 	pp := mp.p.ptr()
-	newg := gfget(pp)
+	var newg *g
+	adaptSched := callergp.adaptSched
+	if adaptSched {
+		newg = adaptGfget(pp)
+	}
 	if newg == nil {
-		newg = malg(stackMin)
+		newg = gfget(pp)
+	}
+
+	if newg == nil {
+		if adaptSched {
+			newg = malg(adaptInitStksize())
+		} else {
+			newg = malg(stackMin)
+		}
 		casgstatus(newg, _Gidle, _Gdead)
 		allgadd(newg) // publishes with a g->status of Gdead so GC scanner doesn't look at uninitialized stack.
 	}
+
+	// sanity checking
+	if newg.adaptSched || newg.adaptPoller {
+		throw("newproc1: newg has adapt flags")
+	}
+	newg.adaptSched = adaptSched
+
 	if newg.stack.hi == 0 {
 		throw("newproc1: newg missing stack")
 	}
@@ -5711,12 +5738,13 @@ func badunlockosthread() {
 }
 
 func gcount(includeSys bool) int32 {
-	n := int32(atomic.Loaduintptr(&allglen)) - sched.gFree.stack.size - sched.gFree.noStack.size
+	n := int32(atomic.Loaduintptr(&allglen)) - sched.gFree.stack.size - sched.gAdaptFree.n - sched.gFree.noStack.size
 	if !includeSys {
 		n -= sched.ngsys.Load()
 	}
 	for _, pp := range allp {
 		n -= pp.gFree.size
+		n -= pp.gAdaptFree.size
 	}
 
 	// All these variables can be changed concurrently, so the result can be inconsistent.
@@ -6005,6 +6033,9 @@ func (pp *p) destroy() {
 	freemcache(pp.mcache)
 	pp.mcache = nil
 	gfpurge(pp)
+	if artsOptEnabled(_AdaptOptGstack) {
+		adaptGfpurge(pp)
+	}
 	if raceenabled {
 		if pp.timers.raceCtx != 0 {
 			// The race detector code uses a callback to fetch
@@ -6514,8 +6545,8 @@ func sysmon() {
 		} else if idle > 50 { // start doubling the sleep after 1ms...
 			delay *= 2
 		}
-		if delay > 10*1000 { // up to 10ms
-			delay = 10 * 1000
+		if delay > sysmonDelayThreshold {
+			delay = sysmonDelayThreshold
 		}
 		usleep(delay)
 
@@ -6580,7 +6611,7 @@ func sysmon() {
 		}
 		// poll network if not polled for more than 10ms
 		lastpoll := sched.lastpoll.Load()
-		if netpollinited() && lastpoll != 0 && lastpoll+10*1000*1000 < now {
+		if netpollinited() && lastpoll != 0 && lastpoll+sysmonNetpollThreshold < now {
 			sched.lastpoll.CompareAndSwap(lastpoll, now)
 			list, delta := netpoll(0) // non-blocking - returns list of goroutines
 			if !list.empty() {

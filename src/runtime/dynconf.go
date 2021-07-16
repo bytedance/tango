@@ -45,6 +45,7 @@ var rtCfgMap = map[string]any{
 	"runtime.tangoVersion,ro":             &tangoVersion,
 	"runtime.optMode,ro":                  &optMode,
 	"runtime.pgoSource,ro":                &pgoSource,
+	"runtime.artsOpts,ro":                 &artsOpts,
 	"runtime.gcPercent,ro":                ptrGCPercent,
 	"runtime.maxHeapBytes,ro":             &maxHeap,
 	"runtime.largeAllocTrace,rw":          &debug.largealloctrace,

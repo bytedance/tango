@@ -355,6 +355,8 @@ var debug struct {
 	gcHeapPercent  int32
 
 	largealloctrace int32
+	adapt           int32
+	adapttrace      int32
 
 	panicnil atomic.Int32
 
@@ -416,6 +418,8 @@ var dbgvars = []*dbgVar{
 	{name: "largealloctrace", value: &debug.largealloctrace},
 	{name: "gcadaptive", value: &debug.gcadaptive},
 	{name: "gcadaptivetrace", value: &debug.gcadaptivetrace},
+	{name: "adapt", value: &debug.adapt},
+	{name: "adapttrace", value: &debug.adapttrace},
 }
 
 func parseRuntimeDebugVars(godebug string) {

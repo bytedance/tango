@@ -1,6 +1,9 @@
 // Copyright 2013 The Go Authors. All rights reserved.
+// Copyright (c) 2021 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2021-07-16.
 
 //go:build linux
 
@@ -131,6 +134,7 @@ retry:
 	}
 	var toRun gList
 	delta := int32(0)
+	var pollers gQueue
 	for i := int32(0); i < n; i++ {
 		ev := events[i]
 		if ev.Events == 0 {
@@ -168,9 +172,10 @@ retry:
 			tag := tp.tag()
 			if pd.fdseq.Load() == tag {
 				pd.setEventErr(ev.Events == linux.EPOLLERR, tag)
-				delta += netpollready(&toRun, pd, mode)
+				delta += netpollready(&toRun, &pollers, pd, mode)
 			}
 		}
 	}
+	toRun.pushAll(pollers)
 	return toRun, delta
 }

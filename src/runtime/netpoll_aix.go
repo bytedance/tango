@@ -1,6 +1,9 @@
 // Copyright 2018 The Go Authors. All rights reserved.
+// Copyright (c) 2021 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2021-07-16.
 
 package runtime
 
@@ -224,7 +227,7 @@ retry:
 		}
 		if mode != 0 {
 			pds[i].setEventErr(pfd.revents == _POLLERR, 0)
-			delta += netpollready(&toRun, pds[i], mode)
+			delta += netpollready(&toRun, nil, pds[i], mode)
 			n--
 		}
 	}

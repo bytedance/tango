@@ -1,6 +1,9 @@
 // Copyright 2013 The Go Authors. All rights reserved.
+// Copyright (c) 2021 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2021-07-16.
 
 package runtime
 
@@ -220,7 +223,7 @@ func netpoll(delay int64) (gList, int32) {
 				println("runtime: GetQueuedCompletionStatusEx returned net_op with invalid mode=", mode)
 				throw("runtime: netpoll failed")
 			}
-			delta += netpollready(&toRun, op.pd, mode)
+			delta += netpollready(&toRun, nil, op.pd, mode)
 		case netpollSourceBreak:
 			netpollWakeSig.Store(0)
 			if delay == 0 {

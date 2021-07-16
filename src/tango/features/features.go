@@ -26,6 +26,7 @@ const (
 	featureGCAdaptive = "gcadaptive"
 	featureGab        = "gab"
 	featureBeastmode  = "beastmode"
+	featureAdaptsched = "adaptsched"
 	featureDynconf    = "pprof/dynconf"
 	featureMemstats   = "pprof/memstats"
 	featureBversion   = "bversion"
@@ -64,6 +65,7 @@ func initFeatures() {
 	featuresVersion[featureGCAdaptive] = "1.0"
 	featuresVersion[featureGab] = "1.0"
 	featuresVersion[featureBeastmode] = "1.3"
+	featuresVersion[featureAdaptsched] = "1.0"
 	featuresVersion[featureDynconf] = "1.3"
 	featuresVersion[featureMemstats] = "1.0"
 	featuresVersion[featureBversion] = "1.1"
@@ -112,8 +114,9 @@ func (t *tangoInstance) AllFeatures() map[string]interface{} {
 			featureGab: newFeatureInstance(featureGab, func() bool {
 				return isGabEnabled()
 			}),
-			featureBeastmode: newBeastmodeInstance(),
-			featureDynconf:   newDynconfInstance(),
+			featureBeastmode:  newBeastmodeInstance(),
+			featureAdaptsched: newAdaptSchedInstance(),
+			featureDynconf:    newDynconfInstance(),
 			featureMemstats: newFeatureInstance(featureMemstats, func() bool {
 				return true
 			}),
@@ -196,6 +199,23 @@ func (f *beastmodeFeature) GetAttr(name string) interface{} {
 
 func newBeastmodeInstance() feature {
 	return &beastmodeFeature{newFeatureInstance(featureBeastmode, isBeastModeEnabled)}
+}
+
+type adaptSchedFeature struct {
+	*featureInstance
+}
+
+func (f *adaptSchedFeature) GetAttr(name string) interface{} {
+	switch name {
+	case attrDetail:
+		return getAdaptSchedOptsInfo()
+	default:
+		return nil
+	}
+}
+
+func newAdaptSchedInstance() feature {
+	return &adaptSchedFeature{newFeatureInstance(featureAdaptsched, isAdaptSchedEnabled)}
 }
 
 type maxHeapFeature struct {

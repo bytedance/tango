@@ -24,5 +24,11 @@ func isGabEnabled() bool
 //go:linkname isBeastModeEnabled runtime.isBeastModeEnabled
 func isBeastModeEnabled() bool
 
+//go:linkname isAdaptSchedEnabled runtime.isAdaptSchedEnabled
+func isAdaptSchedEnabled() bool
+
 //go:linkname getBeastModeInfo runtime.getBeastModeInfo
 func getBeastModeInfo() string
+
+//go:linkname getAdaptSchedOptsInfo runtime.getAdaptSchedOptsInfo
+func getAdaptSchedOptsInfo() string

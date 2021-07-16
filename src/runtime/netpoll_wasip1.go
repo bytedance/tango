@@ -1,6 +1,9 @@
 // Copyright 2023 The Go Authors. All rights reserved.
+// Copyright (c) 2021 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2021-07-16.
 
 //go:build wasip1
 
@@ -244,7 +247,7 @@ retry:
 			pd := (*pollDesc)(unsafe.Pointer(uintptr(e.userdata)))
 			netpolldisarm(pd, mode)
 			pd.setEventErr(e.error != 0, 0)
-			delta += netpollready(&toRun, pd, mode)
+			delta += netpollready(&toRun, nil, pd, mode)
 		}
 	}
 

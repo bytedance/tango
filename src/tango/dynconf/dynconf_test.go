@@ -186,6 +186,7 @@ func testList(t *testing.T) {
 		"config(ro): runtime.maxHeapBytes=",
 		"config(ro): runtime.gabThreshold=",
 		"config(ro): runtime.memoryLimit=",
+		"config(ro): runtime.artsOpts=none",
 		"task: runtime.GC",
 	}
 	listAndCheck(t, expectedStrings, "")
@@ -211,6 +212,13 @@ func testMaxHeap(t *testing.T) {
 
 func testGetLargeAllocTrace(t *testing.T) {
 	testDynConf(t, "get", "runtime.largeAllocTrace", "runtime.largeAllocTrace=0")
+}
+
+func testGetArtsOpts(t *testing.T) {
+	strres, err := postCmd("get", "runtime.artsOpts")
+	if err != nil || !strings.Contains(strres, "runtime.artsOpts=none") {
+		t.Fatalf("Failed to retrieve 'get' output, err=%v, resp=%s", err, strres)
+	}
 }
 
 func testSet(t *testing.T) {
