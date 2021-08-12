@@ -1,6 +1,9 @@
 // Copyright 2016 The Go Authors. All rights reserved.
+// Copyright (c) 2021 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2021-08-12.
 
 package work
 
@@ -17,6 +20,7 @@ import (
 	"cmd/go/internal/base"
 	"cmd/go/internal/cfg"
 	"cmd/go/internal/load"
+	"cmd/go/internal/modload"
 )
 
 func TestRemoveDevNull(t *testing.T) {
@@ -270,5 +274,26 @@ func TestRespectSetgidDir(t *testing.T) {
 	want := sh.fmtCmd("", "cp %s %s", pkgfile.Name(), dirGIDFile)
 	if got != want {
 		t.Fatalf("moveOrCopyFile(%q, %q): want %q, got %q", dirGIDFile, pkgfile.Name(), want, got)
+	}
+}
+
+// check after initialization
+func TestDefaultContextInit(t *testing.T) {
+	moduleLoaderState := modload.NewState()
+	moduleLoaderState.InitWorkfile()
+	BuildInit(moduleLoaderState)
+	found := make(map[string]bool)
+	for _, s := range cfg.BuildContext.BuildTags {
+		for _, tag := range defBuildTags {
+			if s == tag {
+				found[tag] = true
+				break
+			}
+		}
+	}
+	for _, tag := range defBuildTags {
+		if !found[tag] {
+			t.Fatalf("Buildtag %s should have been set after default initialization", tag)
+		}
 	}
 }

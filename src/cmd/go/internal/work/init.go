@@ -1,6 +1,9 @@
 // Copyright 2017 The Go Authors. All rights reserved.
+// Copyright (c) 2021 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2021-08-12.
 
 // Build initialization (after flag parsing).
 
@@ -114,6 +117,8 @@ func BuildInit(loaderstate *modload.State) {
 	if cfg.BuildRace && cfg.BuildCoverMode != "atomic" {
 		base.Fatalf(`-covermode must be "atomic", not %q, when -race is enabled`, cfg.BuildCoverMode)
 	}
+
+	buildTagsInit()
 }
 
 // fuzzInstrumentFlags returns compiler flags that enable fuzzing instrumentation
@@ -127,6 +132,30 @@ func fuzzInstrumentFlags() []string {
 		return nil
 	}
 	return []string{"-d=libfuzzer"}
+}
+
+// Built-in buildtags which are enabled by default.
+// associated with certain API set to provide a way of
+// detecting if certain API presents without parsing version numbers
+var defBuildTags = []string{
+	"bytedance_bversion",
+	"bytedance_tango",
+}
+
+func buildTagsInit() {
+	// If we enable function profiling, make sure the "fprof" exists
+	// in BuildContext.BuildTags.
+	// set all the built-in tags
+	for _, t := range defBuildTags {
+		// check if command line specified tags conflicts with built-in ones
+		for _, bt := range cfg.BuildContext.BuildTags {
+			if t == bt {
+				fmt.Fprintf(os.Stderr, "Warning: commandline build tag %s conflicts with built-in default tag", bt)
+				break
+			}
+		}
+		cfg.BuildContext.BuildTags = append(cfg.BuildContext.BuildTags, t)
+	}
 }
 
 func instrumentInit() {

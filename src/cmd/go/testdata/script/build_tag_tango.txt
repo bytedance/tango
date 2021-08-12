@@ -1,0 +1,24 @@
+go run t
+stderr 'tango.go gets built'
+
+-- tango.go --
+//go:build bytedance_tango
+// +build bytedance_tango
+
+package main
+func main() {
+  println("tango.go gets built")
+}
+
+-- tango0.go --
+//go:build !bytedance_tango
+// +build !bytedance_tango
+
+package main
+func main() {
+  println("tango0.go gets built")
+}
+
+-- go.mod --
+module t
+go 1.16

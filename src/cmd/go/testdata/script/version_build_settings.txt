@@ -37,10 +37,10 @@ go version -m m$GOEXE
 # "race" is included with build tags but not "cgo".
 go build -tags=a,b
 go version -m m$GOEXE
-stdout '^\tbuild\t-tags=a,b$'
+stdout '^\tbuild\t-tags=a,b,bytedance_bversion,bytedance_tango$'
 [race] go build -race
 [race] go version -m m$GOEXE
-[race] ! stdout '^\tbuild\t-tags='
+[race] stdout '^\tbuild\t-tags=bytedance_bversion,bytedance_tango$'
 [race] stdout '^\tbuild\t-race=true$'
 
 # CGO flags are separate settings.
