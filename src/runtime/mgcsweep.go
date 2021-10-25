@@ -695,6 +695,13 @@ func (sl *sweepLocked) sweep(preserve bool) bool {
 		getg().m.p.ptr().trace.reclaimed += uintptr(nfreed) * s.elemsize
 	}
 
+	if debug.gab > 0 && s.isGab() {
+		if nfreed > 0 {
+			bytesFreed := uintptr(nfreed) * size
+			atomic.Xadduintptr(&gabUsedBytes, -bytesFreed)
+		}
+	}
+
 	// gcmarkBits becomes the allocBits.
 	// get a fresh cleared gcmarkBits in preparation for next GC
 	s.allocBits = s.gcmarkBits
@@ -703,19 +710,6 @@ func (sl *sweepLocked) sweep(preserve bool) bool {
 	// refresh pinnerBits if they exists
 	if s.pinnerBits != nil {
 		s.refreshPinnerBits()
-	}
-
-	// memory of s.gabBits is same as s.allocBits, both reside in the gcBitsArenas
-	// and will be swapped at finishsweep_m
-	// so here we allocate new gabBits in current arena, and record intersected
-	// bits with s.allocBits.
-	if debug.gab > 0 && s.gabBits != nil {
-		var cleared uintptr
-		s.gabBits, cleared = s.gabBits.intersect(s.allocBits, uintptr(s.nelems))
-		if cleared > 0 {
-			cleared *= size
-			atomic.Xadduintptr(&gabUsedBytes, -cleared)
-		}
 	}
 
 	// Initialize alloc bits cache.

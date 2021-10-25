@@ -1,6 +1,9 @@
 // Copyright 2022 The Go Authors. All rights reserved.
+// Copyright (c) 2021 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2021-10-25.
 
 // Implementation of (safe) user arenas.
 //
@@ -844,7 +847,7 @@ func newUserArenaChunk() (unsafe.Pointer, *mspan) {
 // distinguish when a span shouldn't be counted (since mSpanInUse might not be
 // enough).
 func (s *mspan) isUnusedUserArenaChunk() bool {
-	return s.isUserArenaChunk && s.spanclass == makeSpanClass(0, true)
+	return s.isUserArenaChunk && s.spanclass == makeSpanClass(0, true, false)
 }
 
 // setUserArenaChunkToFault sets the address space for the user arena chunk to fault
@@ -872,7 +875,7 @@ func (s *mspan) setUserArenaChunkToFault() {
 	// treated as a large object span and there's no meaningful difference between scan
 	// and noscan large objects in the sweeper. The STW at the start of the GC acts as a
 	// barrier for this update.
-	s.spanclass = makeSpanClass(0, true)
+	s.spanclass = makeSpanClass(0, true, false)
 
 	// Actually set the arena chunk to fault, so we'll get dangling pointer errors.
 	// sysFault currently uses a method on each OS that forces it to evacuate all
@@ -1050,7 +1053,7 @@ func (h *mheap) allocUserArenaChunk() *mspan {
 	sysUsed(unsafe.Pointer(base), userArenaChunkBytes, userArenaChunkBytes)
 
 	// Model the user arena as a heap span for a large object.
-	spc := makeSpanClass(0, false)
+	spc := makeSpanClass(0, false, false)
 	// A user arena chunk is always fresh from the OS. It's either newly allocated
 	// via sysAlloc() or reused from the readyList after a sysFault(). The memory is
 	// then re-mapped via sysMap(), so we can safely treat it as scavenged; the

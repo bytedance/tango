@@ -48,8 +48,18 @@ var (
 	gabPolicyEnabled = true // control whether policy should take effect
 )
 
+var gabdebug struct {
+	// Level of tracing for goroutine-allocation-buffer
+	// 0: tracing disabled
+	// 1: trace gab memory chunks
+	// 2: trace mspan
+	// 3: trace object, references
+	trace int32
+}
+
 var gabvars = []dbgVar{
 	{name: "gabPercent", value: &gabMemoryPercent},
+	{name: "trace", value: &gabdebug.trace},
 }
 
 func gabinit() {
@@ -132,6 +142,15 @@ func (buf *gab) refill() {
 	buf.base = mallocgc1(ncap, nil, true, true)
 	buf.top = uintptr(buf.base)
 	buf.end = buf.top + ncap
+
+	if gabdebug.trace >= 1 {
+		s := spanOf(buf.top)
+		if s == nil || !s.isGab() {
+			print("gab.refill(): span=", s, " is not for GAB allocation\n")
+			throw("Invalid span")
+		}
+		print("Alloc gab:g=", hex(uintptr(unsafe.Pointer(getg()))), ", [", hex(buf.top), "~", hex(buf.end), ")\n")
+	}
 }
 func (buf *gab) nextCapacity() (size uintptr) {
 	size = ((buf.end - uintptr(buf.base)) << 1)

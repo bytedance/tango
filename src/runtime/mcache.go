@@ -259,7 +259,7 @@ func (c *mcache) allocLarge(size uintptr, noscan bool) *mspan {
 	// pays the debt down to npage pages.
 	deductSweepCredit(npages*pageSize, npages)
 
-	spc := makeSpanClass(0, noscan)
+	spc := makeSpanClass(0, noscan, false)
 	s := mheap_.alloc(npages, spc)
 	if s == nil {
 		throw("out of memory")

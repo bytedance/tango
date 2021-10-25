@@ -532,19 +532,6 @@ func (s *mspan) layout() (size, n, total uintptr) {
 	return
 }
 
-func (s *mspan) markGab(addr, size uintptr) {
-	if s.gabBits == nil {
-		// allocate gabBits on demand
-		// safe because: 1, preemption off on this g; 2, g-local operation;
-		s.gabBits = newAllocBits(uintptr(s.nelems))
-	}
-	objIndex := s.objIndex(addr)
-	bytep, mask := s.gabBits.bitp(objIndex)
-	atomic.Or8(bytep, mask)
-	// update the gabUsedBytes here by counting the size of entire small-object slot
-	atomic.Xadduintptr(&gabUsedBytes, size)
-}
-
 // recordspan adds a newly allocated span to h.allspans.
 //
 // This only happens the first time a span is allocated from
@@ -599,22 +586,41 @@ func recordspan(vh unsafe.Pointer, p unsafe.Pointer) {
 type spanClass uint8
 
 const (
-	numSpanClasses = gc.NumSizeClasses << 1
-	tinySpanClass  = spanClass(tinySizeClass<<1 | 1)
+	// we arrange [0,2*_NumSizeClasses) to hold non-gab spans,
+	// while [2*_NumSizeClasses, 3*_NumSizeClasses) to hold gab spans,
+	// please note that the GAB spans slots are very sparse
+	numNonGabSpanClasses = gc.NumSizeClasses << 1
+	numSpanClasses       = numNonGabSpanClasses + gc.NumSizeClasses
+	tinySpanClass        = spanClass(tinySizeClass<<1 | 1)
 )
 
-func makeSpanClass(sizeclass uint8, noscan bool) spanClass {
-	return spanClass(sizeclass<<1) | spanClass(bool2int(noscan))
+func makeSpanClass(sizeclass uint8, noscan bool, isgab bool) spanClass {
+	if debug.gab <= 0 || !isgab {
+		return spanClass(sizeclass<<1) | spanClass(bool2int(noscan))
+	} else {
+		if !noscan {
+			throw("gab span must be noscan for now")
+		}
+		return spanClass(numNonGabSpanClasses + sizeclass)
+	}
 }
 
 //go:nosplit
 func (sc spanClass) sizeclass() int8 {
-	return int8(sc >> 1)
+	if sc < numNonGabSpanClasses {
+		return int8(sc >> 1)
+	} else {
+		return int8(sc - numNonGabSpanClasses)
+	}
 }
 
 //go:nosplit
 func (sc spanClass) noscan() bool {
-	return sc&1 != 0
+	return sc&1 != 0 || sc.gabSpanClass()
+}
+
+func (sc spanClass) gabSpanClass() bool {
+	return sc >= numNonGabSpanClasses
 }
 
 // arenaIndex returns the index into mheap_.arenas of the arena
@@ -1852,7 +1858,6 @@ func (span *mspan) init(base uintptr, npages uintptr) {
 	span.allocBits = nil
 	span.gcmarkBits = nil
 	span.pinnerBits = nil
-	span.gabBits = nil
 	span.state.set(mSpanDead)
 	lockInit(&span.speciallock, lockRankMspanSpecial)
 }

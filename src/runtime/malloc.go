@@ -1413,7 +1413,7 @@ func mallocgcSmallNoscan(size uintptr, typ *_type, needzero, isgab bool) (unsafe
 		sizeclass = gc.SizeToSizeClass128[divRoundUp(size-gc.SmallSizeMax, gc.LargeSizeDiv)]
 	}
 	size = uintptr(gc.SizeClassToSize[sizeclass])
-	spc := makeSpanClass(sizeclass, true)
+	spc := makeSpanClass(sizeclass, true, isgab)
 	span := c.alloc[spc]
 
 	// First, check for a reusable object.
@@ -1429,16 +1429,13 @@ func mallocgcSmallNoscan(size uintptr, typ *_type, needzero, isgab bool) (unsafe
 	if v == 0 {
 		v, span, checkGCTrigger = c.nextFree(spc)
 	}
-	if isgab {
-		// Has to do span.markGab in mallocgc because
-		// span.gabBits will be re-allocated at GC sweep, if span.markGab is moved
-		// to other places, STW sweep or concurrent sweep may happen between
-		// getting span.gabBits and setting corresponding bit in span.markGab,
-		// thus cause failure of marking or even writing to invalid memory.
-		// (STW sweep may preempt span.markGab if no acquirem/releasem guard;
-		//  and concurrent sweep may happen because after mallocgc this span will
-		//  not be guaranteed to be alive and associated to mcache)
-		span.markGab(uintptr(v), size)
+	if gabEnabled {
+		if isgab {
+			atomic.Xadduintptr(&gabUsedBytes, size)
+		}
+		if isgab != (spc >= numNonGabSpanClasses) {
+			throw("Incorrect span class!")
+		}
 	}
 	x := unsafe.Pointer(v)
 	if needzero && span.needzero != 0 {
@@ -1566,7 +1563,7 @@ func mallocgcSmallScanNoHeader(size uintptr, typ *_type) (unsafe.Pointer, uintpt
 	checkGCTrigger := false
 	c := getMCache(mp)
 	sizeclass := gc.SizeToSizeClass8[divRoundUp(size, gc.SmallSizeDiv)]
-	spc := makeSpanClass(sizeclass, false)
+	spc := makeSpanClass(sizeclass, false, false)
 	span := c.alloc[spc]
 	v := nextFreeFast(span)
 	if v == 0 {
@@ -1664,7 +1661,7 @@ func mallocgcSmallScanHeader(size uintptr, typ *_type) (unsafe.Pointer, uintptr)
 		sizeclass = gc.SizeToSizeClass128[divRoundUp(size-gc.SmallSizeMax, gc.LargeSizeDiv)]
 	}
 	size = uintptr(gc.SizeClassToSize[sizeclass])
-	spc := makeSpanClass(sizeclass, false)
+	spc := makeSpanClass(sizeclass, false, false)
 	span := c.alloc[spc]
 	v := nextFreeFast(span)
 	if v == 0 {
@@ -2056,7 +2053,7 @@ func freegc(ptr unsafe.Pointer, size uintptr, noscan bool) bool {
 		sizeclass = gc.SizeToSizeClass128[divRoundUp(size-gc.SmallSizeMax, gc.LargeSizeDiv)]
 	}
 
-	spc := makeSpanClass(sizeclass, noscan)
+	spc := makeSpanClass(sizeclass, noscan, false)
 	s := c.alloc[spc]
 
 	if debugReusableLog {
