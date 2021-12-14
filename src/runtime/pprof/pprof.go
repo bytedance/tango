@@ -1,6 +1,9 @@
 // Copyright 2010 The Go Authors. All rights reserved.
+// Copyright (c) 2021 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2021-12-14.
 
 // Package pprof writes runtime profiling data in the format expected
 // by the pprof visualization tool.
@@ -886,6 +889,12 @@ var cpu struct {
 // for [syscall.SIGPROF], but note that doing so may break any profiling
 // being done by the main program.
 func StartCPUProfile(w io.Writer) error {
+	return startCPUProfile(w)
+}
+
+// The actual code for start cpu profile.
+// It's also used in net/http/pprof package via linkname.
+func startCPUProfile(w io.Writer) error {
 	// The runtime routines allow a variable profiling rate,
 	// but in practice operating systems cannot trigger signals
 	// at more than about 500 Hz, and our processing of the

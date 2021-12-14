@@ -144,6 +144,14 @@ func serveError(w http.ResponseWriter, status int, txt string) {
 	fmt.Fprintln(w, txt)
 }
 
+type tangoInfoWriter struct {
+	io.Writer
+}
+
+func (w tangoInfoWriter) NeedTangoInfo() bool {
+	return true
+}
+
 // Profile responds with the pprof-formatted cpu profile.
 // Profiling lasts for duration specified in seconds GET parameter, or for 30 seconds if not specified.
 // The package initialization registers it as /debug/pprof/profile.
@@ -160,7 +168,14 @@ func Profile(w http.ResponseWriter, r *http.Request) {
 	// because if it does it starts writing.
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("Content-Disposition", `attachment; filename="profile"`)
-	if err := pprof.StartCPUProfile(w); err != nil {
+
+	tangoInfo, err := strconv.ParseBool(r.FormValue("tangoinfo"))
+	if err == nil && tangoInfo {
+		err = pprof.StartCPUProfile(tangoInfoWriter{w})
+	} else {
+		err = pprof.StartCPUProfile(w)
+	}
+	if err != nil {
 		// StartCPUProfile failed, so no writes yet.
 		serveError(w, http.StatusInternalServerError,
 			fmt.Sprintf("Could not enable CPU profiling: %s", err))
@@ -275,7 +290,13 @@ func (name handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/octet-stream")
 		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, name))
 	}
-	p.WriteTo(w, debug)
+
+	tangoInfo, err := strconv.ParseBool(r.FormValue("tangoinfo"))
+	if err == nil && tangoInfo {
+		p.WriteTo(tangoInfoWriter{w}, debug)
+	} else {
+		p.WriteTo(w, debug)
+	}
 }
 
 func (name handler) serveDeltaProfile(w http.ResponseWriter, r *http.Request, p *pprof.Profile, secStr string) {

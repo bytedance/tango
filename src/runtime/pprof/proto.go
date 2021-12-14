@@ -1,6 +1,9 @@
 // Copyright 2016 The Go Authors. All rights reserved.
+// Copyright (c) 2021 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2021-12-14.
 
 package pprof
 
@@ -41,6 +44,8 @@ type profileBuilder struct {
 	funcs     map[string]int      // Package path-qualified function name to Function.ID
 	mem       []memMap
 	deck      pcDeck
+
+	needTangoInfo bool
 }
 
 type memMap struct {
@@ -252,6 +257,10 @@ type locInfo struct {
 	firstPCSymbolizeResult symbolizeFlag
 }
 
+type tangoPprof interface {
+	NeedTangoInfo() bool
+}
+
 // newProfileBuilder returns a new profileBuilder.
 // CPU profiling data obtained from the runtime can be added
 // by calling b.addCPUData, and then the eventual profile
@@ -268,6 +277,9 @@ func newProfileBuilder(w io.Writer) *profileBuilder {
 		funcs:     map[string]int{},
 	}
 	b.readMapping()
+	if ti, ok := w.(tangoPprof); ok {
+		b.needTangoInfo = ti.NeedTangoInfo()
+	}
 	return b
 }
 
@@ -385,6 +397,10 @@ func (b *profileBuilder) build() error {
 
 	// TODO: Anything for tagProfile_DropFrames?
 	// TODO: Anything for tagProfile_KeepFrames?
+
+	if b.needTangoInfo {
+		b.pbTangoInfo()
+	}
 
 	b.pb.strings(tagProfile_StringTable, b.strings)
 	_, err := b.zw.Write(b.pb.data)
