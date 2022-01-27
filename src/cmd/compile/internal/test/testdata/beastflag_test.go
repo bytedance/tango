@@ -5,15 +5,14 @@
 package main
 
 import (
-	"bufio"
+	"bytes"
 	"fmt"
 	"internal/testenv"
-	"io"
 	"log"
 	"os"
 	"os/exec"
-	"regexp"
 	"runtime"
+	"strings"
 	"sync"
 	"testing"
 	"unsafe"
@@ -31,7 +30,24 @@ func prepareSource(t *testing.T, filename string, content []byte) (workdir strin
 	return workdir, err
 }
 
+func asanSupported() bool {
+	switch runtime.GOOS {
+	case "linux":
+		return runtime.GOARCH == "arm64" || runtime.GOARCH == "amd64"
+	default:
+		return false
+	}
+}
+
 func TestBeast(t *testing.T) {
+	t.Run("beast", func(t *testing.T) { testBeastFlag(t, true, false) })
+	t.Run("nobeast", func(t *testing.T) { testBeastFlag(t, false, false) })
+	if asanSupported() {
+		t.Run("asanbeast", func(t *testing.T) { testBeastFlag(t, true, true) })
+	}
+}
+
+func testBeastFlag(t *testing.T, isBeast bool, isAsan bool) {
 	testenv.MustHaveGoRun(t)
 
 	source := `package main
@@ -66,71 +82,53 @@ func main() {
 		t.Fatal(err)
 	}
 
-	t.Logf("Created workdir: %s\n", workdir)
-
-	beastArgs := append([]string{"build", "-opt=beast", "-x", "-gcflags=all=-m -m"}, filename)
-	nobeastArgs := append([]string{"build", "-x", "-gcflags=all=-m -m"}, filename)
-
-	haveInlined := regexp.MustCompile(`: inlining call to bigcost`)
-	stacksize := regexp.MustCompile(`runtime/stacksizebeast.go ([^ ]*)`)
-
-	for i := 0; i < 2; i++ {
-		// run go build -gcflags=all=-m -m beast.go.
-		args := beastArgs
-		if i == 1 {
-			args = nobeastArgs
-		}
-		cmd := testenv.CleanCmdEnv(exec.Command(testenv.GoToolPath(t), args...))
-		cmd.Dir = workdir
-		cmd.Env = append(os.Environ(), "GOCACHE="+workdir)
-
-		pr, pw := io.Pipe()
-		cmd.Stdout = pw
-		cmd.Stderr = pw
-		cmdErr := make(chan error, 1)
-		go func() {
-			cmdErr <- cmd.Run()
-			pw.Close()
-		}()
-		scanner := bufio.NewScanner(pr)
-
-		inlined := false
-		tags := false
-
-		for scanner.Scan() {
-			line := scanner.Text()
-			if m := haveInlined.FindStringSubmatch(line); m != nil {
-				inlined = true
-				continue
-			}
-
-			if n := stacksize.FindStringSubmatch(line); n != nil {
-				tags = true
-				continue
-			}
-		}
-
-		if err := <-cmdErr; err != nil {
-			t.Fatal(err)
-		}
-		if err := scanner.Err(); err != nil {
-			t.Fatal(err)
-		}
-		if i == 0 {
-			if !inlined {
-				t.Errorf("beast not work for inlining")
-			}
-			if !tags {
-				t.Errorf("beast not work for tags")
-			}
-		} else {
-			if inlined {
-				t.Errorf("default mode did the inilining")
-			}
-		}
-		pr.Close()
+	var buildArgs []string
+	if isBeast {
+		buildArgs = append([]string{"build", "-opt=beast", "-x", "-gcflags=all=-m -m"}, filename)
+	} else {
+		buildArgs = append([]string{"build", "-x", "-gcflags=all=-m -m"}, filename)
 	}
 
+	if isBeast && isAsan {
+		buildArgs = append([]string{"build", "-asan", "-opt=beast", "-x", "-gcflags=all=-m -m"}, filename)
+	}
+
+	cmd := testenv.CleanCmdEnv(exec.Command(testenv.GoToolPath(t), buildArgs...))
+	cmd.Dir = workdir
+	cmd.Env = append(os.Environ(), "GOCACHE="+workdir)
+
+	var outb, errb bytes.Buffer
+	cmd.Stdout = &outb
+	cmd.Stderr = &errb
+
+	builderr := cmd.Run()
+	output := errb.String()
+	if builderr != nil {
+		if isAsan && strings.HasPrefix(output, "-asan is not supported with") {
+			t.Skip("Skip as C compiler does not satisfy with asan")
+		}
+		t.Fatalf("compile failed")
+	}
+
+	if isBeast && !isAsan && !strings.Contains(output, "inlining call to bigcost") {
+		t.Fatalf("in beast mode, function is not inlined")
+	}
+
+	if isBeast && isAsan && strings.Contains(output, "inlining call to bigcost") {
+		t.Fatal("beast should be turned off in ASAN, bigcost function shouldnot be inlined ")
+	}
+
+	if !isBeast && strings.Contains(output, "inlining call to bigcost") {
+		t.Fatal("in default mode, bigcost function shouldnot be inlined ")
+	}
+
+	if isBeast && !isAsan && !strings.Contains(output, "stacksizebeast.go") {
+		t.Fatalf("stacksize is not set correctly in beast mode")
+	}
+
+	if !isBeast && !strings.Contains(output, "stacksize.go") {
+		t.Fatalf("stacksize is not set correctly in default mode")
+	}
 }
 
 //go:noinline
@@ -226,18 +224,27 @@ func recursive(p *int, n int) {
 	t.Logf("Created workdir: %s\n", workdir)
 
 	// run go build -opt=beast beastStacksize.go -o beast
-	cmd := exec.Command("go", "build", "-opt=beast", "-o", "beast", fname)
+	cmd := exec.Command(testenv.GoToolPath(t), "build", "-opt=beast", "-o", "beast", fname)
 	cmd.Dir = workdir
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		log.Fatalf("beast mode compile failed with %s\n", out)
 	}
 
-	cmd2 := exec.Command("go", "build", "-o", "nobeast", fname)
+	cmd2 := exec.Command(testenv.GoToolPath(t), "build", "-o", "nobeast", fname)
 	cmd2.Dir = workdir
 	out2, err2 := cmd2.CombinedOutput()
 	if err2 != nil {
 		log.Fatalf("no beast mode compile failed with %s\n", out2)
+	}
+
+	if asanSupported() {
+		cmd3 := exec.Command(testenv.GoToolPath(t), "build", "-asan", "-opt=beast", "-o", "asanbeast", fname)
+		cmd3.Dir = workdir
+		out3, err := cmd3.CombinedOutput()
+		if err != nil && !strings.HasPrefix(string(out3), "-asan is not supported with") {
+			log.Fatalf("beast and asan modes compile failed with %s\n", out3)
+		}
 	}
 
 	beastcmd := exec.Command("./beast")
@@ -253,6 +260,16 @@ func recursive(p *int, n int) {
 	// nobeasterr should not be nil
 	if nobeasterr == nil {
 		log.Fatalf("nobeast mode should have panic but not\n")
+	}
+
+	if asanSupported() {
+		// beast with asan amounts to nobeast
+		asanbeastcmd := exec.Command("./asanbeast")
+		asanbeastcmd.Dir = workdir
+		_, asanbeasterr := asanbeastcmd.CombinedOutput()
+		if asanbeasterr == nil {
+			log.Fatalf("asanbeast mode should have panic but not\n")
+		}
 	}
 }
 

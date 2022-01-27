@@ -3242,7 +3242,7 @@ func setToolFlags(loaderstate *modload.State, pkgs ...*Package) {
 		p.Internal.Asmflags = BuildAsmflags.For(loaderstate, p)
 		p.Internal.Gcflags = BuildGcflags.For(loaderstate, p)
 		p.Internal.Ldflags = BuildLdflags.For(loaderstate, p)
-		if cfg.Optmode == "beast" {
+		if cfg.Optmode == "beast" && !cfg.BuildASan {
 			beastOptions := fmt.Sprintf("-beast=bce,inlbudget=%d,gabinline", beastInlBudget)
 			p.Internal.Gcflags = append(p.Internal.Gcflags, beastOptions)
 			p.Internal.Ldflags = append(p.Internal.Ldflags, "-enablebeast")
