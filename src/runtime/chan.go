@@ -1,6 +1,9 @@
 // Copyright 2014 The Go Authors. All rights reserved.
+// Copyright (c) 2022 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2022-01-30.
 
 package runtime
 
@@ -96,13 +99,21 @@ func makechan(t *chantype, size int) *hchan {
 	switch {
 	case mem == 0:
 		// Queue or element size is zero.
-		c = (*hchan)(mallocgc(hchanSize, nil, true))
+		if isEvacEnabled() {
+			c = (*hchan)(mallocgc2(hchanSize, nil, true))
+		} else {
+			c = (*hchan)(mallocgc(hchanSize, nil, true))
+		}
 		// Race detector uses this location for synchronization.
 		c.buf = c.raceaddr()
 	case !elem.Pointers():
 		// Elements do not contain pointers.
 		// Allocate hchan and buf in one call.
-		c = (*hchan)(mallocgc(hchanSize+mem, nil, true))
+		if isEvacEnabled() {
+			c = (*hchan)(mallocgc2(hchanSize+mem, nil, true))
+		} else {
+			c = (*hchan)(mallocgc(hchanSize+mem, nil, true))
+		}
 		c.buf = add(unsafe.Pointer(c), hchanSize)
 	default:
 		// Elements contain pointers.

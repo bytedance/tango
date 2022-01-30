@@ -33,6 +33,9 @@ type mstats struct {
 	// Miscellaneous statistics.
 	other_sys sysMemStat // updated atomically or during STW
 
+	// GAB statistics
+	gab_sys sysMemStat
+
 	// Statistics about the garbage collector.
 
 	// Protected by mheap or worldsema during GC.
@@ -50,6 +53,8 @@ type mstats struct {
 	lastScanStats [gc.NumSizeClasses]sizeClassScanStats
 
 	enablegc bool
+
+	numbalancedgc uint32 // number of GAB evacuation
 }
 
 var memstats mstats
@@ -288,6 +293,9 @@ type MemStats struct {
 	// NumGC is the number of completed GC cycles.
 	NumGC uint32
 
+	// NumBalancedGC is the number of GAB evacuation performed.
+	NumBalancedGC uint32
+
 	// NumForcedGC is the number of GC cycles that were forced by
 	// the application calling the GC function.
 	NumForcedGC uint32
@@ -442,6 +450,9 @@ func readmemstats_m(stats *MemStats) {
 		memstats.stacks_sys.load() + memstats.mspan_sys.load() + memstats.mcache_sys.load() +
 		memstats.buckhash_sys.load() + memstats.gcMiscSys.load() + memstats.other_sys.load() +
 		stackInUse + gcWorkBufInUse
+	if isGabEnabled() {
+		totalMapped += memstats.gab_sys.load()
+	}
 
 	heapGoal := gcController.heapGoal()
 
@@ -549,12 +560,16 @@ func readmemstats_m(stats *MemStats) {
 	// at a more granular level in the runtime.
 	stats.GCSys = memstats.gcMiscSys.load() + gcWorkBufInUse
 	stats.OtherSys = memstats.other_sys.load()
+	if isGabEnabled() {
+		stats.OtherSys += memstats.gab_sys.load()
+	}
 	stats.NextGC = heapGoal
 	stats.LastGC = memstats.last_gc_unix
 	stats.PauseTotalNs = memstats.pause_total_ns
 	stats.PauseNs = memstats.pause_ns
 	stats.PauseEnd = memstats.pause_end
 	stats.NumGC = memstats.numgc
+	stats.NumBalancedGC = memstats.numbalancedgc
 	stats.NumForcedGC = memstats.numforcedgc
 	stats.GCCPUFraction = memstats.gc_cpu_fraction
 	stats.EnableGC = true

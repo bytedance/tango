@@ -1095,11 +1095,15 @@ func mallocgc(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 	//
 	// gabMaxAllocSize should always be aligned to goarch.PtrSize
 	if gabEnabled && noscan && size <= gabMaxAllocSize {
-		size := alignUp(size, goarch.PtrSize)
+		size = alignUp(size, goarch.PtrSize)
 		if gp.ab.remaining() < size {
 			gp.ab.refill()
 		}
-		x := unsafe.Pointer(gp.ab.top)
+		var x unsafe.Pointer
+		if isEvacEnabled() {
+			startObj(gp.ab.top, gp.ab.span)
+		}
+		x = unsafe.Pointer(gp.ab.top)
 		gp.ab.top += size
 		return x
 	}
@@ -1429,13 +1433,11 @@ func mallocgcSmallNoscan(size uintptr, typ *_type, needzero, isgab bool) (unsafe
 	if v == 0 {
 		v, span, checkGCTrigger = c.nextFree(spc)
 	}
-	if gabEnabled {
-		if isgab {
-			atomic.Xadduintptr(&gabUsedBytes, size)
-		}
-		if isgab != (spc >= numNonGabSpanClasses) {
-			throw("Incorrect span class!")
-		}
+	if isgab {
+		atomic.Xadduintptr(&gabUsedBytes, size)
+	}
+	if isgab != spc.gabSpanClass() {
+		throw("Incorrect span class!")
 	}
 	x := unsafe.Pointer(v)
 	if needzero && span.needzero != 0 {

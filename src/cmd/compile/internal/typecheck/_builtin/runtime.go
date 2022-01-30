@@ -315,4 +315,4 @@ func asanregisterglobals(unsafe.Pointer, uintptr)
 func KeepAlive(interface{})
 
 // gab
-var gabEnabled bool
+var gabInliningEnabled bool

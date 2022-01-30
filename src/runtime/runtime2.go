@@ -945,6 +945,7 @@ type p struct {
 	// register state.
 	xRegs xRegPerP
 
+	refsIn             refq
 	largeAllocStk      [maxProfStackDepth]uintptr
 	largeAllocStkFrame Frames
 

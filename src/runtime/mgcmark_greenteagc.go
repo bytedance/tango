@@ -1,6 +1,9 @@
 // Copyright 2025 The Go Authors. All rights reserved.
+// Copyright (c) 2022 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2022-01-30.
 
 // Green Tea mark algorithm
 //
@@ -1235,6 +1238,11 @@ func scanObject(b uintptr, gcw *gcWork) {
 		tp = s.typePointersOfUnchecked(b)
 	}
 
+	var pinned bool
+	if isEvacEnabled() && isEvacuation && !s.isGab() {
+		pinned = s.shouldBePinned(b)
+	}
+
 	var scanSize uintptr
 	for {
 		var addr uintptr
@@ -1266,8 +1274,22 @@ func scanObject(b uintptr, gcw *gcWork) {
 			// just allocated and hence will be marked by
 			// allocation itself.
 			if !tryDeferToSpanScan(obj, gcw) {
+				src := obj
 				if obj, span, objIndex := findObject(obj, b, addr-b); obj != 0 {
 					greyobject(obj, b, addr-b, span, gcw, objIndex)
+					if isEvacEnabled() && span.doEvacuation() {
+						if pinned {
+							span.gabPinObj(obj)
+						} else if !span.isPinnedGab(obj) && src != obj {
+							// src is a pointer that points to a GAB-allocated object.
+							// obj is the base address for the heap object containing src,
+							// so that it is the beginning of the GAB.
+							// src == obj, i.e., src is the base address of a GAB,
+							// which means g is scanned now and addr is &g.ab.base
+							getg().m.p.ptr().refsIn.enqueue(addr)
+							updateMarkedGABObjects(src, obj)
+						}
+					}
 				}
 			}
 		}

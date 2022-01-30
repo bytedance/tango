@@ -19,14 +19,15 @@ import (
 var featuresVersion map[string]string
 
 const (
-	featureMaxheap   = "maxheap"
-	featureGab       = "gab"
-	featureBeastmode = "beastmode"
-	featureDynconf   = "pprof/dynconf"
-	featureMemstats  = "pprof/memstats"
-	featureBversion  = "bversion"
-	featureTangoinfo = "tangoinfo"
-	featureCount     = iota
+	featureBalancedgc = "balancedgc"
+	featureMaxheap    = "maxheap"
+	featureGab        = "gab"
+	featureBeastmode  = "beastmode"
+	featureDynconf    = "pprof/dynconf"
+	featureMemstats   = "pprof/memstats"
+	featureBversion   = "bversion"
+	featureTangoinfo  = "tangoinfo"
+	featureCount      = iota
 )
 
 const (
@@ -45,6 +46,7 @@ var (
 
 func initFeatures() {
 	featuresVersion = make(map[string]string, featureCount)
+	featuresVersion[featureBalancedgc] = "1.0"
 	featuresVersion[featureMaxheap] = "1.0"
 	featuresVersion[featureGab] = "1.0"
 	featuresVersion[featureBeastmode] = "1.0"
@@ -86,6 +88,9 @@ func (t *tangoInstance) AllFeatures() map[string]interface{} {
 	t.once.Do(func() {
 		initFeatures()
 		t.allFeatures = map[string]interface{}{
+			featureBalancedgc: newFeatureInstance(featureBalancedgc, func() bool {
+				return isBalanceGcEnabled()
+			}),
 			featureMaxheap: newMaxHeapInstance(),
 			featureGab: newFeatureInstance(featureGab, func() bool {
 				return isGabEnabled()

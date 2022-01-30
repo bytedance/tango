@@ -254,7 +254,7 @@ var runtimeDecls = [...]struct {
 	{"riscv64HasZbb", varTag, 6},
 	{"asanregisterglobals", funcTag, 136},
 	{"KeepAlive", funcTag, 11},
-	{"gabEnabled", varTag, 6},
+	{"gabInliningEnabled", varTag, 6},
 }
 
 func runtimeTypes() []*types.Type {

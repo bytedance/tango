@@ -1,6 +1,9 @@
 // Copyright 2017 The Go Authors. All rights reserved.
+// Copyright (c) 2022 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2022-01-30.
 
 // This implements the write barrier buffer. The write barrier itself
 // is gcWriteBarrier and is implemented in assembly.
@@ -244,6 +247,9 @@ func wbBufFlush1(pp *p) {
 		if obj == 0 {
 			continue
 		}
+		if span != nil && isEvacEnabled() && span.doEvacuation() {
+			span.gabPinObj(obj)
+		}
 		// TODO: Consider making two passes where the first
 		// just prefetches the mark bits.
 		mbits := span.markBitsForIndex(objIndex)
@@ -260,6 +266,9 @@ func wbBufFlush1(pp *p) {
 
 		if span.spanclass.noscan() {
 			gcw.bytesMarked += uint64(span.elemsize)
+			if isGabEnabled() {
+				gcw.gabMarked += uint64(span.elemsize)
+			}
 			continue
 		}
 		ptrs[pos] = obj

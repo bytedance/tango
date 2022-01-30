@@ -86,6 +86,14 @@ func runTestProg(t *testing.T, binary, name string, env ...string) string {
 		t.Skip("-quick")
 	}
 
+	if !isEvacSupported() {
+		for _, v := range env {
+			if strings.Contains(v, "gab=2") {
+				t.Skip("Skip balanced GC test on platforms other than linux/amd64 and darwin/amd64")
+			}
+		}
+	}
+
 	testenv.MustHaveGoBuild(t)
 	t.Helper()
 

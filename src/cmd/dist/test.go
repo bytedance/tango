@@ -1041,7 +1041,7 @@ func (t *tester) registerTests() {
 			t.registerTest(fmt.Sprintf("GOMAXPROCS=2 runtime -cpu=%d -quick", i),
 				&goTest{
 					variant:   "cpu" + strconv.Itoa(i),
-					timeout:   300 * time.Second,
+					timeout:   600 * time.Second,
 					cpu:       strconv.Itoa(i),
 					gcflags:   gogcflags,
 					short:     true,

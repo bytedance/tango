@@ -238,7 +238,11 @@ func runFinalizers() {
 					// all not yet finalized objects are stored in finq.
 					// If we do not mark it as FlagNoScan,
 					// the last finalized object is not collected.
-					frame = mallocgc(framesz, nil, true)
+					if isEvacEnabled() {
+						frame = mallocgc2(framesz, nil, true)
+					} else {
+						frame = mallocgc(framesz, nil, true)
+					}
 					framecap = framesz
 				}
 				if f.fint == nil {

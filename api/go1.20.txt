@@ -441,6 +441,7 @@ pkg time, const TimeOnly = "15:04:05" #52746
 pkg time, const TimeOnly ideal-string #52746
 pkg time, method (Time) Compare(Time) int #50770
 pkg unicode/utf16, func AppendRune([]uint16, int32) []uint16 #51896
+pkg runtime, type MemStats struct, NumBalancedGC uint32 #408
 # freebsd riscv64 port
 pkg log/syslog (freebsd-riscv64), const LOG_ALERT = 1 #53466
 pkg log/syslog (freebsd-riscv64), const LOG_ALERT Priority #53466

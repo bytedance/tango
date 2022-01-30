@@ -1471,6 +1471,7 @@ const (
 	stwForTestPageCachePagesLeaked                  // "PageCachePagesLeaked (test)"
 	stwForTestResetDebugLog                         // "ResetDebugLog (test)"
 	stwMemStats                                     // "Read tango mem stats"
+	stwVerifyGABs                                   // "Verify GABs (test)"
 )
 
 func (r stwReason) String() string {
@@ -1503,6 +1504,7 @@ var stwReasonStrings = [...]string{
 	stwForTestPageCachePagesLeaked: "PageCachePagesLeaked (test)",
 	stwForTestResetDebugLog:        "ResetDebugLog (test)",
 	stwMemStats:                    "Read tango mem stats",
+	stwVerifyGABs:                  "Verify GABs (test)",
 }
 
 // worldStop provides context from the stop-the-world required by the
@@ -4532,7 +4534,7 @@ func gdestroy(gp *g) {
 	gp.bubble = nil
 	gp.fipsOnlyBypass = false
 	gp.secret = 0
-	gp.ab.clear()
+	gp.ab.retire()
 
 	if gcBlackenEnabled != 0 && gp.gcAssistBytes > 0 {
 		// Flush assist credit to the global pool. This gives

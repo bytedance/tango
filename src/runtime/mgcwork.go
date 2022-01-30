@@ -1,6 +1,9 @@
 // Copyright 2009 The Go Authors. All rights reserved.
+// Copyright (c) 2022 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2022-01-30.
 
 package runtime
 
@@ -114,6 +117,9 @@ type gcWork struct {
 	// Bytes marked (blackened) on this gcWork. This is aggregated
 	// into work.bytesMarked by dispose.
 	bytesMarked uint64
+
+	// Bytes of marked GABs on this gcWork.
+	gabMarked uint64
 
 	// Heap scan work performed on this gcWork. This is aggregated into
 	// gcController by dispose and may also be flushed by callers.
@@ -342,6 +348,10 @@ func (w *gcWork) dispose() {
 		// counter.
 		atomic.Xadd64(&work.bytesMarked, int64(w.bytesMarked))
 		w.bytesMarked = 0
+	}
+	if w.gabMarked != 0 {
+		atomic.Xadd64(&work.gabMarked, int64(w.gabMarked))
+		w.gabMarked = 0
 	}
 	if w.heapScanWork != 0 {
 		gcController.heapScanWork.Add(w.heapScanWork)

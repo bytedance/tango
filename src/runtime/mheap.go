@@ -231,6 +231,13 @@ type mheap struct {
 	specialSecretAlloc         fixalloc // allocator for specialSecret
 	speciallock                mutex    // lock for special record allocators.
 	arenaHintAlloc             fixalloc // allocator for arenaHints
+	refsalloc                  fixalloc // allocator for GC reference queues
+	smallObjStartAlloc         fixalloc // allocator for small objStartBits, 256B per block
+	smallObjStartLock          mutex    // lock for small objStartBits allocator
+	largeObjStartAlloc         fixalloc // allocator for small objStartBits, 512B per block
+	largeObjStartLock          mutex    // lock for large objStartBits allocator
+	frozenBitAlloc             fixalloc // allocator for frozenBits, 16B per block
+	frozenAllocLock            mutex    // lock for frozenBits allocator
 
 	// User arena state.
 	//
@@ -493,6 +500,31 @@ type mspan struct {
 	allocBits  *gcBits
 	gcmarkBits *gcBits
 	pinnerBits *gcBits // bitmap for pinned objects; accessed atomically
+	// when a bit is marked in gabPinBits, the whole GAB array should not be
+	// moved at GC.
+	// Usually we mark this bitmap during conservative stack walking,
+	// to avoid updating uncertain references from goroutine stacks;
+	gabPinBits *gcBits
+	// A bit in frozenBits is marked indicates that the object
+	// is a map bucket and it contains pointers to GAB-allocated objects.
+	frozenBits     *gcBits
+	frozenBytes    uintptr
+	frozenBitsLock mutex
+	// Every pointer-sized memory block corresponds to a bit in the objStartBits.
+	// A bit in objStartBits is marked indicates that that piece of memory
+	// is the start of an object.
+	objStartBits *gcBits
+	// gabEvacBits has the same size as objStartBits and serves two purposes:
+	// 1. marking live GAB objects during GC marking;
+	// 2. marking forwarded GAB objects during GAB evacuation.
+	// It is allocated together with other markBits when it is first accessed
+	// during marking. It is multiplexed, since it is used in disjoint GC phases.
+	// Furthermore, gabEvacBits needs to be cleared and can be accessed directly
+	// during GAB evacuation, since only marked GAB objects need to be copied and
+	// forwarded, and gabEvacBits should have already been allocated.
+	gabEvacBits     *gcBits
+	gabEvacBitsLock mutex
+	isFwdBits       bool
 
 	// sweep generation:
 	// if sweepgen == h->sweepgen - 2, the span needs sweeping
@@ -806,10 +838,28 @@ func heapArenaOf(p uintptr) *heapArena {
 	return l2[ri.l2()]
 }
 
+// Calculate the size of frozenBits.
+// The size of frozenBits is related to the number of objects
+// of the mspan containing the map buckets.
+// Get the size class of the map bucket object.
+// Get the total size and the element size of the corresponding mspan.
+// Number of object = totalSize / elemSize
+func frozenBitsAllocSize() (gabFrozenBitsAllocSize uintptr) {
+	sc := gc.SizeToSizeClass8[divRoundUp(minFrozenMapBucketSize, gc.SmallSizeDiv)]
+	size := uintptr(gc.SizeClassToNPages[sc]) * pageSize
+	elemSize := uintptr(gc.SizeClassToSize[sc])
+	nelems := size / elemSize
+	gabFrozenBitsAllocSize = (nelems + 63) / 64 * 8
+	return
+}
+
 // Initialize the heap.
 func (h *mheap) init() {
 	lockInit(&h.lock, lockRankMheap)
 	lockInit(&h.speciallock, lockRankMheapSpecial)
+	lockInit(&h.smallObjStartLock, lockRankMheap)
+	lockInit(&h.largeObjStartLock, lockRankMheap)
+	lockInit(&h.frozenAllocLock, lockRankMheap)
 
 	h.spanalloc.init(unsafe.Sizeof(mspan{}), recordspan, unsafe.Pointer(h), &memstats.mspan_sys)
 	h.spanSPMCAlloc.init(unsafe.Sizeof(spanSPMC{}), nil, nil, &memstats.gcMiscSys)
@@ -825,6 +875,10 @@ func (h *mheap) init() {
 	h.specialWeakHandleAlloc.init(unsafe.Sizeof(specialWeakHandle{}), nil, nil, &memstats.gcMiscSys)
 	h.specialBubbleAlloc.init(unsafe.Sizeof(specialBubble{}), nil, nil, &memstats.other_sys)
 	h.arenaHintAlloc.init(unsafe.Sizeof(arenaHint{}), nil, nil, &memstats.other_sys)
+	h.refsalloc.init(unsafe.Sizeof(refBlock{}), nil, nil, &memstats.gab_sys)
+	h.smallObjStartAlloc.init(smallObjStartBitsAllocSize, nil, nil, &memstats.gab_sys)
+	h.largeObjStartAlloc.init(largeObjStartBitsAllocSize, nil, nil, &memstats.gab_sys)
+	h.frozenBitAlloc.init(frozenBitsAllocSize(), nil, nil, &memstats.gab_sys)
 
 	// Don't zero mspan allocations. Background sweeping can
 	// inspect a span concurrently with allocating it, so it's
@@ -1515,6 +1569,10 @@ func (h *mheap) initSpan(s *mspan, typ spanAllocType, spanclass spanClass, base,
 		s.allocCache = ^uint64(0) // all 1s indicating all free.
 		s.gcmarkBits = newMarkBits(uintptr(s.nelems))
 		s.allocBits = newAllocBits(uintptr(s.nelems))
+		if isEvacEnabled() && s.isGab() {
+			s.gabPinBits = newAllocBits(uintptr(s.nelems))
+			s.newObjStartBits()
+		}
 
 		// Adjust s.limit down to the object-containing part of the span.
 		s.limit = s.base() + s.elemsize*uintptr(s.nelems)
@@ -1776,6 +1834,14 @@ func (h *mheap) freeSpanLocked(s *mspan, typ spanAllocType) {
 		if gcUsesSpanInlineMarkBits(s.elemsize) {
 			atomic.And8(&arena.pageUseSpanInlineMarkBits[pageIdx], ^pageMask)
 		}
+		// Free balanced GC gcBits.
+		if isGabEnabled() {
+			if s.objStartBits != nil {
+				s.freeObjStartBits()
+			} else if s.frozenBits != nil {
+				s.freeFrozenBits()
+			}
+		}
 	default:
 		throw("mheap.freeSpanLocked - invalid span state")
 	}
@@ -1858,8 +1924,16 @@ func (span *mspan) init(base uintptr, npages uintptr) {
 	span.allocBits = nil
 	span.gcmarkBits = nil
 	span.pinnerBits = nil
+	span.gabPinBits = nil
+	span.frozenBits = nil
+	span.frozenBytes = 0
+	span.objStartBits = nil
+	span.gabEvacBits = nil
+	span.isFwdBits = false
 	span.state.set(mSpanDead)
 	lockInit(&span.speciallock, lockRankMspanSpecial)
+	lockInit(&span.frozenBitsLock, lockRankMheap)
+	lockInit(&span.gabEvacBitsLock, lockRankMheap)
 }
 
 func (span *mspan) inList() bool {

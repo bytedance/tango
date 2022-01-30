@@ -1,0 +1,434 @@
+// Copyright 2022 ByteDance Ltd. and/or its affiliates. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+package runtime_test
+
+import (
+	"fmt"
+	"internal/testenv"
+	"log"
+	"math/rand"
+	"os"
+	"os/exec"
+	"runtime"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+	"unsafe"
+)
+
+func TestGabPinObj(t *testing.T) {
+	if !isEvacSupported() {
+		t.Skip("Skip balanced GC test on platforms other than linux/amd64 and darwin/amd64")
+	}
+	output := runTestProg(t, "testproggab", "PinObjs", "GODEBUG=gab=2")
+	t.Logf("%s", output)
+	if strings.Contains(output, "panic") {
+		t.Fatalf("Child testing process failed")
+	}
+}
+
+func TestGabGCALot(t *testing.T) {
+	for _, env := range getGABEnvs() {
+		output := runTestProg(t, "testproggab", "GCALot", env...)
+		t.Logf("%s", output)
+		if strings.Contains(output, "panic") {
+			t.Fatalf("Child testing process failed")
+		}
+	}
+
+}
+
+func TestGabMemSim(t *testing.T) {
+	var envs = [][]string{
+		{
+			"GODEBUG=gab=1,gctrace=1",
+			"GAB_TEST_ENV=-d=5s",
+		},
+		{
+			"GODEBUG=gab=2,gctrace=1",
+			"GAB_TEST_ENV=-d=5s",
+		},
+		{
+			"GODEBUG=gab=2,gctrace=1",
+			"GOGABOPT=evacuation=1",
+			"GAB_TEST_ENV=-d=10s",
+		},
+		{
+			"GODEBUG=gab=2,gctrace=1",
+			"GOGABOPT=evacuation=1",
+			"GAB_TEST_ENV=-d=10s",
+		},
+	}
+
+	for _, env := range envs {
+		t.Run(strings.Join(env, " "), func(t2 *testing.T) {
+			output := runTestProg(t2, "testproggab", "MemSim", env...)
+			t2.Logf("%s", output)
+			if strings.Contains(output, "panic") {
+				t2.Fatalf("Child testing process failed")
+			}
+		})
+	}
+}
+
+// Test whether GAB evacuation properly handle specials.
+func TestGabSpecialRelocation(t *testing.T) {
+	for _, env := range getGABEnvs() {
+		t.Run(strings.Join(env, " "), func(t2 *testing.T) {
+			output := runTestProg(t2, "testproggab", "SpecialRelocation", env...)
+			t2.Logf("%s", output)
+			if strings.Contains(output, "panic") {
+				t2.Fatalf("Child testing process failed")
+			}
+		})
+	}
+}
+
+// Recursively install a finalizer on an object,
+// which cannot be reclaimed in this case.
+func TestGabSpecialRecursiveFinalizers(t *testing.T) {
+	for _, env := range getGABEnvs() {
+		t.Run(strings.Join(env, " "), func(t2 *testing.T) {
+			output := runTestProg(t2, "testproggab", "InstallFinalizerRecursion", env...)
+			t2.Logf("%s", output)
+			if strings.Contains(output, "panic") {
+				t2.Fatalf("Child testing process failed")
+			}
+		})
+	}
+}
+
+func TestGabMapWithGABPointerAsKey(t *testing.T) {
+	for _, env := range getGABEnvs() {
+		t.Run(strings.Join(env, " "), func(t2 *testing.T) {
+			output := runTestProg(t2, "testproggab", "MapWithGABPointerAsKey", env...)
+			t2.Logf("%s", output)
+			if strings.Contains(output, "panic") {
+				t2.Fatalf("Child testing process failed")
+			}
+		})
+	}
+}
+
+func TestGabMapWithNormalObjectAsKey(t *testing.T) {
+	for _, env := range getGABEnvs() {
+		t.Run(strings.Join(env, " "), func(t2 *testing.T) {
+			output := runTestProg(t2, "testproggab", "MapWithNormalObjectAsKey", env...)
+			t2.Logf("%s", output)
+			if strings.Contains(output, "panic") {
+				t2.Fatalf("Child testing process failed")
+			}
+		})
+	}
+}
+
+func TestGabMapAsyncPreemption(t *testing.T) {
+	for _, env := range getGABEnvs() {
+		t.Run(strings.Join(env, " "), func(t2 *testing.T) {
+			output := runTestProg(t2, "testproggab", "GabMapAsyncPreemption", env...)
+			t2.Logf("%s", output)
+			if strings.Contains(output, "panic") {
+				t2.Fatalf("Child testing process failed")
+			}
+		})
+	}
+}
+
+// Before stack scanning is enabled, enable balanced GC
+// during test case compilation has the potential to
+// trigger the crash.
+func TestGabStackRescanning(t *testing.T) {
+	if *flagQuick {
+		t.Skip("-quick")
+	}
+	testenv.MustHaveGoBuild(t)
+	const FREQ = 5
+
+	// Use separate GOPATH and GOCACHE to prevent this case from
+	// interfering others at 'dist test'.
+	gopath := t.TempDir()
+	gocache := t.TempDir()
+	newCmd := func(name string, arg ...string) *exec.Cmd {
+		cmd := exec.Command(name, arg...)
+		cmd.Env = os.Environ()
+		cmd.Env = append(cmd.Env, "GOPATH="+gopath)
+		cmd.Env = append(cmd.Env, "GOCACHE="+gocache)
+		return cmd
+	}
+
+	for i := 0; i < FREQ; i++ {
+		dir := t.TempDir()
+		t.Logf("Working directory: %s\n", dir)
+
+		newCmd(testenv.GoToolPath(t), "clean").CombinedOutput()
+		newCmd(testenv.GoToolPath(t), "clean", "-cache").CombinedOutput()
+		newCmd(testenv.GoToolPath(t), "clean", "-testcache").CombinedOutput()
+
+		cmd := newCmd(testenv.GoToolPath(t), "test", "-v", "-c", "-o", "test", "-run=Gab", "runtime")
+		// Enable balanced GC
+		cmd.Env = os.Environ()
+		cmd.Env = append(cmd.Env, "GODEBUG=gab=2")
+		cmd.Env = append(cmd.Env, "GOGABOPT=evacuation=1")
+		cmd.Dir = dir
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("Error occurred.\n%s", string(out))
+		}
+	}
+}
+
+// Concurrently performing GAB GC bits cleaning.
+func TestGabConcGCBitsClean(t *testing.T) {
+	if !isEvacSupported() {
+		t.Skip("Skip balanced GC test on platforms other than linux/amd64 and darwin/amd64")
+	}
+	var envs = [][]string{
+		{
+			"GODEBUG=gab=2",
+		},
+		{
+			"GODEBUG=gab=2",
+			"GOGABOPT=evacuation=1",
+		},
+	}
+
+	for _, env := range envs {
+		t.Run(strings.Join(env, " "), func(t2 *testing.T) {
+			output := runTestProg(t2, "testproggab", "ConcGCBitsClean", env...)
+			t2.Logf("%s", output)
+			if strings.Contains(output, "panic") {
+				t2.Fatalf("Child testing process failed")
+			}
+		})
+	}
+}
+
+func TestGabFindBlockFast(t *testing.T) {
+	if !isEvacSupported() {
+		t.Skip("Skip balanced GC test on platforms other than linux/amd64 and darwin/amd64")
+	}
+	maxHeap := 4 << 30
+	var envs = [][]string{
+		{
+			fmt.Sprintf("MY_MEM_LIMIT=%d", maxHeap),
+			"GODEBUG=gab=2,gcHeapPercent=50",
+			"GOGABOPT=evacuation=1,trace=0",
+		},
+	}
+
+	for _, env := range envs {
+		t.Run(strings.Join(env, " "), func(t2 *testing.T) {
+			output := runTestProg(t2, "testproggab", "FindBlockFast", env...)
+			t2.Logf("%s", output)
+			if strings.Contains(output, "panic") {
+				t2.Fatalf("Child testing process failed")
+			}
+		})
+	}
+}
+
+func TestGabMarkStacks(t *testing.T) {
+	if !isEvacSupported() {
+		t.Skip("Skip balanced GC test on platforms other than linux/amd64 and darwin/amd64")
+	}
+	var envs = [][]string{
+		{
+			"GODEBUG=gab=2,gctrace=0",
+			"GOGABOPT=evacuation=1,trace=0",
+		},
+	}
+
+	for _, env := range envs {
+		t.Run(strings.Join(env, " "), func(t2 *testing.T) {
+			output := runTestProg(t2, "testproggab", "GabMarkStacks", env...)
+			t2.Logf("Output: %s", output)
+			if strings.Contains(output, "panic") {
+				t2.Fatalf("Child testing process failed")
+			}
+		})
+	}
+}
+
+// Allocate large enough objects to trigger gcProg case and
+// check whether balanced GC stack rescanning can properly
+// handle gcProg.
+func TestGabRescanGCProg(t *testing.T) {
+	if !isEvacSupported() {
+		t.Skip("Skip balanced GC test on platforms other than linux/amd64 and darwin/amd64")
+	}
+	var envs = [][]string{
+		{
+			"GODEBUG=gab=2,gctrace=0",
+			"GOGABOPT=evacuation=1,trace=0",
+		},
+	}
+
+	for _, env := range envs {
+		t.Run(strings.Join(env, " "), func(t2 *testing.T) {
+			output := runTestProg(t2, "testproggab", "GabRescanGCProg", env...)
+			t2.Logf("Output: %s", output)
+			if strings.Contains(output, "panic") {
+				t2.Fatalf("Child testing process failed")
+			}
+		})
+	}
+}
+
+func TestGabNumEvac(t *testing.T) {
+	if *flagQuick {
+		t.Skip("-quick")
+	}
+	if !isEvacSupported() {
+		t.Skip("Skip balanced GC test on platforms other than linux/amd64 and darwin/amd64")
+	}
+
+	// Use max heap to avoid any non-forced GC
+	maxHeap := 4 << 30
+	var evacInterval uint32 = 5
+	var envs = []string{
+		fmt.Sprintf("MY_MEM_LIMIT=%d", maxHeap),
+		"GODEBUG=gab=2,gcHeapPercent=50",
+		fmt.Sprintf("GOGABOPT=evacuation=%d,trace=1", evacInterval),
+	}
+
+	if !testGabInChildProcEnv(t, "GabNumEvac", envs...) {
+		return
+	}
+
+	var numGC uint32 = 100
+	numEvac := numGC / evacInterval
+	min := 8
+	max := 128
+
+	// Allocate GAB objects
+	holder := make([]unsafe.Pointer, 1<<20)
+	rand.Seed(time.Now().UnixNano())
+	getSize := func() int {
+		return min + rand.Intn(max-min+1)
+	}
+	for i := uint32(0); i < numGC; i++ {
+		for j := 0; j < cap(holder); j++ {
+			buf := make([]byte, getSize())
+			holder[j] = unsafe.Pointer(&buf)
+		}
+		// Triggering GC
+		runtime.GC()
+	}
+
+	// Evaluate memstats
+	var memstats runtime.MemStats
+	runtime.ReadMemStats(&memstats)
+	actualGC := memstats.NumGC
+	actualEvac := memstats.NumBalancedGC
+
+	if numGC != actualGC {
+		log.Fatalf("Incorrect numgc. Expected %d, actual %d", numGC, actualEvac)
+	}
+
+	if numEvac != actualEvac {
+		log.Fatalf("Incorrect numEvac. Expected %d, actual %d", numEvac, actualEvac)
+	}
+}
+
+// Test switching from balanced GC to GAB.
+func TestGabBalancedGC2GAB(t *testing.T) {
+	if !isEvacSupported() {
+		t.Skip("Skip balanced GC test on platforms other than linux/amd64 and darwin/amd64")
+	}
+
+	maxHeap := 4 << 30
+
+	var envs = []string{
+		fmt.Sprintf("MY_MEM_LIMIT=%d", maxHeap),
+		"GODEBUG=gab=2,gcHeapPercent=50,gctrace=1",
+		"GOGABOPT=evacuation=1,trace=1",
+	}
+
+	if !testGabInChildProcEnv(t, "GabBalancedGC2GAB", envs...) {
+		return
+	}
+
+	// Allocate GAB objects with balanced GC allocator
+	gab2Holder := make([]unsafe.Pointer, 5)
+	rand.Seed(time.Now().UnixNano())
+	min := 8
+	max := 128
+	getSize := func() int {
+		return min + rand.Intn(max-min+1)
+	}
+
+	{
+		var wg1 sync.WaitGroup
+		for i := 0; i < 5; i++ {
+			i := i
+			wg1.Add(1)
+			ptrs := make([]unsafe.Pointer, 1<<12)
+			go func() {
+				for j := 0; j < 1<<12; j++ {
+					buf := make([]byte, getSize())
+					ptrs[j] = unsafe.Pointer(&buf)
+				}
+				gab2Holder[i] = unsafe.Pointer(&ptrs)
+				wg1.Done()
+			}()
+		}
+		wg1.Wait()
+	}
+	var memstat runtime.MemStats
+	runtime.ReadMemStats(&memstat)
+	println(gab2Holder)
+
+	// Switch to GAB allocator
+	runtime.BalancedGC2GAB()
+	gabSysBefore := runtime.GetGabSysMemUsage()
+
+	gab1Holder := make([]unsafe.Pointer, 5)
+	// Allocate GAB objects with GAB allocator
+	{
+		var wg2 sync.WaitGroup
+		for i := 0; i < 5; i++ {
+			i := i
+			wg2.Add(1)
+			ptrs := make([]unsafe.Pointer, 1<<12)
+			go func() {
+				for j := 0; j < 1<<12; j++ {
+					buf := make([]byte, getSize())
+					ptrs[j] = unsafe.Pointer(&buf)
+				}
+				gab1Holder[i] = unsafe.Pointer(&ptrs)
+				wg2.Done()
+			}()
+		}
+		wg2.Wait()
+	}
+	runtime.ReadMemStats(&memstat)
+	println(gab1Holder)
+	println(gab2Holder)
+
+	// Perform GC
+	for i := 0; i < 10; i++ {
+		time.Sleep(100 * time.Millisecond)
+		runtime.GC()
+	}
+	runtime.ReadMemStats(&memstat)
+
+	// Release memory
+	gab1Holder = make([]unsafe.Pointer, 5)
+	gab2Holder = make([]unsafe.Pointer, 5)
+
+	// Perform GC
+	for i := 0; i < 10; i++ {
+		time.Sleep(100 * time.Millisecond)
+		runtime.GC()
+	}
+	runtime.ReadMemStats(&memstat)
+	gabSysAfter := runtime.GetGabSysMemUsage()
+
+	// Check gab_sys
+	if gabSysBefore != gabSysAfter {
+		t.Fatalf("gab_sys should not increased when GAB allocator is used, before %d after %d", gabSysBefore, gabSysAfter)
+	}
+}

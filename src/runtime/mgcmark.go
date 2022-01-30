@@ -1,6 +1,9 @@
 // Copyright 2009 The Go Authors. All rights reserved.
+// Copyright (c) 2022 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2022-01-30.
 
 // Garbage collector: marking and scanning
 
@@ -1501,6 +1504,9 @@ func scanblock(b0, n0 uintptr, ptrmask *uint8, gcw *gcWork, stk *stackScanState)
 						if !tryDeferToSpanScan(p, gcw) {
 							if obj, span, objIndex := findObject(p, b, i); obj != 0 {
 								greyobject(obj, b, i, span, gcw, objIndex)
+								if isEvacEnabled() && span.doEvacuation() {
+									span.gabPinObj(obj)
+								}
 							}
 						}
 					}
@@ -1509,6 +1515,131 @@ func scanblock(b0, n0 uintptr, ptrmask *uint8, gcw *gcWork, stk *stackScanState)
 			bits >>= 1
 			i += goarch.PtrSize
 		}
+	}
+}
+
+// scanobject scans the object starting at b, adding pointers to gcw.
+// b must point to the beginning of a heap object or an oblet.
+// scanobject consults the GC bitmap for the pointer mask and the
+// spans for the size of the object.
+//
+// TODO: balancedGC add branches in scanobject, keep this temp function
+// to edit the add the new branches in scanObject
+//go:nowritebarrier
+func scanobject(b uintptr, gcw *gcWork) {
+	// Prefetch object before we scan it.
+	//
+	// This will overlap fetching the beginning of the object with initial
+	// setup before we start scanning the object.
+	sys.Prefetch(b)
+
+	// Find the bits for b and the size of the object at b.
+	//
+	// b is either the beginning of an object, in which case this
+	// is the size of the object to scan, or it points to an
+	// oblet, in which case we compute the size to scan below.
+	s := spanOfUnchecked(b)
+	n := s.elemsize
+	if n == 0 {
+		throw("scanobject n == 0")
+	}
+	if s.spanclass.noscan() {
+		// Correctness-wise this is ok, but it's inefficient
+		// if noscan objects reach here.
+		throw("scanobject of a noscan object")
+	}
+
+	var tp typePointers
+	if n > maxObletBytes {
+		// Large object. Break into oblets for better
+		// parallelism and lower latency.
+		if b == s.base() {
+			// Enqueue the other oblets to scan later.
+			// Some oblets may be in b's scalar tail, but
+			// these will be marked as "no more pointers",
+			// so we'll drop out immediately when we go to
+			// scan those.
+			for oblet := b + maxObletBytes; oblet < s.base()+s.elemsize; oblet += maxObletBytes {
+				if !gcw.putObjFast(oblet) {
+					gcw.putObj(oblet)
+				}
+			}
+		}
+
+		// Compute the size of the oblet. Since this object
+		// must be a large object, s.base() is the beginning
+		// of the object.
+		n = s.base() + s.elemsize - b
+		n = min(n, maxObletBytes)
+		tp = s.typePointersOfUnchecked(s.base())
+		tp = tp.fastForward(b-tp.addr, b+n)
+	} else {
+		tp = s.typePointersOfUnchecked(b)
+	}
+
+	var pinned bool
+	if isEvacEnabled() && isEvacuation && !s.isGab() {
+		pinned = s.shouldBePinned(b)
+	}
+
+	var scanSize uintptr
+	for {
+		var addr uintptr
+		if tp, addr = tp.nextFast(); addr == 0 {
+			if tp, addr = tp.next(b + n); addr == 0 {
+				break
+			}
+		}
+
+		// Keep track of farthest pointer we found, so we can
+		// update heapScanWork. TODO: is there a better metric,
+		// now that we can skip scalar portions pretty efficiently?
+		scanSize = addr - b + goarch.PtrSize
+
+		// Work here is duplicated in scanblock and above.
+		// If you make changes here, make changes there too.
+		obj := *(*uintptr)(unsafe.Pointer(addr))
+
+		// At this point we have extracted the next potential pointer.
+		// Quickly filter out nil and pointers back to the current object.
+		if obj != 0 && obj-b >= n {
+			// Test if obj points into the Go heap and, if so,
+			// mark the object.
+			//
+			// Note that it's possible for findObject to
+			// fail if obj points to a just-allocated heap
+			// object because of a race with growing the
+			// heap. In this case, we know the object was
+			// just allocated and hence will be marked by
+			// allocation itself.
+			if !tryDeferToSpanScan(obj, gcw) {
+				src := obj
+				if obj, span, objIndex := findObject(obj, b, addr-b); obj != 0 {
+					greyobject(obj, b, addr-b, span, gcw, objIndex)
+					if isEvacEnabled() && span.doEvacuation() {
+						if pinned {
+							span.gabPinObj(obj)
+						} else if !span.isPinnedGab(obj) {
+							getg().m.p.ptr().refsIn.enqueue(addr)
+							updateMarkedGABObjects(span, src, obj)
+						}
+					}
+				}
+			}
+		}
+	}
+	gcw.bytesMarked += uint64(n)
+	gcw.heapScanWork += int64(scanSize)
+	if debug.gctrace > 1 {
+		gcw.stats[s.spanclass.sizeclass()].sparseObjsScanned++
+	}
+}
+
+func updateMarkedGABObjects(s *mspan, src, lbound uintptr) {
+	start, size := gabFindBlockFast(src, lbound)
+	if !isMarked(s, start) {
+		atomic.Xadduintptr(&gabgcstats.gabMarkedBytes, size)
+		setMarked(s, start)
 	}
 }
 
@@ -1611,6 +1742,10 @@ func scanConservative(b, n uintptr, ptrmask *uint8, gcw *gcWork, state *stackSca
 		obj := span.base() + idx*span.elemsize
 		if !tryDeferToSpanScan(obj, gcw) {
 			greyobject(obj, b, i, span, gcw, idx)
+
+			if isEvacEnabled() && span.doEvacuation() {
+				span.gabPinObj(obj)
+			}
 		}
 	}
 }
@@ -1625,6 +1760,9 @@ func shade(b uintptr) {
 	if !tryDeferToSpanScan(b, gcw) {
 		if obj, span, objIndex := findObject(b, 0, 0); obj != 0 {
 			greyobject(obj, 0, 0, span, gcw, objIndex)
+			if span != nil && isEvacEnabled() && span.doEvacuation() {
+				span.gabPinObj(obj)
+			}
 		}
 	}
 }
@@ -1677,6 +1815,9 @@ func greyobject(obj, base, off uintptr, span *mspan, gcw *gcWork, objIndex uintp
 	// instead of greying it.
 	if span.spanclass.noscan() {
 		gcw.bytesMarked += uint64(span.elemsize)
+		if isGabEnabled() && span.isGab() {
+			gcw.gabMarked += uint64(span.elemsize)
+		}
 		return
 	}
 
@@ -1700,7 +1841,7 @@ func gcDumpObject(label string, obj, off uintptr) {
 		print(" s=nil\n")
 		return
 	}
-	print(" s.base()=", hex(s.base()), " s.limit=", hex(s.limit), " s.spanclass=", s.spanclass, " s.elemsize=", s.elemsize, " s.state=")
+	print(" s.isGab()=", s.isGab(), " s.base()=", hex(s.base()), " s.limit=", hex(s.limit), " s.spanclass=", s.spanclass, " s.elemsize=", s.elemsize, " s.state=")
 	if state := s.state.get(); 0 <= state && int(state) < len(mSpanStateNames) {
 		print(mSpanStateNames[state], "\n")
 	} else {
@@ -1762,6 +1903,11 @@ func gcmarknewobject(span *mspan, obj uintptr) {
 		span.scannedBitsForIndex(objIndex).setMarked()
 	}
 
+	// Pinning the newly allocated GAB
+	if isEvacEnabled() && span.doEvacuation() {
+		span.gabPinObj(obj)
+	}
+
 	// Mark span.
 	arena, pageIdx, pageMask := pageIndexOf(span.base())
 	if arena.pageMarks[pageIdx]&pageMask == 0 {
@@ -1770,6 +1916,9 @@ func gcmarknewobject(span *mspan, obj uintptr) {
 
 	gcw := &getg().m.p.ptr().gcw
 	gcw.bytesMarked += uint64(span.elemsize)
+	if isGabEnabled() && span.isGab() {
+		gcw.gabMarked += uint64(span.elemsize)
+	}
 }
 
 // gcMarkTinyAllocs greys all active tiny alloc blocks.

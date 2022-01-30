@@ -40,6 +40,14 @@ var AtomicFields = []uintptr{
 	unsafe.Offsetof(mstats{}.last_gc_nanotime),
 	unsafe.Offsetof(mstats{}.last_gc_unix),
 	unsafe.Offsetof(workType{}.bytesMarked),
+	unsafe.Offsetof(workType{}.gabMarked),
+	unsafe.Offsetof(gabGCStats{}.refsSkipped),
+	unsafe.Offsetof(gabGCStats{}.refsUpdated),
+	unsafe.Offsetof(gabGCStats{}.objCopied),
+	unsafe.Offsetof(gabGCStats{}.bytesCopied),
+	unsafe.Offsetof(gabGCStats{}.rescannedG),
+	unsafe.Offsetof(gabGCStats{}.refsEnqueued),
+	unsafe.Offsetof(gabGCStats{}.refsProcessed),
 }
 
 // AtomicVariables is the set of global variables on which we perform
@@ -54,4 +62,5 @@ var AtomicVariables = []unsafe.Pointer{
 	unsafe.Pointer(&sched),
 	unsafe.Pointer(&ticks),
 	unsafe.Pointer(&work),
+	unsafe.Pointer(&gabgcstats),
 }

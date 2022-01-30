@@ -2148,6 +2148,59 @@ func GetGABTopOffset() uintptr {
 func GetGABEndOffset() uintptr {
 	return unsafe.Offsetof(G{}.ab) + unsafe.Offsetof(G{}.ab.end)
 }
+
+// Export sizeclasses.go variables
+var (
+	SmallSizeDiv = gc.SmallSizeDiv
+	SmallSizeMax = gc.SmallSizeMax
+	LargeSizeDiv = gc.LargeSizeDiv
+	PageShift    = gc.PageShift
+
+	Class_to_size        = gc.SizeClassToSize
+	Class_to_allocnpages = gc.SizeClassToNPages
+	Size_to_class8       = gc.SizeToSizeClass8
+	Size_to_class128     = gc.SizeToSizeClass128
+
+	SmallObjStartBitsAllocSize = smallObjStartBitsAllocSize
+	LargeObjStartBitsAllocSize = largeObjStartBitsAllocSize
+	MinFrozenMapBucketSize     = minFrozenMapBucketSize
+	GABCapInitial              = gabCapInitial
+	GABFrozenBitsAllocSize     = frozenBitsAllocSize()
+)
+
+// The offset of hmap.buckets
+var MapBucketsOffset = unsafe.Offsetof(hmap{}.buckets)
+
+func SizeClass(p uintptr) int8 {
+	s := spanOf(p)
+	if s == nil {
+		println("unexpected pointer", hex(p))
+		panic("")
+	} else {
+		return s.spanclass.sizeclass()
+	}
+}
+
+func IsFrozenObj(p uintptr) bool {
+	s := spanOf(p)
+	if s == nil {
+		println(hex(p), "is not a heap pointer")
+		return false
+	}
+	if s.spanclass.noscan() {
+		println(s, "is not a scan-type mspan")
+		print("s=", s, " s.isGab()=", s.isGab(), " s.noscan()=", s.spanclass.noscan(), " s.base()=", hex(s.base()),
+			" s.limit=", hex(s.limit), " s.spanclass=", s.spanclass, " s.elemsize=", s.elemsize, "\n")
+		return false
+	}
+	if s.frozenBits == nil {
+		println(s, "do not have frozenBits")
+		return false
+	}
+	i := s.objIndex(p)
+	return s.frozenBitsForIndex(i).isMarked()
+}
+
 func SetMaxHeap(bytes int64) int64 {
 	return gcSetMaxHeap(bytes)
 }

@@ -704,8 +704,31 @@ func (sl *sweepLocked) sweep(preserve bool) bool {
 
 	// gcmarkBits becomes the allocBits.
 	// get a fresh cleared gcmarkBits in preparation for next GC
+	// Relocate objStartBits and frozenBits.
+	// New mark bits arena epoch is established in the beginning
+	// of each GC cycle. Both objStartBits and frozenBits need
+	// to be preserved across GC cycles. Relocating them ensures
+	// that they are in active gcBitsArenas.
 	s.allocBits = s.gcmarkBits
 	s.gcmarkBits = newMarkBits(uintptr(s.nelems))
+	// Balanced GC supports switching to GAB allocator at runtime.
+	// Those balanced GC off-heap memory still needs to be released
+	// when GAB allocator is used.
+	if isGabEnabled() && s.state.get() == mSpanInUse {
+		if s.isGab() {
+			s.gabPinBits = nil
+			if isEvacEnabled() {
+				s.clrFreeObjStartBits()
+			}
+			s.gabEvacBits = nil
+			s.isFwdBits = false
+			if isEvacEnabled() {
+				s.gabPinBits = newMarkBits(uintptr(s.nelems))
+			}
+		} else if s.frozenBits != nil {
+			s.updateFrozenBits()
+		}
+	}
 
 	// refresh pinnerBits if they exists
 	if s.pinnerBits != nil {

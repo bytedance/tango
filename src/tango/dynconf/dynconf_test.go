@@ -72,6 +72,7 @@ func getExpectedCfgs(local bool) map[string]any {
 	expectedCfgs := map[string]any{
 		"runtime.gab":              int32(0),
 		"runtime.gabUsedBytes":     uintptr(0),
+		"runtime.gabThreshold":     uintptr(0),
 		"runtime.gabMemoryPercent": int32(20),
 		"runtime.gabEnabled":       false,
 		"runtime.gctrace":          int32(0),
@@ -135,6 +136,7 @@ func testList(t *testing.T) {
 		"config(ro): runtime.harddecommit=",
 		"config(ro): runtime.maxHeapBytes=",
 		"config(ro): runtime.largeAllocTrace=",
+		"config(ro): runtime.gabThreshold=",
 		"task: runtime.GC",
 	}
 	if !strings.HasPrefix(runtime.BVersion(), "devel ") {

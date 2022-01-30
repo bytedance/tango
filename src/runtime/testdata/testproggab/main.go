@@ -26,6 +26,18 @@ func getGabCap() (init, max uintptr)
 //go:linkname rtCfgListAll runtime.rtCfgListAll
 func rtCfgListAll() map[string]any
 
+//go:linkname isInGabSpan runtime.dbgIsInGabSpan
+func isInGabSpan(p uintptr) bool
+
+//go:linkname gabPin runtime.dbgGabPin
+func gabPin(p uintptr)
+
+//go:linkname isGabPinned runtime.dbgIsGabPinned
+func isGabPinned(p uintptr) bool
+
+//go:linkname dumpGABObject runtime.dbgDumpGABObject
+func dumpGABObject(label string, p uintptr) bool
+
 func register(name string, f func()) {
 	if cmds[name] != nil {
 		panic("duplicate registration: " + name)

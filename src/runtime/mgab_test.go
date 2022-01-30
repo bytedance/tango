@@ -6,6 +6,7 @@ package runtime_test
 
 import (
 	"fmt"
+	"internal/goarch"
 	"internal/testenv"
 	"io/ioutil"
 	"os"
@@ -17,22 +18,57 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 	"unsafe"
 )
 
+func getGABEnvs() [][]string {
+	var envs [][]string
+	if isEvacSupported() {
+		envs = [][]string{
+			{
+				"GODEBUG=gab=1",
+			},
+			{
+				"GODEBUG=gab=2",
+			},
+			{
+				"GODEBUG=gab=2",
+				"GOGABOPT=evacuation=1",
+			},
+		}
+	} else {
+		envs = [][]string{
+			{
+				"GODEBUG=gab=1",
+			},
+		}
+	}
+	return envs
+}
+
+func isEvacSupported() bool {
+	// TODO balanced GC supports arm64
+	return runtime.GOARCH == "amd64" && (runtime.GOOS == "linux" || runtime.GOOS == "darwin")
+}
+
 func TestGabAllocBasic(t *testing.T) {
-	output := runTestProg(t, "testproggab", "AllocBasic", "GODEBUG=gab=1")
-	want := "OK\n"
-	if output != want {
-		t.Errorf("expected %q got %v", want, output)
+	for _, env := range getGABEnvs() {
+		output := runTestProg(t, "testproggab", "AllocBasic", env...)
+		want := "OK\n"
+		if output != want {
+			t.Errorf("expected %q got %v", want, output)
+		}
 	}
 }
 
 func TestGabObjFinalizer(t *testing.T) {
-	output := runTestProg(t, "testproggab", "ObjFinalizer", "GODEBUG=gab=1")
-	want := "OK\n"
-	if output != want {
-		t.Errorf("expected %q got %v", want, output)
+	for _, env := range getGABEnvs() {
+		output := runTestProg(t, "testproggab", "ObjFinalizer", env...)
+		want := "OK\n"
+		if output != want {
+			t.Errorf("expected %q got %v", want, output)
+		}
 	}
 }
 
@@ -172,10 +208,10 @@ func BenchmarkSmallGarbage(b *testing.B) {
 
 func TestGabMaxCap(t *testing.T) {
 	gabToCap := map[int]int{
-		-1:    0,
-		0:     0,
-		1:     16384,
-		2:     16384,
+		-1: 0,
+		0:  0,
+		1:  16384,
+		//2:     16384, TODO balanced GC supports arm64
 		1023:  16384,
 		1024:  1024,
 		1025:  1024,
@@ -252,35 +288,82 @@ func TestGabUsedBytes(t *testing.T) {
 
 // testing for maximum limit of GAB
 func TestGabPolicyMemPercentLimit(t *testing.T) {
-	output := runTestProg(t, "testproggab", "MemoryPercentLimit", "GODEBUG=gab=1")
-	t.Logf("%s", output)
+	maxHeap := 1 << 30
+	envs := [][]string{
+		{
+			fmt.Sprintf("MY_MEM_LIMIT=%d", maxHeap),
+			"GODEBUG=gab=1,gcHeapPercent=50",
+		},
+		{
+			fmt.Sprintf("MY_MEM_LIMIT=%d", maxHeap),
+			"GODEBUG=gab=2,gcHeapPercent=50",
+		},
+		{
+			fmt.Sprintf("MY_MEM_LIMIT=%d", maxHeap),
+			"GODEBUG=gab=2,gcHeapPercent=50",
+			"GOGABOPT=evacuation=1",
+		},
+	}
+	for _, env := range envs {
+		output := runTestProg(t, "testproggab", "MemoryPercentLimit", env...)
+		t.Logf("%s", output)
+	}
+}
+
+// testing the hard memory limit of GAB memory.
+// Use the environment variable MY_MEM_LIMIT to specify the memory limit.
+func TestGabHardMemoryLimit(t *testing.T) {
+	envs := [][]string{
+		{
+			fmt.Sprintf("MY_MEM_LIMIT=%d", 1<<28),
+			"GODEBUG=gab=1",
+		},
+		{
+			fmt.Sprintf("MY_MEM_LIMIT=%d", 1<<28),
+			"GODEBUG=gab=2",
+		},
+		{
+			fmt.Sprintf("MY_MEM_LIMIT=%d", 1<<28),
+			"GODEBUG=gab=2",
+			"GOGABOPT=evacuation=1",
+		},
+	}
+
+	for _, env := range envs {
+		output := runTestProg(t, "testproggab", "GabHardMemPctLimit", env...)
+		t.Logf("%s", output)
+	}
 }
 
 func TestGabDebugOpt(t *testing.T) {
 	//valid percent values
 	pctToTest := []int64{1, 10, 20, 50, 90, 99}
 	for _, pct := range pctToTest {
-		output := runTestProg(t, "testproggab", "EchoMemoryPercent", fmt.Sprintf("GOGABOPT=gabPercent=%d", pct), "GODEBUG=gab=1")
-		iv, err := strconv.ParseInt(output, 10, 32)
-		if err != nil {
-			t.Fatalf("Failed to parse output for uint64: %s", output)
-		}
-		if iv != pct {
-			t.Log(output)
-			t.Fatalf("Trying to set GOGABOPT=gabPercent=%d, but get %d", pct, iv)
+		for _, env := range getGABEnvs() {
+			output := runTestProg(t, "testproggab", "EchoMemoryPercent", append(env, fmt.Sprintf("GOGABOPT=gabPercent=%d", pct))...)
+			iv, err := strconv.ParseInt(output, 10, 32)
+			if err != nil {
+				t.Fatalf("Failed to parse output for uint64: %s", output)
+			}
+			if iv != pct {
+				t.Log(output)
+				t.Fatalf("Trying to set GOGABOPT=gabPercent=%d, but get %d", pct, iv)
+			}
 		}
 	}
 	//invalid percent values
 	pctToTest = []int64{-1, 100, 1024}
 	for _, pct := range pctToTest {
 		// should fail
-		output := runTestProg(t, "testproggab", "EchoMemoryPercent", fmt.Sprintf("GOGABOPT=gabPercent=%d", pct), "GODEBUG=gab=1")
-		if !strings.Contains(output, "fatal error: Illegal gabMemoryPercent") {
-			t.Log(output)
-			t.Fatalf("Should fail with GOGABOPT=gabPercent=%d", pct)
+		for _, env := range getGABEnvs() {
+			output := runTestProg(t, "testproggab", "EchoMemoryPercent", append(env, fmt.Sprintf("GOGABOPT=gabPercent=%d", pct))...)
+			if !strings.Contains(output, "fatal error: Illegal gabMemoryPercent") {
+				t.Log(output)
+				t.Fatalf("Should fail with GOGABOPT=gabPercent=%d", pct)
+			}
 		}
 		// should pass even for illegal values if GAB off
-		output = runTestProg(t, "testproggab", "EchoMemoryPercent", fmt.Sprintf("GOGABOPT=gabPercent=%d", pct), "GODEBUG=gab=0")
+		output := runTestProg(t, "testproggab", "EchoMemoryPercent", fmt.Sprintf("GOGABOPT=gabPercent=%d", pct))
 		if strings.Contains(output, "fatal error: Illegal gabMemoryPercent") {
 			t.Log(output)
 			t.Fatalf("Should fail with GOGABOPT=gabPercent=%d", pct)
@@ -328,4 +411,367 @@ func main() {
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("Failed to verify gab inlining\n%s", out)
 	}
+}
+
+func TestGabObjectSize(t *testing.T) {
+	if !isEvacSupported() {
+		t.Skip("Skip balanced GC test on platforms other than linux/amd64 and darwin/amd64")
+	}
+
+	if !testGabInChildProcEnvs(t, "GabObjectSize", []string{"GODEBUG=gab=2"}) {
+		return
+	}
+
+	m := make(map[unsafe.Pointer]struct{})
+	for i := 0; i < 1024; i++ {
+		p := allocGABObj()
+		m[p] = struct{}{}
+	}
+
+	for k, _ := range m {
+		p := uintptr(k)
+		expected := unsafe.Sizeof(GABObject{})
+		if actual, success := runtime.GetGABObjectSize(p); success {
+			if expected != actual {
+				t.Fatalf("Inconsistent GAB object size. expected %v, actual %v.", expected, actual)
+			}
+		} else {
+			t.Fatalf("Fail to obtain object size.")
+		}
+	}
+}
+
+func TestGabVerification(t *testing.T) {
+	if !isEvacSupported() {
+		t.Skip("Skip balanced GC test on platforms other than linux/amd64 and darwin/amd64")
+	}
+
+	if !testGabInChildProcEnvs(t, "GabVerification", []string{"GODEBUG=gab=2"}) {
+		return
+	}
+	const Length = 1000
+	var ptrs [Length]unsafe.Pointer
+	// Allocate in GABs with vary-size objects so that we can see filler objects here.
+	for i := 0; i < len(ptrs); i++ {
+		if i%2 == 0 {
+			ptrs[i] = allocGABObjArray()
+		} else {
+			ptrs[i] = allocGABObj()
+		}
+	}
+
+	if !runtime.VerifyGABs() {
+		t.Fatalf("Fail to find filler object in the GAB.")
+	}
+}
+
+type GABObject struct {
+	val int
+}
+
+//go:noinline
+func allocGABObj() unsafe.Pointer {
+	return unsafe.Pointer(&GABObject{})
+}
+
+//go:noinline
+func allocGABObjArray() unsafe.Pointer {
+	return unsafe.Pointer(&[8]GABObject{})
+}
+
+func testGabInChildProcEnvs(t *testing.T, name string, envs []string) bool {
+	if os.Getenv("GAB_TEST") != "" {
+		return true
+	}
+	testenv.MustHaveGoBuild(t)
+	cmd := exec.Command(testenv.GoToolPath(t), "test", fmt.Sprintf("-run=%s", name))
+	cmd.Env = os.Environ()
+	cmd.Env = append(cmd.Env, "GAB_TEST=true")
+	cmd.Env = append(cmd.Env, envs...)
+
+	if out, er := cmd.CombinedOutput(); er != nil {
+		t.Fatalf("Failed to test %s:%s", name, out)
+	} else {
+		t.Logf("Outout: %s", string(out))
+	}
+	return false
+}
+
+// We rely on objStartBits rather than object metaword
+// to calculate the size of GAB-allocated objects.
+// Since no object allocated on the RHS of the top object,
+// using objStartBits to calculate its size may be invalid.
+// In order to verify, we first stop the world and make GABs
+// parsable, then perform verification.
+func TestGabObjStartBits(t *testing.T) {
+	if !isEvacSupported() {
+		t.Skip("Skip balanced GC test on platforms other than linux/amd64 and darwin/amd64")
+	}
+
+	if !testGabInChildProcEnvs(t, "GabObjStartBits", []string{"GODEBUG=gab=2"}) {
+		return
+	}
+
+	const Length = 1000
+	var ptrs [Length]unsafe.Pointer
+	objSize := unsafe.Sizeof(GABObject{})
+
+	for i := 0; i < len(ptrs); i++ {
+		ptrs[i] = allocGABObj()
+	}
+
+	for i := 0; i < len(ptrs); i++ {
+		if !runtime.VerifyObjStartBits(ptrs[:], objSize) {
+			t.Fatalf("Fail to locate object start.")
+		}
+	}
+}
+
+// Check whether the size class of minFrozenMapBucketSize equals to
+// the size of actual map bucket.
+func TestGabMinFrozenMapBucketSize(t *testing.T) {
+	if !isEvacSupported() {
+		t.Skip("Skip balanced GC test on platforms other than linux/amd64 and darwin/amd64")
+	}
+
+	m := allocFrozenMap()
+	bucketPtr := map2BucketPtr(unsafe.Pointer(m))
+	sc := size2SizeClass(runtime.MinFrozenMapBucketSize)
+	groundTruth := runtime.SizeClass(bucketPtr)
+	if sc != groundTruth {
+		t.Fatalf("Minimal map bucket with frozenBits size %d, sizeclass %d, expected %d",
+			runtime.MinFrozenMapBucketSize, sc, groundTruth)
+	}
+}
+
+// Allocate maps with pointer pointing to GAB-allocated object.
+// Then verify whether the map bucket is frozen.
+func TestGabFrozenBits(t *testing.T) {
+	if !isEvacSupported() {
+		t.Skip("Skip balanced GC test on platforms other than linux/amd64 and darwin/amd64")
+	}
+
+	if !testGabInChildProcEnv(t, "GabVerifyFrozenBits", "GODEBUG=gab=2", "GOGABOPT=evacuation=1") {
+		return
+	}
+	const length = 10000
+	var ptrs [length]unsafe.Pointer
+	for i := 0; i < length; i++ {
+		ptrs[i] = unsafe.Pointer(allocFrozenMap())
+	}
+
+	go func() {
+		for {
+			runtime.GC()
+			time.Sleep(time.Millisecond)
+		}
+	}()
+
+	for i := 0; i < length; i++ {
+		bucketPtr := map2BucketPtr(ptrs[i])
+		if !runtime.IsFrozenObj(bucketPtr) {
+			t.Fatalf("Object %x is expected to be frozen", unsafe.Pointer(bucketPtr))
+		}
+	}
+}
+
+// Verify the size of frozenBits.
+// Allocate a minimal size of map that can have frozenBits.
+// From the size of that map bucket, verify each mspan.
+// frozenBits should be less than 16 bytes.
+func TestGabFrozenBitsSize(t *testing.T) {
+	if !isEvacSupported() {
+		t.Skip("Skip balanced GC test on platforms other than linux/amd64 and darwin/amd64")
+	}
+	verifyFrozenBitsSize(t)
+}
+
+func verifyFrozenBitsSize(t *testing.T) {
+	// Allocate a map. Normal map variable is a pointer
+	// refers to an instance of hmap.
+	// ptr is a pointer to map, so it refers to a pointer of hmap.
+	ptr := unsafe.Pointer(allocFrozenMap())
+	buckets := map2BucketPtr(ptr)
+	minSizeClass := runtime.SizeClass(buckets)
+	minFrozenMapBktSizeClass := size2SizeClass(runtime.MinFrozenMapBucketSize)
+	if minSizeClass < minFrozenMapBktSizeClass {
+		t.Fatalf("Map bucket size class %d, expected %d", minSizeClass, minFrozenMapBktSizeClass)
+	}
+	for i := int(minSizeClass); i < len(runtime.Class_to_size); i++ {
+		elemSize := int(runtime.Class_to_size[i])
+		page := int(runtime.Class_to_allocnpages[i])
+		mspanSize := page << runtime.PageShift
+		// One bit for one object in mspan.
+		nelems := mspanSize / elemSize
+		// Round up to 8 bytes.
+		bytesNeeded := ((nelems + 63) / 64) * 8
+
+		if bytesNeeded > int(runtime.GABFrozenBitsAllocSize) {
+			t.Fatalf("frozenBits overflows. mspan size %d B, element size %d B, frozenBits size %d B, actual size %d",
+				mspanSize, elemSize, bytesNeeded, runtime.GABFrozenBitsAllocSize)
+		}
+	}
+}
+
+// ptr points to a map, map2BucketPtr returns the pointer pointing to the map buckets.
+//
+//go:nocheckptr
+func map2BucketPtr(ptr unsafe.Pointer) uintptr {
+	// mapHeader points to an hmap instance
+	mapHeader := *(*uintptr)(unsafe.Pointer(ptr))
+	// bucketsPtr points to hmap.buckets, which is a pointer
+	bucketsPtr := mapHeader + runtime.MapBucketsOffset
+	// de-reference bucketsPtr, now we have a pointer to the actual map buckets
+	buckets := *((*uintptr)(unsafe.Pointer(bucketsPtr)))
+	return buckets
+}
+
+//go:noinline
+func allocFrozenMap() *map[*GABObject]struct{} {
+	m := map[*GABObject]struct{}{}
+	obj := &GABObject{}
+	m[obj] = struct{}{}
+	return &m
+}
+
+func testGabInChildProcEnv(t *testing.T, name string, env ...string) bool {
+	if os.Getenv("GAB_TEST") != "" {
+		return true
+	}
+	testenv.MustHaveGoBuild(t)
+	cmd := exec.Command(testenv.GoToolPath(t), "test", fmt.Sprintf("-run=%s", name))
+	cmd.Env = os.Environ()
+	cmd.Env = append(cmd.Env, "GAB_TEST=true")
+	cmd.Env = append(cmd.Env, env...)
+
+	if out, er := cmd.CombinedOutput(); er != nil {
+		t.Fatalf("Failed to test %s:%s", name, out)
+	}
+	return false
+}
+
+// Verify the size of objStartBits.
+// The size of GAB can be 1 KB, 2 KB, 4 KB, 8 KB, 16 KB and 32 KB.
+// Get the sizeclass of GAB mspan according to the GAB size.
+// Calculate the size of forzenBits according to the size of mspan.
+func TestGabObjStartBitsSize(t *testing.T) {
+	if !isEvacSupported() {
+		t.Skip("Skip balanced GC test on platforms other than linux/amd64 and darwin/amd64")
+	}
+	verifyObjStartBitsSize(t)
+}
+
+func verifyObjStartBitsSize(t *testing.T) {
+	var gabSizes [6]uintptr
+	var objStartBitsSizes = [6]uintptr{runtime.SmallObjStartBitsAllocSize, runtime.SmallObjStartBitsAllocSize,
+		runtime.SmallObjStartBitsAllocSize, runtime.SmallObjStartBitsAllocSize, runtime.SmallObjStartBitsAllocSize,
+		runtime.LargeObjStartBitsAllocSize}
+	for i := 0; i < len(gabSizes); i++ {
+		gabSizes[i] = uintptr(runtime.GABCapInitial << i)
+	}
+
+	for i := 0; i < len(gabSizes); i++ {
+		gabSize := gabSizes[i]
+		sizeclass := size2SizeClass(gabSize)
+		page := int(runtime.Class_to_allocnpages[sizeclass])
+		mspanSize := page << runtime.PageShift
+		// One bit for a pointer-width memory block.
+		nelems := mspanSize / goarch.PtrSize
+		// Round up to 8 bytes.
+		bytesNeeded := (nelems + 63) / 64 * 8
+
+		if bytesNeeded > int(objStartBitsSizes[i]) {
+			t.Fatalf("objStartBits overflows. mspan size %d B, objStartBits size %d B",
+				mspanSize, bytesNeeded)
+		}
+	}
+}
+
+// Copy from mallocgc1()
+func size2SizeClass(size uintptr) int8 {
+	divRoundUp := func(n, a uintptr) uintptr {
+		// a is generally a power of two. This will get inlined and
+		// the compiler will optimize the division.
+		return (n + a - 1) / a
+	}
+
+	var sc uint8
+	if size <= uintptr(runtime.SmallSizeMax-8) {
+		sc = runtime.Size_to_class8[divRoundUp(size, uintptr(runtime.SmallSizeDiv))]
+	} else {
+		sc = runtime.Size_to_class128[divRoundUp(size-uintptr(runtime.SmallSizeMax), uintptr(runtime.LargeSizeDiv))]
+	}
+	return int8(sc)
+}
+
+// Testing the live GAB objects in bytes collected during GC.
+func TestGabMarked(t *testing.T) {
+	// GOMAXPROCS=1 makes sure that only one GC worker.
+	if !testGabInChildProcEnv(t, "GabMarked", "GODEBUG=gab=1", "GOMAXPROCS=1") {
+		return
+	}
+
+	// to make gab decision to take effects
+	ballast := make([]byte, 1<<25)
+	runtime.GC()
+
+	var gabAllocLimit = 1 << 25
+	allocGrain := 128
+	var allocBytes int
+	var refs []unsafe.Pointer
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	// allocation worker
+	go func() {
+		defer wg.Done()
+		for allocBytes < gabAllocLimit {
+			buf := make([]byte, allocGrain)
+			ptr := unsafe.Pointer(&buf)
+			refs = append(refs, ptr)
+			allocBytes += allocGrain
+		}
+	}()
+	wg.Wait()
+	runtime.GC()
+	beforeMarked := runtime.GabMarked()
+	verifyGabMemory(t)
+
+	// Clear half of the buffers
+	for i := len(refs) / 2; i < len(refs); i++ {
+		refs[i] = nil
+	}
+	runtime.GC()
+	afterMarked := runtime.GabMarked()
+	verifyGabMemory(t)
+
+	if afterMarked >= beforeMarked {
+		t.Fatalf("GAB Before marked %d B, after marked %d B", beforeMarked, afterMarked)
+	} else {
+		fmt.Printf("GAB Before marked %d B, after marked %d B\n", beforeMarked, afterMarked)
+	}
+
+	ballast[0] = 1
+	refs = make([]unsafe.Pointer, 1)
+}
+
+func verifyGabMemory(t *testing.T) {
+	// Make sure there are no more GAB allocations.
+	*runtime.GabEnabled = false
+	used := *runtime.GabUsedBytes
+	marked := uintptr(runtime.GabMarked())
+	live := runtime.LiveGabSize()
+
+	// GABUsedBytes is GAB memory in bytes. It is updated during allocation and sweeping.
+	// liveGABs is obtained by iterating over all GAB mspans.
+	// gabMarked is collected during GC marking.
+	// These three statistics are expected to be equal.
+	// Because GC marking is performed concurrently, gabMarked could be
+	// slightly larger than GABUsedBytes and liveGABs. Using only one
+	// GC worker (specified by GOMAXPROCS) to avoid this issue.
+	if used != live || marked != live {
+		t.Fatalf("GAB uses %d B, marked %d B, live %d B", used, marked, live)
+	}
+	fmt.Printf("GAB uses %d B, marked %d B, live %d B\n", used, marked, live)
+	*runtime.GabEnabled = true
 }

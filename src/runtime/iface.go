@@ -1,6 +1,9 @@
 // Copyright 2014 The Go Authors. All rights reserved.
+// Copyright (c) 2022 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2022-01-30.
 
 package runtime
 
@@ -144,7 +147,12 @@ func itabAdd(m *itab) {
 		// t2 = new(itabTableType) + some additional entries
 		// We lie and tell malloc we want pointer-free memory because
 		// all the pointed-to values are not in the heap.
-		t2 := (*itabTableType)(mallocgc((2+2*t.size)*goarch.PtrSize, nil, true))
+		var t2 *itabTableType
+		if isEvacEnabled() {
+			t2 = (*itabTableType)(mallocgc2((2+2*t.size)*goarch.PtrSize, nil, true))
+		} else {
+			t2 = (*itabTableType)(mallocgc((2+2*t.size)*goarch.PtrSize, nil, true))
+		}
 		t2.size = t.size * 2
 
 		// Copy over entries.

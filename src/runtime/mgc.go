@@ -383,6 +383,9 @@ type workType struct {
 	// (and thus 8-byte alignment even on 32-bit architectures).
 	bytesMarked uint64
 
+	// gabMarked is the number of bytes of marked GABs in this cycle.
+	gabMarked uint64
+
 	markrootNext atomic.Uint32 // next markroot job
 	markrootJobs atomic.Uint32 // number of markroot jobs
 
@@ -919,6 +922,10 @@ func gcStart(trigger gcTrigger) {
 	// happen, we want to enable assists as early as
 	// possible.
 	setGCPhase(_GCmark)
+	if isEvacEnabled() && isEvacuation {
+		assertWorldStopped()
+		gabGCPrologue()
+	}
 
 	gcBgMarkPrepare() // Must happen before assists are enabled.
 	gcPrepareMarkRoots()
@@ -1075,6 +1082,13 @@ top:
 
 	// For debugging/testing.
 	for gcDebugMarkDone.spinAfterRaggedBarrier.Load() {
+	}
+
+	// Initialize GAB copying destination memory area right before the second STW
+	if isEvacEnabled() && isEvacuation && gabgcstats.refsEnqueued != 0 {
+		atomic.Storeuintptr(&gabgcstats.gabUsedBytesBeforeEvac, atomic.Loaduintptr(&gabUsedBytes))
+		survivorGABs := atomic.Loaduintptr(&gabgcstats.gabMarkedBytes) * safeMargin / 100
+		gabInitStwChunks(survivorGABs)
 	}
 
 	// There was no global work, no local work, and no Ps
@@ -1390,6 +1404,10 @@ func gcMarkTermination(stw worldStop) {
 
 		// marking is complete so we can turn the write barrier off
 		setGCPhase(_GCoff)
+		if isEvacEnabled() && isEvacuation {
+			gabEvacuate()
+			gabGCEpilogue()
+		}
 		stwSwept = gcSweep(work.mode)
 	})
 
@@ -1627,6 +1645,9 @@ func gcMarkTermination(stw worldStop) {
 
 		if debug.gctrace > 1 {
 			dumpScanStats()
+		}
+		if isGabEnabled() {
+			print("[GAB memory: ", gabUsedBytes>>10, "->", work.gabMarked>>10, " KB]\n")
 		}
 		printunlock()
 	}
@@ -2138,6 +2159,7 @@ func gcResetMarkState() {
 	}
 
 	work.bytesMarked = 0
+	work.gabMarked = 0
 	work.initialHeapLive = gcController.heapLive.Load()
 }
 

@@ -6,6 +6,7 @@ package main
 
 import (
 	"fmt"
+	"internal/goarch"
 	"internal/runtime/atomic"
 	"runtime"
 	"sync"
@@ -39,8 +40,14 @@ func testAllocBasic() {
 	addr1 := uintptr(refs1[0])
 	addr2 := uintptr(refs1[1])
 	// addr1 must reside before addr2
-	if addr1 > addr2 || addr2-addr1 > 16 {
-		fmt.Println("addr1 (0x%x) addr2 (0x%x) should be in same GAB\n", addr1, addr2)
+	var addrDiff uintptr
+	if *gab == 1 {
+		addrDiff = 16
+	} else if *gab == 2 {
+		addrDiff = 16 + goarch.PtrSize
+	}
+	if addr1 > addr2 || addr2-addr1 > addrDiff {
+		fmt.Printf("addr1 (0x%x) addr2 (0x%x) should be in same GAB\n", addr1, addr2)
 	}
 	fmt.Println("OK")
 }

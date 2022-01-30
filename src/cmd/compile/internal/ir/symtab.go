@@ -29,7 +29,7 @@ type symsStruct struct {
 	Deferreturn               *obj.LSym
 	Duffcopy                  *obj.LSym
 	Duffzero                  *obj.LSym
-	GabEnabled                *obj.LSym
+	GabInliningEnabled        *obj.LSym
 	GCWriteBarrier            [8]*obj.LSym
 	Goschedguarded            *obj.LSym
 	Growslice                 *obj.LSym

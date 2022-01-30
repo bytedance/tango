@@ -1,6 +1,9 @@
 // Copyright 2013 The Go Authors. All rights reserved.
+// Copyright (c) 2022 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2022-01-30.
 
 package runtime_test
 
@@ -78,6 +81,7 @@ func TestMemStats(t *testing.T) {
 		"NextGC": {nz, le(1e10)}, "LastGC": {nz},
 		"PauseTotalNs": {le(1e11)}, "PauseNs": nil, "PauseEnd": nil,
 		"NumGC": {nz, le(1e9)}, "NumForcedGC": {nz, le(1e9)},
+		"NumBalancedGC": {eq(uint32(0))},
 		"GCCPUFraction": {le(0.99)}, "EnableGC": {eq(true)}, "DebugGC": {eq(false)},
 		"BySize": nil,
 	}

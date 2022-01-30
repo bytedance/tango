@@ -118,7 +118,7 @@ func InitConfig() {
 	ir.Syms.Deferreturn = typecheck.LookupRuntimeFunc("deferreturn")
 	ir.Syms.Duffcopy = typecheck.LookupRuntimeFunc("duffcopy")
 	ir.Syms.Duffzero = typecheck.LookupRuntimeFunc("duffzero")
-	ir.Syms.GabEnabled = typecheck.LookupRuntimeVar("gabEnabled")
+	ir.Syms.GabInliningEnabled = typecheck.LookupRuntimeVar("gabInliningEnabled")
 	ir.Syms.GCWriteBarrier[0] = typecheck.LookupRuntimeFunc("gcWriteBarrier1")
 	ir.Syms.GCWriteBarrier[1] = typecheck.LookupRuntimeFunc("gcWriteBarrier2")
 	ir.Syms.GCWriteBarrier[2] = typecheck.LookupRuntimeFunc("gcWriteBarrier3")
@@ -3796,7 +3796,7 @@ func (s *state) resultAddrOfCall(c *ssa.Value, which int64, t *types.Type) *ssa.
 // gabInline generates the following code:
 //
 //	var res unsafe.Pointer [phi]
-//	if gabEnabled {
+//	if gabInliningEnabled {
 //		gp := getg()
 //		if gp.ab.end - gp.ab.top < size {
 //			res = newobject(typ)
@@ -3820,7 +3820,7 @@ func (s *state) gabInline(n *ir.UnaryExpr) *ssa.Value {
 	newobj := s.f.NewBlock(ssa.BlockPlain)
 	final := s.f.NewBlock(ssa.BlockPlain)
 
-	enabledaddr := s.newValue1A(ssa.OpAddr, types.Types[types.TBOOL].PtrTo(), ir.Syms.GabEnabled, s.sb)
+	enabledaddr := s.newValue1A(ssa.OpAddr, types.Types[types.TBOOL].PtrTo(), ir.Syms.GabInliningEnabled, s.sb)
 	enabled := s.load(types.Types[types.TBOOL], enabledaddr)
 
 	b := s.endBlock()
