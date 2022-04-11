@@ -1,6 +1,9 @@
 // Copyright 2011 The Go Authors. All rights reserved.
+// Copyright (c) 2022 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2022-04-11.
 
 // CPU profiling.
 //
@@ -19,7 +22,7 @@ import (
 )
 
 const (
-	maxCPUProfStack = 64
+	maxCPUProfStack = 128
 
 	// profBufWordCount is the size of the CPU profile buffer's storage for the
 	// header and stack of each sample, measured in 64-bit words. Every sample
