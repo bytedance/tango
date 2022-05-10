@@ -19,6 +19,7 @@ var maxHeap int64 = math.MaxInt64
 //go:linkname gcSetMaxHeapFunc
 var gcSetMaxHeapFunc = gcSetMaxHeap
 
+//go:linkname setMaxHeapEnabled
 func setMaxHeapEnabled() bool {
 	return maxHeap != math.MaxInt64
 }
@@ -48,6 +49,7 @@ func gcPolicyInit() {
 	}
 }
 
+//go:linkname gcSetMaxHeap
 func gcSetMaxHeap(in int64) int64 {
 	var out int64
 	systemstack(func() {

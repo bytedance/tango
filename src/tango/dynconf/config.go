@@ -10,6 +10,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	_ "tango/features" // to build a dependency
 )
 
 // all known configurations
