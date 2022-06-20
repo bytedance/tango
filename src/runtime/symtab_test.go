@@ -1,10 +1,14 @@
 // Copyright 2009 The Go Authors. All rights reserved.
+// Copyright (c) 2022 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2022-06-20.
 
 package runtime_test
 
 import (
+	"internal/testenv"
 	"runtime"
 	"strings"
 	"testing"
@@ -218,6 +222,9 @@ func tracebackFunc(t *testing.T) uintptr {
 //
 // This is a regression test for issue 44971.
 func TestFunctionAlignmentTraceback(t *testing.T) {
+	if testenv.IsBeastModeEnabled() {
+		t.Skip("skipped as the different inline policy makes the case invalid")
+	}
 	pc := tracebackFunc(t)
 
 	// Double-check we got the right PC.

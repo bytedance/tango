@@ -1,6 +1,9 @@
 // Copyright 2021 The Go Authors. All rights reserved.
+// Copyright (c) 2022 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2022-06-20.
 
 package fipstest
 
@@ -10,6 +13,7 @@ import (
 	"crypto/internal/cryptotest"
 	"crypto/internal/fips140/nistec"
 	"fmt"
+	"internal/testenv"
 	"math/big"
 	"math/rand"
 	"testing"
@@ -17,6 +21,11 @@ import (
 
 func TestNISTECAllocations(t *testing.T) {
 	cryptotest.SkipTestAllocations(t)
+
+	if testenv.IsBeastModeEnabled() {
+		t.Skip("skipping allocations test in beast mode")
+	}
+
 	t.Run("P224", func(t *testing.T) {
 		if allocs := testing.AllocsPerRun(100, func() {
 			p := nistec.NewP224Point().SetGenerator()

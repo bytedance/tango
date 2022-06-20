@@ -1,6 +1,9 @@
 // Copyright 2015 The Go Authors. All rights reserved.
+// Copyright (c) 2022 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2022-06-20.
 
 package ssa
 
@@ -2123,7 +2126,7 @@ func rewriteFixedLoad(v *Value, sym Sym, sb *Value, off int64) *Value {
 	if (v.Type.IsPtrShaped() || v.Type.IsUintptr()) && lsym.Type == objabi.SRODATA {
 		for _, r := range lsym.R {
 			if (r.Type == objabi.R_ADDR || r.Type == objabi.R_WEAKADDR) && int64(r.Off) == off && r.Add == 0 {
-				if strings.HasPrefix(r.Sym.Name, "type:") {
+				if r.Sym.TypeInfo() != nil {
 					// In case we're loading a type out of a dictionary, we need to record
 					// that the containing function might put that type in an interface.
 					// That information is currently recorded in relocations in the dictionary,

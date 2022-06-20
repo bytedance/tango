@@ -1,6 +1,9 @@
 // Copyright 2012 The Go Authors. All rights reserved.
+// Copyright (c) 2022 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2022-06-20.
 
 package runtime_test
 
@@ -949,6 +952,9 @@ func init() {
 }
 
 func TestRuntimePanic(t *testing.T) {
+	if testenv.IsBeastModeEnabled() {
+		t.Skip("skipped as the bound check eliminated in runtime")
+	}
 	cmd := testenv.CleanCmdEnv(exec.Command(testenv.Executable(t), "-test.run=^TestRuntimePanic$"))
 	cmd.Env = append(cmd.Env, "GO_TEST_RUNTIME_PANIC=1")
 	out, err := cmd.CombinedOutput()

@@ -1,6 +1,9 @@
 // Copyright 2015 The Go Authors. All rights reserved.
+// Copyright (c) 2022 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2022-06-20.
 
 // Package testenv provides information about what functionality
 // is available in different testing environments run by the Go team.
@@ -26,6 +29,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	_ "unsafe"
 )
 
 // Save the original environment during init for use in checks. A test
@@ -545,4 +549,11 @@ func CPUProfilingBroken() bool {
 	}
 
 	return false
+}
+
+//go:linkname isBeastModeEnabled runtime.isBeastModeEnabled
+func isBeastModeEnabled() bool
+
+func IsBeastModeEnabled() bool {
+	return isBeastModeEnabled()
 }

@@ -1,6 +1,9 @@
 // Copyright 2020 The Go Authors. All rights reserved.
+// Copyright (c) 2022 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2022-06-20.
 
 package netip_test
 
@@ -2300,6 +2303,9 @@ func TestNoAllocs(t *testing.T) {
 }
 
 func TestAddrStringAllocs(t *testing.T) {
+	if testenv.IsBeastModeEnabled() {
+		t.Skip("Skip TestAddrStringAllocs in beast mode")
+	}
 	tests := []struct {
 		name       string
 		ip         Addr

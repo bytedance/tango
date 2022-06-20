@@ -1,6 +1,9 @@
 // Copyright 2015 The Go Authors. All rights reserved.
+// Copyright (c) 2022 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2022-06-20.
 
 package main
 
@@ -317,6 +320,7 @@ type goTest struct {
 	tags     []string      // Build tags
 	race     bool          // Force -race
 	bench    bool          // Run benchmarks (briefly), not tests.
+	beast    bool          // enable beast mode
 	runTests string        // Regexp of tests to run
 	cpu      string        // If non-empty, -cpu flag
 	skip     string        // If non-empty, -skip flag
@@ -454,6 +458,9 @@ func (opts *goTest) buildArgs(t *tester) (build, run, pkgs, testFlags []string, 
 	if t.asan {
 		build = append(build, "-asan")
 	}
+	if opts.beast {
+		build = append(build, "-opt=beast")
+	}
 	if opts.bench {
 		// Run no tests.
 		run = append(run, "-run=^$")
@@ -545,12 +552,16 @@ func (opts *goTest) printSkip(t *tester, msg string) {
 //
 // ranGoBench and benchMatches are the same, but are only used
 // in -race mode.
+//
+// ranTangoTest is almost the same as ranGoTest but has different compile options.
 var (
 	ranGoTest  bool
 	stdMatches []string
 
 	ranGoBench   bool
 	benchMatches []string
+
+	ranTangoTest bool
 )
 
 func (t *tester) registerStdTest(pkg string) {
@@ -581,6 +592,41 @@ func (t *tester) registerStdTest(pkg string) {
 			gcflags: gcflags,
 			pkgs:    stdMatches,
 		}).run(t)
+	})
+}
+
+func (t *tester) registerStdTestInBeastMode(pkg string) {
+	heading := "Testing packages with beast option."
+	testPrefix := "tango_test:"
+
+	testName := testPrefix + pkg
+
+	t.tests = append(t.tests, distTest{
+		name:    testName,
+		heading: heading,
+		fn: func(dt *distTest) error {
+			if ranTangoTest {
+				return nil
+			}
+			t.runPending(dt)
+			timelog("start", dt.name)
+			defer timelog("end", dt.name)
+			ranTangoTest = true
+
+			timeoutSec := 480 * time.Second
+			for _, pkg := range stdMatches {
+				if pkg == "cmd/go" {
+					timeoutSec *= 3
+					break
+				}
+			}
+
+			return (&goTest{
+				timeout: timeoutSec,
+				beast:   true,
+				pkgs:    stdMatches,
+			}).run(t)
+		},
 	})
 }
 
@@ -677,7 +723,15 @@ func (t *tester) registerTests() {
 			}
 			t.registerStdTest(pkg)
 		}
-		if t.race && !t.short {
+
+		// TODO: beast mode does not work well with -race for now
+		if !t.race {
+			for _, pkg := range pkgs {
+				t.registerStdTestInBeastMode(pkg)
+			}
+		}
+
+		if t.race {
 			for _, pkg := range pkgs {
 				if t.packageHasBenchmarks(pkg) {
 					t.registerRaceBenchTest(pkg)

@@ -1,6 +1,9 @@
 // Copyright 2011 The Go Authors. All rights reserved.
+// Copyright (c) 2022 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2022-06-20.
 
 //go:build !js
 
@@ -354,7 +357,13 @@ func inlinedWrapperCallerDump(pcs []uintptr) {
 	h.dump(pcs)
 }
 
+//go:linkname isBeastModeEnabled runtime.isBeastModeEnabled
+func isBeastModeEnabled() bool
+
 func TestCPUProfileRecursion(t *testing.T) {
+	if isBeastModeEnabled() {
+		t.Skip("invalid inline for beast mode")
+	}
 	matches := matchAndAvoidStacks(stackContains, []string{"runtime/pprof.inlinedCallee", "runtime/pprof.recursionCallee", "runtime/pprof.recursionCaller"}, avoidFunctions())
 	p := testCPUProfile(t, matches, func(dur time.Duration) {
 		cpuHogger(recursionCaller, &salt1, dur)
@@ -2477,6 +2486,9 @@ func TestTracebackAll(t *testing.T) {
 // tests such cases by using fake call sequences and forcing the profile build
 // utilizing translateCPUProfile defined in proto_test.go
 func TestTryAdd(t *testing.T) {
+	if testenv.IsBeastModeEnabled() {
+		t.Skip("Skip TestTryAdd in beast mode")
+	}
 	if _, found := findInlinedCall(inlinedCallerDump, 4<<10); !found {
 		t.Skip("Can't determine whether anything was inlined into inlinedCallerDump.")
 	}
