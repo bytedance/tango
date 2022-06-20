@@ -1,6 +1,9 @@
 // Copyright 2018 The Go Authors. All rights reserved.
+// Copyright (c) 2022 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2022-06-20.
 
 package modload
 
@@ -424,6 +427,12 @@ func moduleInfo(loaderstate *State, ctx context.Context, rs *Requirements, m mod
 	info.Replace = &modinfo.ModulePublic{
 		Path:    r.Path,
 		Version: r.Version,
+	}
+	if cfg.Optmode == "beast" && cfg.BuildV {
+		path := info.Path
+		if path == "github.com/choleraehyq/pid" {
+			fmt.Printf("[Beast] %s is replaced with %s in go.mod\n", path, info.Replace.Path)
+		}
 	}
 	if v, ok := rawGoVersion.Load(m); ok {
 		info.Replace.GoVersion = v.(string)

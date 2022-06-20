@@ -1,6 +1,9 @@
 // Copyright 2011 The Go Authors. All rights reserved.
+// Copyright (c) 2022 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2022-06-20.
 
 // Action graph execution.
 
@@ -16,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"go/token"
+	"internal/buildcfg"
 	"internal/lazyregexp"
 	"io"
 	"io/fs"
@@ -780,6 +784,10 @@ func (b *Builder) build(ctx context.Context, a *Action) (err error) {
 	gofiles := str.StringList(p.GoFiles)
 	cfiles := str.StringList(p.CFiles)
 	sfiles := str.StringList(p.SFiles)
+	// Exclude assembly files in the pid package if intrinsic is on
+	if a.Package != nil && excludeGoidFuncs(a.Package) {
+		sfiles = make([]string, 0)
+	}
 	var objects, cgoObjects []string
 
 	// If we're doing coverage, preprocess the .go files and put them in the work directory
@@ -1031,6 +1039,15 @@ func (b *Builder) build(ctx context.Context, a *Action) (err error) {
 
 	a.built = objpkg
 	return nil
+}
+
+func excludeGoidFuncs(p *load.Package) bool {
+	path := p.ImportPath
+	return beastIntrinsic(p) && path == "github.com/choleraehyq/pid"
+}
+
+func beastIntrinsic(p *load.Package) bool {
+	return p.Internal.BeastOpt.Intrinsic != 0 && (buildcfg.GOARCH == "amd64" || buildcfg.GOARCH == "arm64")
 }
 
 func (b *Builder) checkDirectives(a *Action) error {

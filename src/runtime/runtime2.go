@@ -604,6 +604,19 @@ type g struct {
 	ab gab // goroutine allocation buffer; offset known to cmd/compile/internal/gc/ssa.go
 }
 
+// Replace pid.Get() and pid.GetPid() with runtime.getGId() and runtime.getPId()
+// to avoid compilation error when upgrading to a higher version of Go.
+// Replacement happens during SSA generation.
+// See cmd/compile/internal/ssagen/gid_op.go
+func getGId() int64 {
+	return int64(getg().goid)
+}
+
+//go:noinline
+func getPId() int {
+	return int(getg().m.p.ptr().id)
+}
+
 // gTrackingPeriod is the number of transitions out of _Grunning between
 // latency tracking runs.
 const gTrackingPeriod = 8

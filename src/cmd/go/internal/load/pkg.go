@@ -248,6 +248,10 @@ type PackageInternal struct {
 	Gcflags    []string // -gcflags for this package
 	Ldflags    []string // -ldflags for this package
 	Gccgoflags []string // -gccgoflags for this package
+
+	BeastOpt struct {
+		Intrinsic int
+	}
 }
 
 // A NoGoError indicates that no Go files for the package were applicable to the
@@ -3243,11 +3247,40 @@ func setToolFlags(loaderstate *modload.State, pkgs ...*Package) {
 		p.Internal.Gcflags = BuildGcflags.For(loaderstate, p)
 		p.Internal.Ldflags = BuildLdflags.For(loaderstate, p)
 		if cfg.Optmode == "beast" && !cfg.BuildASan {
-			beastOptions := fmt.Sprintf("-beast=bce,inlbudget=%d,gabinline", beastInlBudget)
+			beastOptions := fmt.Sprintf("-beast=bce,inlbudget=%d,gabinline,intrinsic", beastInlBudget)
+			if cfg.BuildV {
+				beastOptions = beastOptions + ",verbose"
+			}
 			p.Internal.Gcflags = append(p.Internal.Gcflags, beastOptions)
 			p.Internal.Ldflags = append(p.Internal.Ldflags, "-enablebeast")
 		}
+		p.parseBeastOptions()
 		p.Internal.Gccgoflags = BuildGccgoflags.For(loaderstate, p)
+	}
+}
+
+func (p *Package) parseBeastOptions() {
+	beastPrefix := "-beast="
+	var beastOpt string
+	for _, gcflag := range p.Internal.Gcflags {
+		if strings.HasPrefix(gcflag, beastPrefix) {
+			beastOpt = gcflag
+			break
+		}
+	}
+	if beastOpt == "" {
+		return
+	}
+
+	opts := strings.TrimPrefix(beastOpt, beastPrefix)
+	for _, o := range strings.Split(opts, ",") {
+		if o == "" {
+			continue
+		}
+		if o == "intrinsic" {
+			p.Internal.BeastOpt.Intrinsic = 1
+			break
+		}
 	}
 }
 

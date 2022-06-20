@@ -1,6 +1,9 @@
 // Copyright 2024 The Go Authors. All rights reserved.
+// Copyright (c) 2022 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2022-06-20.
 
 package ssagen
 
@@ -1731,6 +1734,8 @@ func initIntrinsics(cfg *intrinsicBuildConfig) {
 		sfp2("Float64x8.SelectFromPairGrouped", ssa.OpconcatSelectedConstantGroupedFloat64x8, types.TypeVec512, cscimm2g4)
 
 	}
+	// pid support
+	initGIdOp(addF)
 }
 
 func cscimm4(a, b, c, d uint8) int64 {

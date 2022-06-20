@@ -190,6 +190,8 @@ func InitConfig() {
 	ir.Syms.WriteBarrier = typecheck.LookupRuntimeVar("writeBarrier") // struct { bool; ... }
 	ir.Syms.Zerobase = typecheck.LookupRuntimeVar("zerobase")
 	ir.Syms.ZeroVal = typecheck.LookupRuntimeVar("zeroVal")
+	ir.Syms.GetGId = typecheck.LookupRuntimeFunc("getGId")
+	ir.Syms.GetPId = typecheck.LookupRuntimeFunc("getPId")
 
 	if Arch.LinkArch.Family == sys.Wasm {
 		BoundsCheckFunc[ssa.BoundsIndex] = typecheck.LookupRuntimeFunc("goPanicIndex")
