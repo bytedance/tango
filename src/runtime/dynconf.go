@@ -22,6 +22,7 @@ var rtCfgMap = map[string]any{
 	"runtime.madvdontneed,ro":     &debug.madvdontneed,
 	"runtime.harddecommit,ro":     &debug.harddecommit,
 	"runtime.optMode,ro":          &optMode,
+	"runtime.maxHeapBytes,ro":     &maxHeap,
 }
 
 //go:linkname rtCfgListAll

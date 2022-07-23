@@ -352,6 +352,7 @@ var debug struct {
 	// to os.Setenv("GODEBUG").
 	traceallocfree atomic.Int32
 	gab            int32
+	gcHeapPercent  int32
 
 	panicnil atomic.Int32
 
@@ -406,6 +407,7 @@ var dbgvars = []*dbgVar{
 	{name: "tracefpunwindoff", value: &debug.tracefpunwindoff},
 	{name: "updatemaxprocs", value: &debug.updatemaxprocs, def: 1},
 	{name: "gab", value: &debug.gab},
+	{name: "gcHeapPercent", value: &debug.gcHeapPercent},
 }
 
 func parseRuntimeDebugVars(godebug string) {

@@ -205,6 +205,8 @@ func gcinit() {
 	lockInit(&work.wbufSpans.lock, lockRankWbufSpans)
 	lockInit(&work.spanSPMCs.lock, lockRankSpanSPMCs)
 	lockInit(&gcCleanups.lock, lockRankCleanupQueue)
+
+	gcPolicyInit() // Depends on the value of gcpercent, put it at the end.
 }
 
 // gcenable is called after the bulk of the runtime initialization,
@@ -715,7 +717,7 @@ func (t gcTrigger) test() bool {
 		trigger, _ := gcController.trigger()
 		return gcController.heapLive.Load() >= trigger
 	case gcTriggerTime:
-		if gcController.gcPercent.Load() < 0 {
+		if gcController.gcPercent.Load() < 0 && !setMaxHeapEnabled() {
 			return false
 		}
 		lastgc := int64(atomic.Load64(&memstats.last_gc_nanotime))

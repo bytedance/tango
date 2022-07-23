@@ -1,6 +1,9 @@
 // Copyright 2021 The Go Authors. All rights reserved.
+// Copyright (c) 2022 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2022-07-23.
 
 package runtime
 
@@ -1004,7 +1007,7 @@ func (c *gcControllerState) heapGoalInternal() (goal, minTrigger uint64) {
 	goal = c.gcPercentHeapGoal.Load()
 
 	// Check if the memory-limit-based goal is smaller, and if so, pick that.
-	if newGoal := c.memoryLimitHeapGoal(); newGoal < goal {
+	if newGoal := c.memoryLimitHeapGoal(); newGoal < goal || setMaxHeapEnabled() {
 		goal = newGoal
 	} else {
 		// We're not limited by the memory limit goal, so perform a series of
@@ -1152,6 +1155,23 @@ func (c *gcControllerState) memoryLimitHeapGoal() uint64 {
 	} else {
 		goal = goal - headroom
 	}
+
+	if setMaxHeapEnabled() {
+		// In MaxHeap, when the surviving memory is too high, a 10% overrun is allowed to
+		// avoid frequent GC using too much CPU and affecting the running of user code.
+		// In some transient large requests, using more memory to allow more CPUs to
+		// quickly complete processing and release memory is a better choice than frequent GC.
+
+		// There are two reasons for choosing 10. One is to maintain compatibility with the previous version,
+		// and the other is that a 10% overrun is allowed during the GC mark process (see const maxOvershoot = 1.1),
+		// modify the goal directly to allow this overrun in MaxHeap.
+		const minGOGC = 10
+		lowerBound := c.heapMarked + c.heapMarked*minGOGC/100
+		if goal < lowerBound {
+			goal = lowerBound
+		}
+	}
+
 	// Don't let us go below the live heap. A heap goal below the live heap doesn't make sense.
 	if goal < c.heapMarked {
 		goal = c.heapMarked

@@ -2148,3 +2148,24 @@ func GetGABTopOffset() uintptr {
 func GetGABEndOffset() uintptr {
 	return unsafe.Offsetof(G{}.ab) + unsafe.Offsetof(G{}.ab.end)
 }
+func SetMaxHeap(bytes int64) int64 {
+	return gcSetMaxHeap(bytes)
+}
+
+func GcReadPolicy() (gogc int, maxHeapOut int64, goal uint64) {
+	systemstack(func() {
+		lock(&mheap_.lock)
+		gogc, maxHeapOut, goal = gcReadPolicyLocked()
+		unlock(&mheap_.lock)
+	})
+	return
+}
+
+// mheap_.lock must be locked, therefore this must be called on the
+// systemstack.
+//
+//go:systemstack
+func gcReadPolicyLocked() (gogc int, maxHeapOut int64, goal uint64) {
+	assertLockHeld(&mheap_.lock)
+	return int(gcController.gcPercent.Load()), maxHeap, gcController.heapGoal()
+}

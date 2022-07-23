@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"internal/testenv"
 	"io/ioutil"
+	"math"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -57,6 +58,7 @@ func TestPprofDynconf(t *testing.T) {
 	t.Run("TestList", testList)
 	t.Run("TestGetAndCheck", testGetAndCheck)
 	t.Run("TestGetOptmode", testGetOptmode)
+	t.Run("TestMaxHeap", testMaxHeap)
 	t.Run("TestSet", testSet)
 	t.Run("TestTrySetROConfig", testTrySetROConfg)
 	t.Run("TestIntOverflow", testIntOverflow)
@@ -76,6 +78,7 @@ func getExpectedCfgs(local bool) map[string]any {
 		"runtime.asyncpreemptoff":  int32(0),
 		"runtime.madvdontneed":     int32(0),
 		"runtime.harddecommit":     int32(0),
+		"runtime.maxHeapBytes":     int64(math.MaxInt64),
 	}
 
 	if runtime.GOOS == "linux" {
@@ -128,6 +131,7 @@ func testList(t *testing.T) {
 		"config(ro): runtime.asyncpreemptoff=",
 		"config(ro): runtime.madvdontneed=",
 		"config(ro): runtime.harddecommit=",
+		"config(ro): runtime.maxHeapBytes=",
 		"task: runtime.GC",
 	}
 	if !strings.HasPrefix(runtime.BVersion(), "devel ") {
@@ -148,10 +152,11 @@ func testGetAndCheck(t *testing.T) {
 }
 
 func testGetOptmode(t *testing.T) {
-	strres, err := postCmd("get", "runtime.optMode")
-	if err != nil || !strings.Contains(strres, "runtime.optMode=default") {
-		t.Fatalf("Failed to retrieve 'get' output, err=%v, resp=%s", err, strres)
-	}
+	testDynConf(t, "get", "runtime.optMode", "runtime.optMode=default")
+}
+
+func testMaxHeap(t *testing.T) {
+	testDynConf(t, "get", "runtime.maxHeapBytes", fmt.Sprintf("runtime.maxHeapBytes=%d", math.MaxInt64))
 }
 
 func testSet(t *testing.T) {
@@ -243,6 +248,13 @@ func postCmd(cmd, arg string) (string, error) {
 		return "", e
 	}
 	return string(b), nil
+}
+
+func testDynConf(t *testing.T, cmd, arg, contains string) {
+	strres, err := postCmd(cmd, arg)
+	if err != nil || !strings.Contains(strres, contains) {
+		t.Fatalf("Failed to retrieve '%s' output, err=%v, resp=%s, want=%s", cmd, err, strres, contains)
+	}
 }
 
 func getInt64Value(t *testing.T, k string) int64 {
