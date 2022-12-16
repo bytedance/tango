@@ -354,6 +354,8 @@ var debug struct {
 	gab            int32
 	gcHeapPercent  int32
 
+	largealloctrace int32
+
 	panicnil atomic.Int32
 
 	// asynctimerchan controls whether timer channels
@@ -408,6 +410,7 @@ var dbgvars = []*dbgVar{
 	{name: "updatemaxprocs", value: &debug.updatemaxprocs, def: 1},
 	{name: "gab", value: &debug.gab},
 	{name: "gcHeapPercent", value: &debug.gcHeapPercent},
+	{name: "largealloctrace", value: &debug.largealloctrace},
 }
 
 func parseRuntimeDebugVars(godebug string) {

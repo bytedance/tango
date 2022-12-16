@@ -59,6 +59,7 @@ func TestPprofDynconf(t *testing.T) {
 	t.Run("TestGetAndCheck", testGetAndCheck)
 	t.Run("TestGetOptmode", testGetOptmode)
 	t.Run("TestMaxHeap", testMaxHeap)
+	t.Run("TestGetLargeAllocTrace", testGetLargeAllocTrace)
 	t.Run("TestSet", testSet)
 	t.Run("TestTrySetROConfig", testTrySetROConfg)
 	t.Run("TestIntOverflow", testIntOverflow)
@@ -79,6 +80,7 @@ func getExpectedCfgs(local bool) map[string]any {
 		"runtime.madvdontneed":     int32(0),
 		"runtime.harddecommit":     int32(0),
 		"runtime.maxHeapBytes":     int64(math.MaxInt64),
+		"runtime.largeAllocTrace":  int32(0),
 	}
 
 	if runtime.GOOS == "linux" {
@@ -132,6 +134,7 @@ func testList(t *testing.T) {
 		"config(ro): runtime.madvdontneed=",
 		"config(ro): runtime.harddecommit=",
 		"config(ro): runtime.maxHeapBytes=",
+		"config(ro): runtime.largeAllocTrace=",
 		"task: runtime.GC",
 	}
 	if !strings.HasPrefix(runtime.BVersion(), "devel ") {
@@ -157,6 +160,10 @@ func testGetOptmode(t *testing.T) {
 
 func testMaxHeap(t *testing.T) {
 	testDynConf(t, "get", "runtime.maxHeapBytes", fmt.Sprintf("runtime.maxHeapBytes=%d", math.MaxInt64))
+}
+
+func testGetLargeAllocTrace(t *testing.T) {
+	testDynConf(t, "get", "runtime.largeAllocTrace", "runtime.largeAllocTrace=0")
 }
 
 func testSet(t *testing.T) {

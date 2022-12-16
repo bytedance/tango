@@ -246,6 +246,10 @@ func (c *mcache) refill(spc spanClass) {
 
 // allocLarge allocates a span for a large object.
 func (c *mcache) allocLarge(size uintptr, noscan bool) *mspan {
+	if largeAllocTraceEnabled && size >= uintptr(debug.largealloctrace) {
+		recordAllocLarge(size)
+	}
+
 	if size+pageSize < size {
 		throw("out of memory")
 	}
