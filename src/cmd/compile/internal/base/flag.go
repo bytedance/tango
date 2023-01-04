@@ -156,6 +156,7 @@ type CmdFlags struct {
 			Intrinsic     int
 			Verbose       int
 			MakeSliceCopy int
+			AmdVersion    int
 		}
 	}
 }
@@ -166,6 +167,7 @@ func parseBeastOption(beastStr string) {
 		"inlbudget":     &Flag.Cfg.BeastOpt.MaxInlbudget,
 		"gabinline":     &Flag.Cfg.BeastOpt.GabInline,
 		"intrinsic":     &Flag.Cfg.BeastOpt.Intrinsic,
+		"amdver":        &Flag.Cfg.BeastOpt.AmdVersion,
 		"verbose":       &Flag.Cfg.BeastOpt.Verbose,
 		"makeslicecopy": &Flag.Cfg.BeastOpt.MakeSliceCopy,
 	}
@@ -415,6 +417,10 @@ func ParseFlags() {
 	// parse -beast argument
 	if Flag.Beast != "" {
 		parseBeastOption(Flag.Beast)
+	}
+
+	if Flag.Cfg.BeastOpt.AmdVersion > buildcfg.GOAMD64 {
+		buildcfg.GOAMD64 = Flag.Cfg.BeastOpt.AmdVersion
 	}
 
 	// set via a -d flag

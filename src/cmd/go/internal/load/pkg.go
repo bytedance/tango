@@ -3310,10 +3310,15 @@ func setToolFlags(loaderstate *modload.State, pkgs ...*Package) {
 		beastStr := flag_beast.GetBeastStr(p.Internal.Gcflags)
 		var beastOptions []string
 		if cfg.Optmode == "beast" && !cfg.BuildASan {
-			beastOptions = append(beastOptions, "bce", "gabinline", "intrinsic", "makeslicecopy",
+			beastOptions = append(beastOptions, "bce", "gabinline", "intrinsic", "amdver=3", "makeslicecopy",
 				"inlbudget="+strconv.Itoa(beastInlBudget))
 			if cfg.BuildV {
 				beastOptions = append(beastOptions, "verbose")
+			}
+			// We set GOAMD64 here, and then the function gc will
+			// pass this environment variable to the generated sub-command.
+			if os.Getenv("GOAMD64") < "v3" {
+				os.Setenv("GOAMD64", "v3")
 			}
 		}
 		if len(beastOptions) > 0 {

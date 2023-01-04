@@ -1,6 +1,9 @@
 // Copyright 2021 The Go Authors. All rights reserved.
+// Copyright (c) 2023 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2023-01-04.
 
 // When using GOEXPERIMENT=boringcrypto, the test program links in the boringcrypto syso,
 // which does not respect GOAMD64, so we skip the test if boringcrypto is enabled.
@@ -26,11 +29,18 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	_ "unsafe"
 )
+
+//go:linkname isBeastModeEnabled runtime.isBeastModeEnabled
+func isBeastModeEnabled() bool
 
 // Test to make sure that when building for GOAMD64=v1, we don't
 // use any >v1 instructions.
 func TestGoAMD64v1(t *testing.T) {
+	if isBeastModeEnabled() {
+		t.Skip("this testcase is for GOAMD64 v1, and in beast, GOAMD64 is set to v3")
+	}
 	if runtime.GOARCH != "amd64" {
 		t.Skip("amd64-only test")
 	}
