@@ -25,14 +25,20 @@ func GabInline() {
 	// amd64:`.*runtime\.gabInliningEnabled`
 	// amd64:`MOVQ\s*472\(R14\), [A-Z]{2}`
 	// amd64:`MOVQ\s*480\(R14\), [A-Z]{2}`
+	// arm64:`.*runtime\.gabInliningEnabled`
+	// arm64:`LDP\s*472\(g\)`
 	refs[0] = unsafe.Pointer(new([2]int))
 	// amd64:`.*runtime\.gabInliningEnabled`
+	// arm64:`.*runtime\.gabInliningEnabled`
 	refs[1] = unsafe.Pointer(&[2]int{})
 	// amd64:`.*runtime\.gabInliningEnabled`
+	// arm64:`.*runtime\.gabInliningEnabled`
 	refs[2] = unsafe.Pointer(&(new([128]byte)[0]))
 	// amd64:-`.*runtime\.gabInliningEnabled`
+	// arm64:-`.*runtime\.gabInliningEnabled`
 	refs[3] = unsafe.Pointer(&(new([129]byte)[0]))
 	// amd64:-`.*runtime\.gabInliningEnabled`
+	// arm64:-`.*runtime\.gabInliningEnabled`
 	c := new([2]int) // not inline: c is not escaped
 	c[0] = 0
 }

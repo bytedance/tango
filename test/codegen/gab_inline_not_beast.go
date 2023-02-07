@@ -19,7 +19,9 @@ var refs []unsafe.Pointer
 func GabNotInline() {
 	refs = make([]unsafe.Pointer, 2)
 	// amd64:-`.*runtime\.gabInliningEnabled`
+	// arm64:-`.*runtime\.gabInliningEnabled`
 	refs[0] = unsafe.Pointer(new([2]int))
 	// amd64:-`.*runtime\.gabInliningEnabled`
+	// arm64:-`.*runtime\.gabInliningEnabled`
 	refs[1] = unsafe.Pointer(&[2]int{})
 }

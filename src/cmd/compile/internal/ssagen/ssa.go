@@ -3746,7 +3746,7 @@ func (s *state) exprCheckPtr(n ir.Node, checkPtrOK bool) *ssa.Value {
 		}
 		et := n.Type().Elem()
 		if n.Type().Size() != 0 {
-			if Arch.LinkArch.Name == "amd64" && base.Flag.Cfg.BeastOpt.GabInline != 0 && !et.HasPointers() && et.Size() > 0 && et.Size() <= rtabi.GabMaxAllocSize {
+			if (Arch.LinkArch.Name == "amd64" || Arch.LinkArch.Name == "arm64") && base.Flag.Cfg.BeastOpt.GabInline != 0 && !et.HasPointers() && et.Size() > 0 && et.Size() <= rtabi.GabMaxAllocSize {
 				return s.gabInline(n)
 			}
 		}
