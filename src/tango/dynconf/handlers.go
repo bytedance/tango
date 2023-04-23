@@ -15,6 +15,7 @@ import (
 	"internal/godebug"
 	"net/http"
 	"runtime"
+	"sort"
 	"strings"
 )
 
@@ -31,6 +32,9 @@ var (
 
 func init() {
 	loadRuntimeConfigs()
+
+	sort.Slice(allConfigs, func(i, j int) bool { return allConfigs[i].name < allConfigs[j].name })
+
 	if godebug.New("httpmuxgo121").Value() != "1" {
 		http.HandleFunc("GET /debug/pprof/dynconf", handleDynconf)
 		http.HandleFunc("POST /debug/pprof/dynconf", handleDynconf)
@@ -75,7 +79,8 @@ func cmdSetConfig(args []byte) (res []byte, err error) {
 		}
 		k := arrs[0]
 		v := arrs[1]
-		if cfg, ok := dyncfgMap[k]; ok {
+
+		if cfg := getcfg(k); cfg != nil {
 			e := cfg.setStringValue(v)
 			if e == nil {
 				res = append(res, []byte(fmt.Sprintf("Successful: %s=%s\n", k, v))...)
@@ -96,7 +101,7 @@ func cmdSetConfig(args []byte) (res []byte, err error) {
 func cmdGetConfig(args []byte) (res []byte, err error) {
 	names := strings.Split(string(args), ",")
 	for _, name := range names {
-		if cfg, ok := dyncfgMap[name]; ok {
+		if cfg := getcfg(name); cfg != nil {
 			res = append(res, []byte(cfg.String())...)
 		} else {
 			err = fmt.Errorf("config \"%s\" does not exist", name)
@@ -109,7 +114,7 @@ func cmdGetConfig(args []byte) (res []byte, err error) {
 
 func cmdListConfigs(args []byte) ([]byte, error) {
 	res := []string{}
-	for _, cfg := range dyncfgMap {
+	for _, cfg := range allConfigs {
 		res = append(res, cfg.String())
 	}
 	for t := range taskMap {

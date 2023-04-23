@@ -5,7 +5,13 @@
 package dynconf
 
 import (
-	"unsafe"
+	_ "unsafe"
 )
 
-func listRuntimeConfigs() ([]string, []unsafe.Pointer)
+//go:linkname listRuntimeConfigs runtime.rtCfgListAll
+func listRuntimeConfigs() map[string]any
+
+// gcSetMaxHeap is provided by package runtime.
+//
+//go:linkname gcSetMaxHeap runtime.gcSetMaxHeap
+func gcSetMaxHeap(bytes int64) int64

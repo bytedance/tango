@@ -4,23 +4,22 @@
 
 package runtime
 
-import (
-	"unsafe"
-)
+import "unsafe"
 
-var rtCfgMap = map[string]unsafe.Pointer{
-	"runtime.gab,int32,rw":           unsafe.Pointer(&debug.gab),
-	"runtime.gctrace,int32,rw":       unsafe.Pointer(&debug.gctrace),
-	"runtime.buildVersion,string,ro": unsafe.Pointer(&buildVersion),
-	"runtime.tangoVersion,string,ro": unsafe.Pointer(&tangoVersion),
-	"runtime.gcPercent,int32,ro":     unsafe.Pointer(&gcController.gcPercent),
+// This variable ignores the atomic inherency of atomic.Int32
+var ptrGCPercent *int32 = (*int32)(unsafe.Pointer(&gcController.gcPercent))
+
+var rtCfgMap = map[string]any{
+	"runtime.gctrace,rw":         &debug.gctrace,
+	"runtime.buildVersion,ro":    &buildVersion,
+	"runtime.tangoVersion,ro":    &tangoVersion,
+	"runtime.gcPercent,ro":       ptrGCPercent,
+	"runtime.asyncpreemptoff,ro": &debug.asyncpreemptoff,
+	"runtime.madvdontneed,ro":    &debug.madvdontneed,
+	"runtime.harddecommit,ro":    &debug.harddecommit,
 }
 
-//go:linkname rtCfgListAll tango/dynconf.listRuntimeConfigs
-func rtCfgListAll() (names []string, addrs []unsafe.Pointer) {
-	for name, addr := range rtCfgMap {
-		names = append(names, name)
-		addrs = append(addrs, addr)
-	}
-	return
+//go:linkname rtCfgListAll
+func rtCfgListAll() map[string]any {
+	return rtCfgMap
 }

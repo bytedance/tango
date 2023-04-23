@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package dynconf_test
+package dynconf
 
 import (
 	"fmt"
@@ -11,8 +11,9 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
-	"os"
 	"os/exec"
+	"path"
+	"reflect"
 	"runtime"
 	"strconv"
 	"strings"
@@ -24,18 +25,12 @@ var (
 	httpurl string
 )
 
-func TestDynconf(t *testing.T) {
+func TestPprofDynconf(t *testing.T) {
 	testenv.MustHaveGoBuild(t)
 
-	tmpdir := fmt.Sprintf("%s/dynconf_test_%d", os.TempDir(), time.Now().UnixNano())
-	err := os.Mkdir(tmpdir, 0755)
-	if err != nil {
-		t.Fatalf("Failed to create tmpdir")
-	}
-	defer os.RemoveAll(tmpdir)
+	tmpdir := t.TempDir()
 	var port int = 8000 + rand.Int()%1024
-
-	binpath := fmt.Sprintf("%s/test1", tmpdir)
+	binpath := path.Join(tmpdir, "pprof_dynconf")
 
 	cmd := exec.Command(testenv.GoToolPath(t), "build", "-o", binpath, "testdata/svr.go")
 	if cmd.Run() != nil {
@@ -59,13 +54,55 @@ func TestDynconf(t *testing.T) {
 	httpurl = fmt.Sprintf("http://127.0.0.1:%d/debug/pprof/dynconf", port)
 	t.Logf("httpurl=%s", httpurl)
 
-	testList(t)
-	testGet(t)
-	testGetGcPercent(t)
-	testSet(t)
-	testTrySetROConfg(t)
-	testIntOverflow(t)
-	testSetGetEquals(t)
+	t.Run("TestList", testList)
+	t.Run("TestGetAndCheck", testGetAndCheck)
+	t.Run("TestSet", testSet)
+	t.Run("TestTrySetROConfig", testTrySetROConfg)
+	t.Run("TestIntOverflow", testIntOverflow)
+	t.Run("TestSetGetEquals", testSetGetEquals)
+	t.Run("TestRemoteStableness", testRemoteStableness)
+}
+
+// retrieve the default expected values of dynconf
+func getExpectedCfgs(local bool) map[string]any {
+	expectedCfgs := map[string]any{
+		"runtime.gctrace":         int32(0),
+		"runtime.gcPercent":       int32(100),
+		"runtime.asyncpreemptoff": int32(0),
+		"runtime.madvdontneed":    int32(0),
+		"runtime.harddecommit":    int32(0),
+	}
+
+	if runtime.GOOS == "linux" {
+		expectedCfgs["runtime.madvdontneed"] = int32(1)
+	}
+	return expectedCfgs
+}
+
+// check stableness of the remote list
+func testRemoteStableness(t *testing.T) {
+	// fetch remote configs and generate line-to-index mapping
+	// assuming no configs changed during verifying
+	fetchRemote := func() map[string]int {
+		strres, err := postCmd("list", "")
+		if err != nil {
+			t.Fatalf("Failed to postCmd 'list', error=%v\n", err)
+		}
+		indices := make(map[string]int)
+		for idx, line := range strings.Split(strres, "\n") {
+			indices[line] = idx
+		}
+		return indices
+	}
+
+	// the first one as baseline
+	m1 := fetchRemote()
+	for i := 0; i < 16; i++ {
+		m2 := fetchRemote()
+		if !reflect.DeepEqual(m1, m2) {
+			t.Fatalf("Unstable results!")
+		}
+	}
 }
 
 func testList(t *testing.T) {
@@ -74,11 +111,13 @@ func testList(t *testing.T) {
 		t.Fatalf("Failed to postCmd 'list', error=%v\n", err)
 	}
 	expectedStrings := []string{
-		"config(rw): runtime.gab=",
-		"config(rw): runtime.gctrace=",
+		"config(rw): runtime.gctrace=0",
 		"config(ro): runtime.buildVersion=",
 		"config(ro): runtime.tangoVersion=bm.1.",
-		"config(ro): runtime.gcPercent=",
+		"config(ro): runtime.gcPercent=100",
+		"config(ro): runtime.asyncpreemptoff=",
+		"config(ro): runtime.madvdontneed=",
+		"config(ro): runtime.harddecommit=",
 		"task: runtime.GC",
 	}
 	if !strings.HasPrefix(runtime.BVersion(), "devel ") {
@@ -88,17 +127,13 @@ func testList(t *testing.T) {
 	shouldContains(strres, expectedStrings, t)
 }
 
-func testGet(t *testing.T) {
-	strres, err := postCmd("get", "runtime.gctrace")
-	if err != nil || !strings.Contains(strres, "runtime.gctrace=") {
-		t.Fatalf("Failed to retrieve 'get' output, err=%v, resp=%s", err, strres)
-	}
-}
-
-func testGetGcPercent(t *testing.T) {
-	strres, err := postCmd("get", "runtime.gcPercent")
-	if err != nil || !strings.Contains(strres, "runtime.gcPercent=100") {
-		t.Fatalf("Failed to retrieve 'get' output, err=%v, resp=%s", err, strres)
+func testGetAndCheck(t *testing.T) {
+	for key, val := range getExpectedCfgs(false) {
+		strres, err := postCmd("get", key)
+		expected := fmt.Sprintf("%s=%v", key, val)
+		if err != nil || !strings.Contains(strres, expected) {
+			t.Fatalf("Failed to retrieve 'get' output, err=%v, resp=%s, want=%s", err, strres, expected)
+		}
 	}
 }
 
@@ -211,5 +246,45 @@ func shouldContains(s string, keys []string, t *testing.T) {
 		if !strings.Contains(s, k) {
 			t.Fatalf("keyword \"%s\" not found in \"%s\"", k, s)
 		}
+	}
+}
+
+// Test the dynconf facilities from within current process
+func TestLocalGet(t *testing.T) {
+	if len(allConfigs) <= 0 {
+		t.Fatal("Local dynconf Map is empty")
+	}
+
+	dumpValue := func(v any) string {
+		typ := reflect.TypeOf(v)
+		return fmt.Sprintf("%v (type %s)", v, typ.String())
+	}
+	for key, val := range getExpectedCfgs(true) {
+		if cfg := getcfg(key); cfg != nil {
+			v := cfg.v.Interface()
+			if v != val {
+				t.Fatalf("Dynconf key %s value=%s in local map, but wanted value=%s", key, dumpValue(v), dumpValue(val))
+			}
+		} else {
+			t.Fatalf("Dynconf key %s does exist in local map", key)
+		}
+	}
+}
+
+func TestLocalReadAfterChange(t *testing.T) {
+	cfg := getcfg("runtime.gctrace")
+	s1 := cfg.String()
+	e := cfg.setStringValue("1")
+	if e != nil {
+		t.Fatal("Failed to set runtime.gctrace")
+	}
+	defer cfg.setStringValue("0")
+	s2 := cfg.String()
+	if s1 == s2 {
+		t.Fatal("Failed to update config")
+	}
+	s3 := cfg.String()
+	if s2 != s3 {
+		t.Fatal("should be same")
 	}
 }

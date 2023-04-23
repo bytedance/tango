@@ -7,39 +7,30 @@ package dynconf
 import (
 	"fmt"
 	r "reflect"
+	"sort"
 	"strconv"
 	"strings"
-	"unsafe"
 )
 
-var (
-	// all known configurations
-	dyncfgMap = map[string]*dyncfg{}
-	// type name to reflect.type
-	typeMap = map[string]r.Type{
-		"int8":    r.TypeOf(int8(0)),
-		"int16":   r.TypeOf(int16(0)),
-		"int32":   r.TypeOf(int32(0)),
-		"int64":   r.TypeOf(int64(0)),
-		"int":     r.TypeOf(int(0)),
-		"uint8":   r.TypeOf(uint8(0)),
-		"uint16":  r.TypeOf(uint16(0)),
-		"uint32":  r.TypeOf(uint32(0)),
-		"uint64":  r.TypeOf(uint64(0)),
-		"uint":    r.TypeOf(uint(0)),
-		"string":  r.TypeOf(""),
-		"bool":    r.TypeOf(true),
-		"float32": r.TypeOf(float32(0.0)),
-		"float64": r.TypeOf(float64(0.0)),
+// all known configurations
+var allConfigs []*dyncfg
+
+// search for dynamic config with a given name
+func getcfg(name string) *dyncfg {
+	idx, found := sort.Find(len(allConfigs), func(i int) int {
+		return strings.Compare(name, allConfigs[i].name)
+	})
+	if found {
+		return allConfigs[idx]
 	}
-)
+	return nil
+}
 
 // dyncfg defines the interface to operate on a configuration item
 type dyncfg struct {
 	name string
 	rw   bool
-	pv   interface{} // previous value
-	v    r.Value     // initialized by reflect.NewAt
+	v    r.Value // initialized by reflect.Indirect
 }
 
 func (c *dyncfg) String() string {
@@ -47,54 +38,46 @@ func (c *dyncfg) String() string {
 	if c.rw {
 		perm = "rw"
 	}
-	return fmt.Sprintf("config(%s): %s=%v", perm, c.name, c.stringValue())
+	return fmt.Sprintf("config(%s): %s=%v", perm, c.name, c.v.Interface())
 }
 
 func (c *dyncfg) setStringValue(s string) error {
 	if !c.rw {
 		return fmt.Errorf("config %s is readonly", c.name)
 	}
-	pv, e := c.value()
-	if e != nil {
-		return e
-	}
-	c.pv = pv
 	switch c.v.Kind() {
 	case r.Bool:
-		b, err := strconv.ParseBool(s)
-		if err != nil {
+		if b, err := strconv.ParseBool(s); err == nil {
+			c.v.SetBool(b)
+		} else {
 			return err
 		}
-		c.v.SetBool(b)
 	case r.Int8, r.Int16, r.Int32, r.Int64, r.Int:
-		i, err := strconv.ParseInt(s, 10, 64)
-		if err != nil {
-			return err
-		}
-		if !c.v.OverflowInt(i) {
+		if i, err := strconv.ParseInt(s, 10, 64); err == nil {
+			if c.v.OverflowInt(i) {
+				return fmt.Errorf("int overflow, skip setting %s=%d", c.name, i)
+			}
 			c.v.SetInt(i)
 		} else {
-			return fmt.Errorf("int overflow, skip setting %s=%d", c.name, i)
-		}
-	case r.Uint8, r.Uint16, r.Uint32, r.Uint64, r.Uint:
-		u, err := strconv.ParseUint(s, 10, 64)
-		if err != nil {
 			return err
 		}
-		if !c.v.OverflowUint(u) {
+	case r.Uint8, r.Uint16, r.Uint32, r.Uint64, r.Uint, r.Uintptr:
+		if u, err := strconv.ParseUint(s, 10, 64); err == nil {
+			if c.v.OverflowUint(u) {
+				return fmt.Errorf("uint overflow, skip setting %s=%d", c.name, u)
+			}
 			c.v.SetUint(u)
 		} else {
-			return fmt.Errorf("uint overflow, skip setting %s=%d", c.name, u)
-		}
-	case r.Float32, r.Float64:
-		f, err := strconv.ParseFloat(s, 64)
-		if err != nil {
 			return err
 		}
-		if !c.v.OverflowFloat(f) {
+	case r.Float32, r.Float64:
+		if f, err := strconv.ParseFloat(s, 64); err == nil {
+			if c.v.OverflowFloat(f) {
+				return fmt.Errorf("float overflow, skip setting %s=%f", c.name, f)
+			}
 			c.v.SetFloat(f)
 		} else {
-			return fmt.Errorf("float overflow, skip setting %s=%f", c.name, f)
+			return err
 		}
 	case r.String:
 		c.v.SetString(s)
@@ -104,56 +87,26 @@ func (c *dyncfg) setStringValue(s string) error {
 	return nil
 }
 
-func (c *dyncfg) value() (interface{}, error) {
-	switch c.v.Kind() {
-	case r.Bool:
-		return c.v.Bool(), nil
-	case r.Int8, r.Int16, r.Int32, r.Int64, r.Int:
-		return c.v.Int(), nil
-	case r.Uint8, r.Uint16, r.Uint32, r.Uint64, r.Uint:
-		return c.v.Uint(), nil
-	case r.Float32, r.Float64:
-		return c.v.Float(), nil
-	case r.String:
-		return c.v.String(), nil
-	default:
-		return nil, fmt.Errorf("unsupported value of type %s", c.v.Kind().String())
-	}
-}
-
-func (c *dyncfg) stringValue() string {
-	v, e := c.value()
-	if e == nil {
-		return fmt.Sprintf("%v", v)
-	}
-	s := fmt.Sprintf("<error: %v>", e)
-	fmt.Printf("Failed to get string value of %s, %s\n", c.name, s)
-	return s
-}
-
 // load available configurations from package runtime
 func loadRuntimeConfigs() {
 	parseConfigs(listRuntimeConfigs())
 }
 
-func parseConfigs(names []string, addrs []unsafe.Pointer) {
-	if len(names) != len(addrs) {
-		fmt.Printf("dynconf: inconsistent number of names/addrs for package runtime\n")
+func parseConfigs(cfgs map[string]any) {
+	if len(cfgs) == 0 {
 		return
 	}
 
-	for i := 0; i < len(names); i++ {
-		ns := strings.Split(names[i], ",")
-		t, ok := typeMap[ns[1]]
-		if !ok {
-			fmt.Printf("dynconf: error parsing type %s for package runtime\n", names[i])
-			return
+	for kn, val := range cfgs {
+		ns := strings.Split(kn, ",")
+		if len(ns) != 2 {
+			panic("unexpected dynconf format: " + kn)
 		}
-		c := &dyncfg{
+		cfg := &dyncfg{
 			name: ns[0],
-			rw:   (ns[2] == "rw"),
-			v:    r.Indirect(r.NewAt(t, addrs[i])),
+			rw:   (ns[1] == "rw"),
+			v:    r.Indirect(r.ValueOf(val)),
 		}
-		dyncfgMap[ns[0]] = c
+		allConfigs = append(allConfigs, cfg)
 	}
 }
