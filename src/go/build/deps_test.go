@@ -692,6 +692,10 @@ var depsRules = `
     unsafe
     < tango/runtimex;
 
+    # Conv
+    encoding, encoding/json, reflect, strconv, unsafe, math/big
+    < tango/conv;
+
 	net/http
 	< tango/memstats;
 
