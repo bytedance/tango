@@ -51,7 +51,7 @@ func (stat *gabGCStats) print() {
 	print(stat.refsProcessed, " references processed = ", stat.objCopied, " objects copied + ", stat.refsUpdated, " references updated + ", stat.refsSkipped, " references skipped; ")
 	print("evacuated GABs ", stat.gabEvacuatedBytes>>10, " KB; ")
 	print("off-heap memory ", memstats.gab_sys.load(), " B; ")
-	print("reason: ", gabEvacReason)
+	print("reason: ", gabState.gabEvacReason)
 	println("]")
 	printunlock()
 }

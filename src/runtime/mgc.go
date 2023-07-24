@@ -522,6 +522,7 @@ type workType struct {
 
 	// Cumulative estimated CPU usage.
 	cpuStats
+	gabUsedBytes uintptr
 }
 
 // GC runs a garbage collection and blocks the caller until the
@@ -922,7 +923,7 @@ func gcStart(trigger gcTrigger) {
 	// happen, we want to enable assists as early as
 	// possible.
 	setGCPhase(_GCmark)
-	if isEvacEnabled() && isEvacuation {
+	if isEvacEnabled() && gabState.isEvacuation {
 		assertWorldStopped()
 		gabGCPrologue()
 	}
@@ -1085,7 +1086,7 @@ top:
 	}
 
 	// Initialize GAB copying destination memory area right before the second STW
-	if isEvacEnabled() && isEvacuation && gabgcstats.refsEnqueued != 0 {
+	if isEvacEnabled() && gabState.isEvacuation && gabgcstats.refsEnqueued != 0 {
 		atomic.Storeuintptr(&gabgcstats.gabUsedBytesBeforeEvac, atomic.Loaduintptr(&gabUsedBytes))
 		survivorGABs := atomic.Loaduintptr(&gabgcstats.gabMarkedBytes) * safeMargin / 100
 		gabInitStwChunks(survivorGABs)
@@ -1393,8 +1394,15 @@ func gcMarkTermination(stw worldStop) {
 	})
 
 	var stwSwept bool
+	if isGabEnabled() {
+		gabState.endCycle()
+	}
 	systemstack(func() {
 		work.heap2 = work.bytesMarked
+		// Total size of GABs before GC sweeping is performed.
+		if isGabEnabled() {
+			work.gabUsedBytes = gabUsedBytes
+		}
 		if debug.gccheckmark > 0 {
 			runCheckmark(func(_ *gcWork) { gcPrepareMarkRoots() })
 		}
@@ -1404,7 +1412,7 @@ func gcMarkTermination(stw worldStop) {
 
 		// marking is complete so we can turn the write barrier off
 		setGCPhase(_GCoff)
-		if isEvacEnabled() && isEvacuation {
+		if isEvacEnabled() && gabState.isEvacuation {
 			gabEvacuate()
 			gabGCEpilogue()
 		}
@@ -1647,7 +1655,7 @@ func gcMarkTermination(stw worldStop) {
 			dumpScanStats()
 		}
 		if isGabEnabled() {
-			print("[GAB memory: ", gabUsedBytes>>10, "->", work.gabMarked>>10, " KB]\n")
+			print("[GAB memory: ", work.gabUsedBytes>>10, "->", work.gabMarked>>10, " KB]\n")
 		}
 		printunlock()
 	}

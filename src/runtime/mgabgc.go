@@ -30,7 +30,7 @@ func (s *mspan) isGab() bool {
 
 //go:nowritebarrierrec
 func (s *mspan) doEvacuation() bool {
-	return isEvacuation && s.isGab()
+	return gabState.isEvacuation && s.isGab()
 }
 
 //go:nowritebarrierrec
@@ -99,6 +99,7 @@ func gabEvacuate() {
 	gabgcstats.evacEndNs = nanotime()
 	gabIsEvacuating = false
 	gabgcstats.balancedGCEndNs = nanotime()
+	gabState.updateGabEvacuated(uint64(gabgcstats.gabEvacuatedBytes))
 }
 
 //go:nowritebarrierrec

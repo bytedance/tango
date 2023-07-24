@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"internal/testenv"
 	"log"
+	"math"
 	"math/rand"
 	"os"
 	"os/exec"
@@ -286,46 +287,60 @@ func TestGabNumEvac(t *testing.T) {
 	}
 
 	// Use max heap to avoid any non-forced GC
-	maxHeap := 4 << 30
+	maxHeap := 5 << 30
 	var evacInterval uint32 = 5
 	var envs = []string{
 		fmt.Sprintf("MY_MEM_LIMIT=%d", maxHeap),
-		"GODEBUG=gab=2,gcHeapPercent=50",
-		fmt.Sprintf("GOGABOPT=evacuation=%d,trace=1", evacInterval),
+		"GODEBUG=gab=2,gcHeapPercent=50,gctrace=1",
+		fmt.Sprintf("GOGABOPT=evacuation=%d,trace=0", evacInterval),
 	}
 
 	if !testGabInChildProcEnv(t, "GabNumEvac", envs...) {
 		return
 	}
 
-	var numGC uint32 = 100
-	numEvac := numGC / evacInterval
-	min := 8
-	max := 128
+	var allocFreq uint32 = 10
+	var gcFreq uint32 = 10
+	numEvac := gcFreq / evacInterval
+
+	var wg sync.WaitGroup
 
 	// Allocate GAB objects
-	holder := make([]unsafe.Pointer, 1<<20)
-	rand.Seed(time.Now().UnixNano())
-	getSize := func() int {
-		return min + rand.Intn(max-min+1)
-	}
-	for i := uint32(0); i < numGC; i++ {
-		for j := 0; j < cap(holder); j++ {
-			buf := make([]byte, getSize())
-			holder[j] = unsafe.Pointer(&buf)
+	wg.Add(1)
+	gabHolder := make([]unsafe.Pointer, 1<<20)
+	nonGabHolder := make([]unsafe.Pointer, 1<<20)
+	go func() {
+		defer wg.Done()
+		for i := uint32(0); i < allocFreq; i++ {
+			for j := 0; j < len(gabHolder); j++ {
+				b1 := make([]byte, 8)
+				gabHolder[j] = unsafe.Pointer(&b1)
+				b2 := make([]*int, 16)
+				nonGabHolder[j] = unsafe.Pointer(&b2)
+			}
 		}
-		// Triggering GC
-		runtime.GC()
-	}
+	}()
 
+	// Triggering GC
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := uint32(0); i < gcFreq; i++ {
+			runtime.GC()
+			time.Sleep(100 * time.Millisecond)
+		}
+		println("Finish force GC")
+	}()
+
+	wg.Wait()
 	// Evaluate memstats
 	var memstats runtime.MemStats
 	runtime.ReadMemStats(&memstats)
 	actualGC := memstats.NumGC
 	actualEvac := memstats.NumBalancedGC
 
-	if numGC != actualGC {
-		log.Fatalf("Incorrect numgc. Expected %d, actual %d", numGC, actualEvac)
+	if gcFreq != actualGC {
+		log.Fatalf("Incorrect numgc. Expected %d, actual %d", gcFreq, actualGC)
 	}
 
 	if numEvac != actualEvac {
@@ -430,5 +445,58 @@ func TestGabBalancedGC2GAB(t *testing.T) {
 	// Check gab_sys
 	if gabSysBefore != gabSysAfter {
 		t.Fatalf("gab_sys should not increased when GAB allocator is used, before %d after %d", gabSysBefore, gabSysAfter)
+	}
+}
+
+// Allocate some GAB and non-GAB objects and let GAB pacer to
+// estimate the ratio of GAB objects. If the estimated ratio
+// is larger than a threshold, an error is raised.
+func TestGabPacer(t *testing.T) {
+	if *flagQuick {
+		t.Skip("-quick")
+	}
+	if !isEvacSupported() {
+		t.Skip("Skip balanced GC test on platforms other than linux/amd64 and darwin/amd64")
+	}
+
+	maxHeap := 4 << 30
+	var envs = []string{
+		fmt.Sprintf("MY_MEM_LIMIT=%d", maxHeap),
+		"GODEBUG=gab=2,gcHeapPercent=50,gctrace=1",
+		"GOGABOPT=gabPacer=1,trace=1",
+	}
+
+	if !testGabInChildProcEnv(t, "GabPacer", envs...) {
+		return
+	}
+
+	length := 1 << 20
+	gabHolder := make([]unsafe.Pointer, length)
+	nonGabHolder := make([]unsafe.Pointer, length)
+
+	for gi := 0; gi < 5; gi++ {
+		go func() {
+			for i := 0; ; i++ {
+				// Allocate scan objects
+				x := make([]unsafe.Pointer, 16)
+				nonGabHolder[i%length] = unsafe.Pointer(&x)
+				// Allocate GAB objects
+				y := make([]byte, 32)
+				gabHolder[i%length] = unsafe.Pointer(&y)
+			}
+		}()
+	}
+
+	time.Sleep(15 * time.Second)
+
+	println(&gabHolder)
+	println(&nonGabHolder)
+
+	error := math.Abs(runtime.GetGabPacerError())
+	epsilon := 0.01
+	if error > epsilon {
+		log.Fatalf("GAB pacer error is too large %f, threshold %f\n", error, epsilon)
+	} else {
+		log.Printf("GAB pacer error %f, threshold %f", error, epsilon)
 	}
 }

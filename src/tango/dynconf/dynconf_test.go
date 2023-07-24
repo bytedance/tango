@@ -72,7 +72,7 @@ func getExpectedCfgs(local bool) map[string]any {
 	expectedCfgs := map[string]any{
 		"runtime.gab":              int32(0),
 		"runtime.gabUsedBytes":     uintptr(0),
-		"runtime.gabThreshold":     uintptr(0),
+		"runtime.gabThreshold":     uint64(0),
 		"runtime.gabMemoryPercent": int32(20),
 		"runtime.gabEnabled":       false,
 		"runtime.gctrace":          int32(0),

@@ -12,7 +12,7 @@ var ptrGCPercent *int32 = (*int32)(unsafe.Pointer(&gcController.gcPercent))
 var rtCfgMap = map[string]any{
 	"runtime.gab,ro":              &debug.gab,
 	"runtime.gabUsedBytes,ro":     &gabUsedBytes,
-	"runtime.gabThreshold,ro":     &gabThreshold,
+	"runtime.gabThreshold,ro":     &gabState.gabMemLimit,
 	"runtime.gabMemoryPercent,rw": &gabMemoryPercent,
 	"runtime.gabEnabled,ro":       &gabEnabled,
 	"runtime.gctrace,rw":          &debug.gctrace,

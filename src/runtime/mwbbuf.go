@@ -266,7 +266,7 @@ func wbBufFlush1(pp *p) {
 
 		if span.spanclass.noscan() {
 			gcw.bytesMarked += uint64(span.elemsize)
-			if isGabEnabled() {
+			if isGabEnabled() && span.isGab() {
 				gcw.gabMarked += uint64(span.elemsize)
 			}
 			continue

@@ -1578,7 +1578,7 @@ func scanobject(b uintptr, gcw *gcWork) {
 	}
 
 	var pinned bool
-	if isEvacEnabled() && isEvacuation && !s.isGab() {
+	if isEvacEnabled() && gabState.isEvacuation && !s.isGab() {
 		pinned = s.shouldBePinned(b)
 	}
 

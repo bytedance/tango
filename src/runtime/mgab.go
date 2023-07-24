@@ -43,28 +43,20 @@ const (
 	// See comments before newFrozenBits() for details.
 	// This size is guarded by the test case TestGabMinFrozenMapBucketSize().
 	minFrozenMapBucketSize uintptr = 80
-	// GAB evacuation reasons
-	gabEvacThreshold = "threshold"
-	gabEvacPeriodic  = "periodic"
 )
 
 var (
-	gabCapMax       uintptr = gabCapMaxDefault // default value of gab Max Capacity.
-	gabUsedBytes    uintptr                    // total consumed bytes
-	gabMemHardLimit uintptr                    // The hard limit of GAB memory, which is the 10% of the pod memory
-	gabThreshold    uintptr                    // The memory limit of GABs
-	gabVerbose      = false                    // print extra information
+	gabCapMax    uintptr = gabCapMaxDefault // default value of gab Max Capacity.
+	gabUsedBytes uintptr                    // total consumed bytes
 	// 'gabEnabled' control the runtime state of GAB feature,
 	// mallocgc() will check this flag to determine if should goto fastpath.
 	// on the other hand, 'runtime.debug.gab' represents user's intension
 	// about whether GAB is expected to be enabled over all or not
-	gabEnabled         = false
-	gabInliningEnabled = false
-	gabMemoryPercent   int32   // hard limit on total bytes used by GAB, 10% of memory target
-	gabPolicyEnabled   = true  // control whether policy should take effect
-	isEvacuation       = false // whether perform GAB evacuation during current GC cycle
-	gabEvacReason      string
-	safeMargin         uintptr = 120 // Allocate more survivor GABs
+	gabEnabled                 = false
+	gabInliningEnabled         = false
+	gabMemoryPercent   int32   = gabDefaultMemoryPercent // hard limit on total bytes used by GAB, 10% of memory target
+	gabPolicyEnabled           = true                    // control whether policy should take effect
+	safeMargin         uintptr = 120                     // Allocate more survivor GABs
 )
 
 var gabdebug struct {
@@ -78,17 +70,21 @@ var gabdebug struct {
 	// 0 by default. No forced evacuation.
 	// x: do evacuation every x GC cycle, which incurs overhead.
 	evacuation int32
+	// Whether enable GAB pacer strategy
+	// 0 by default.
+	// 1: enabled.
+	// For testing only. Will be removed later.
+	gabPacer int32
 }
 
 var gabvars = []dbgVar{
 	{name: "gabPercent", value: &gabMemoryPercent},
 	{name: "trace", value: &gabdebug.trace},
 	{name: "evacuation", value: &gabdebug.evacuation},
+	{name: "gabPacer", value: &gabdebug.gabPacer},
 }
 
 func gabinit() {
-	gabMemoryPercent = gabDefaultMemoryPercent
-
 	// parse gab environ option
 	for p := gogetenv("GOGABOPT"); p != ""; {
 		field := ""
@@ -113,18 +109,7 @@ func gabinit() {
 		}
 	}
 
-	// Get TCE pod memory limit
-	if mem := gogetenv("MY_MEM_LIMIT"); mem != "" {
-		if memLimit, ok := strconv.Atoi(mem); ok && memLimit > 0 {
-			gabMemHardLimit = uintptr(memLimit * gabDefaultPodMemoryPercent / 100)
-		}
-	}
-
 	gabConfigInit()
-
-	if isEvacEnabled() {
-		gabgcinit()
-	}
 }
 
 // this initilization routine will be invoked MORE THAN ONCE
@@ -155,6 +140,11 @@ func gabConfigInit() {
 	// default values
 	gabEnabled = true
 	gabInliningEnabled = gabEnabled && !isEvacEnabled()
+
+	gabState.init()
+	if isEvacEnabled() {
+		gabgcinit()
+	}
 }
 
 // for testing only
@@ -302,39 +292,10 @@ func gabNoteGCEnd() {
 		gabInliningEnabled = false
 		return
 	}
-	isEvacuation = false
-	// try to decide only if total heap retained bytes > gabCapMax
-	memalloc := uintptr(gcController.heapGoal())
-	if memalloc > gabUsePolicyThreshold {
-		// If either SetMaxHeap is enabled or gabMemoryPercent is explicitly specified,
-		// use heapGoal to determine the GAB threshold.
-		// If not, the GAB threshold is the min(heapGoal * gabMemoryPercent, gabMemHardLimit).
-		thresh := memalloc * uintptr(gabMemoryPercent) / 100
-		if !setMaxHeapEnabled() && gabMemoryPercent == gabDefaultMemoryPercent &&
-			gabMemHardLimit != 0 && gabMemHardLimit < thresh {
-			gabThreshold = gabMemHardLimit
-		} else {
-			gabThreshold = thresh
-		}
-		gabEnabled = false
-		gabMarked := uintptr(work.gabMarked)
-		if gabMarked < gabThreshold {
-			if gabVerbose {
-				println("Enable GAB: ", gabMarked, "<", gabThreshold)
-			}
-			gabEnabled = true
-		} else {
-			gabEvacReason = gabEvacThreshold
-			isEvacuation = true
-		}
-	}
-
-	// Decide enable GAB allocation fastpath or not
-	gabInliningEnabled = gabEnabled && !isEvacEnabled()
-
-	// Periodic GAB evacuation
-	if isEvacEnabled() && gabdebug.evacuation != 0 && int32(memstats.numgc+1)%gabdebug.evacuation == 0 {
-		gabEvacReason = gabEvacPeriodic
-		isEvacuation = true
+	// Use GAB pacer if GOGABOPT=gabPacer=1 is specified.
+	if gabdebug.gabPacer == 1 {
+		gabState.gabPacer()
+	} else {
+		gabState.oldStrategy()
 	}
 }

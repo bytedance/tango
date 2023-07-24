@@ -2118,7 +2118,6 @@ var (
 	GabUsedBytes     = &gabUsedBytes
 	GabEnabled       = &gabEnabled
 	GabMemoryPercent = &gabMemoryPercent
-	GabVerbose       = &gabVerbose
 	GabPolicyEnabled = &gabPolicyEnabled
 )
 
@@ -2199,6 +2198,10 @@ func IsFrozenObj(p uintptr) bool {
 	}
 	i := s.objIndex(p)
 	return s.frozenBitsForIndex(i).isMarked()
+}
+
+func GetGabPacerError() float64 {
+	return gabState.gabRatioError
 }
 
 func SetMaxHeap(bytes int64) int64 {
