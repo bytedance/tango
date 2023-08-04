@@ -3250,7 +3250,7 @@ func setToolFlags(loaderstate *modload.State, pkgs ...*Package) {
 		beastStr := flag_beast.GetBeastStr(p.Internal.Gcflags)
 		var beastOptions []string
 		if cfg.Optmode == "beast" && !cfg.BuildASan {
-			beastOptions = append(beastOptions, "bce", "gabinline", "intrinsic",
+			beastOptions = append(beastOptions, "bce", "gabinline", "intrinsic", "makeslicecopy",
 				"inlbudget="+strconv.Itoa(beastInlBudget))
 			if cfg.BuildV {
 				beastOptions = append(beastOptions, "verbose")

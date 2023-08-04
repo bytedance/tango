@@ -1,6 +1,9 @@
 // Copyright 2012 The Go Authors. All rights reserved.
+// Copyright (c) 2023 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2023-08-04.
 
 package walk
 
@@ -441,13 +444,36 @@ func orderMakeSliceCopy(s []ir.Node) {
 
 	as := s[0].(*ir.AssignStmt)
 	cp := s[1].(*ir.BinaryExpr)
-	if as.Y == nil || as.Y.Op() != ir.OMAKESLICE || ir.IsBlank(as.X) ||
-		as.X.Op() != ir.ONAME || cp.X.Op() != ir.ONAME || cp.Y.Op() != ir.ONAME ||
-		as.X.Name() != cp.X.Name() || cp.X.Name() == cp.Y.Name() {
-		// The line above this one is correct with the differing equality operators:
-		// we want as.X and cp.X to be the same name,
-		// but we want the initial data to be coming from a different name.
-		return
+	if base.Flag.Cfg.BeastOpt.MakeSliceCopy == 0 {
+		if as.Y == nil || as.Y.Op() != ir.OMAKESLICE || ir.IsBlank(as.X) ||
+			as.X.Op() != ir.ONAME || cp.X.Op() != ir.ONAME || cp.Y.Op() != ir.ONAME ||
+			as.X.Name() != cp.X.Name() || cp.X.Name() == cp.Y.Name() {
+			// The line above this one is correct with the differing equality operators:
+			// we want as.X and cp.X to be the same name,
+			// but we want the initial data to be coming from a different name.
+			return
+		}
+	} else {
+		// we want as.X and cp.X to be the same name.
+		if as.Y == nil || as.Y.Op() != ir.OMAKESLICE || ir.IsBlank(as.X) ||
+			as.X.Op() != ir.ONAME || cp.X.Op() != ir.ONAME || as.X.Name() != cp.X.Name() {
+			return
+		}
+		// We want the initial data to be coming from a different name.
+		switch cp.Y.Op() {
+		case ir.ONAME:
+			if cp.X.Name() == cp.Y.Name() {
+				return
+			}
+		case ir.OSLICE:
+			x := cp.Y.(*ir.SliceExpr).X
+			if x.Op() != ir.ONAME || cp.X.Name() == x.Name() {
+				return
+			}
+		default:
+			// Disallow other complex expression.
+			return
+		}
 	}
 
 	mk := as.Y.(*ir.MakeExpr)

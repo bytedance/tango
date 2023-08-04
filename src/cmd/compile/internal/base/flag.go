@@ -150,22 +150,24 @@ type CmdFlags struct {
 
 		// Beast options
 		BeastOpt struct {
-			Bce          int // aggressive boundary check elimination
-			MaxInlbudget int // max inline budget
-			GabInline    int
-			Intrinsic    int
-			Verbose      int
+			Bce           int // aggressive boundary check elimination
+			MaxInlbudget  int // max inline budget
+			GabInline     int
+			Intrinsic     int
+			Verbose       int
+			MakeSliceCopy int
 		}
 	}
 }
 
 func parseBeastOption(beastStr string) {
 	beastVars := map[string]*int{
-		"bce":       &Flag.Cfg.BeastOpt.Bce,
-		"inlbudget": &Flag.Cfg.BeastOpt.MaxInlbudget,
-		"gabinline": &Flag.Cfg.BeastOpt.GabInline,
-		"intrinsic": &Flag.Cfg.BeastOpt.Intrinsic,
-		"verbose":   &Flag.Cfg.BeastOpt.Verbose,
+		"bce":           &Flag.Cfg.BeastOpt.Bce,
+		"inlbudget":     &Flag.Cfg.BeastOpt.MaxInlbudget,
+		"gabinline":     &Flag.Cfg.BeastOpt.GabInline,
+		"intrinsic":     &Flag.Cfg.BeastOpt.Intrinsic,
+		"verbose":       &Flag.Cfg.BeastOpt.Verbose,
+		"makeslicecopy": &Flag.Cfg.BeastOpt.MakeSliceCopy,
 	}
 	for oname, val := range flag_beast.ParseBeastArguments(beastStr) {
 		if opt, ok := beastVars[oname]; ok {
