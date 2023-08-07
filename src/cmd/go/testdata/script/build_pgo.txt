@@ -55,6 +55,35 @@ go build -x -pgo=prof -trimpath -o triv.exe triv.go
 go version -m triv.exe
 stdout 'build\s+-pgo=prof'
 
+# build with filename with profile source info, extra keys should appear in build info
+cp prof source.global.service.profile_202308072100_xxxxx1_2100_xxxxx2_2100_xxxxx3.pgo
+go build -x -pgo=source.global.service.profile_202308072100_xxxxx1_2100_xxxxx2_2100_xxxxx3.pgo -trimpath -o triv.exe triv.go
+
+# check that the source region appears
+go version -m triv.exe
+stdout 'tango.pgo.pprof.region=global'
+
+# check that profiling ids appear
+go version -m triv.exe
+stdout 'tango.pgo.pprof.id=service.profile_202308072100_xxxxx1'
+stdout 'tango.pgo.pprof.id=service.profile_202308072100_xxxxx2'
+stdout 'tango.pgo.pprof.id=service.profile_202308072100_xxxxx3'
+
+# check that the PGO profile filename appears
+go version -m triv.exe
+stdout 'tango.pgo=source.global.service.profile_202308072100_xxxxx1_2100_xxxxx2_2100_xxxxx3.pgo'
+
+# build with incorrect filename, extra key should not appear in build info
+cp prof source.profile_202308072100_xxxxx1_2100_xxxxx2_2100_xxxxx3.pgo
+go build -x -pgo=source.profile_202308072100_xxxxx1_2100_xxxxx2_2100_xxxxx3.pgo -trimpath -o triv.exe triv.go
+
+# check that extra keys do not appear in build info
+go version -m triv.exe
+stdout '-pgo=source.profile_202308072100_xxxxx1_2100_xxxxx2_2100_xxxxx3.pgo'
+! stdout 'tango.pgo.pprof.region='
+! stdout 'tango.pgo.pprof.id='
+stdout 'tango.pgo=source.profile_202308072100_xxxxx1_2100_xxxxx2_2100_xxxxx3.pgo'
+
 -- prof --
 -- triv.go --
 package main

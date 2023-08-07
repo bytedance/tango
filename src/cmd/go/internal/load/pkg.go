@@ -23,6 +23,7 @@ import (
 	"os"
 	pathpkg "path"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"runtime/debug"
 	"slices"
@@ -3008,6 +3009,53 @@ func PackagesAndErrors(loaderstate *modload.State, ctx context.Context, opts Pac
 	return pkgs
 }
 
+type pgoSourceInfo struct {
+	Region       string
+	ProfilingIDs []string
+}
+
+// parsePGOSourceInfo parse region and profiling IDs from profile filename
+// this info will be used for plugin PGO build, the profile filename is in the format of
+// {source}.{region}.{id_common_prefix}{id_suffix_0}_{id_suffix_1}...{id_suffix_n}.pgo
+func parsePGOSourceInfo(filename string) (pgoSourceInfo, bool) {
+	var (
+		info = pgoSourceInfo{}
+		// regexp for {source}.{region}.{id_common_prefix}{id_suffix_0}_{id_suffix_1}...{id_suffix_n}.pgo
+		// ((?:\w+\.)*\w+_\d{8}) for {id_common_prefix}
+		// all id suffixes are matched as a string here, and will be split later
+		re = regexp.MustCompile(`\w+\.(\w+)\.((?:\w+\.)*\w+_\d{8})(\w+)\.pgo`)
+		// a valid filename will match a full string and three submatch strings
+		expectMatchNum = 4
+	)
+
+	matches := re.FindStringSubmatch(filename)
+	if len(matches) != expectMatchNum {
+		return info, false
+	}
+
+	var (
+		// matches slice will be [filename, region, id_common_prefix, id_suffixes]
+		// so we use index 1, 2, 3 to get corresponding value
+		region         = matches[1]
+		idCommonPrefix = matches[2]
+		idSuffixes     = matches[3]
+		suffixRe       = regexp.MustCompile(`\d{4}_[a-zA-Z0-9]{6}`)
+		suffixList     = suffixRe.FindAllString(idSuffixes, -1)
+	)
+
+	if len(suffixList) == 0 {
+		return info, false
+	}
+
+	info.Region = region
+	for _, suffix := range suffixList {
+		profilingID := idCommonPrefix + suffix
+		info.ProfilingIDs = append(info.ProfilingIDs, profilingID)
+	}
+
+	return info, true
+}
+
 // setPGOProfilePath sets the PGO profile path for pkgs.
 // In -pgo=auto mode, it finds the default PGO profile.
 func setPGOProfilePath(pkgs []*Package) {
@@ -3022,6 +3070,18 @@ func setPGOProfilePath(pkgs []*Package) {
 		} else {
 			appendBuildSetting(p.Internal.BuildInfo, "-pgo", file)
 		}
+
+		// Update additional build info including region and profiling ids for plugin pgo build flow
+		if extraInfo, ok := parsePGOSourceInfo(filepath.Base(file)); ok {
+			appendBuildSetting(p.Internal.BuildInfo, "tango.pgo.pprof.region", extraInfo.Region)
+			for _, profilingID := range extraInfo.ProfilingIDs {
+				appendBuildSetting(p.Internal.BuildInfo, "tango.pgo.pprof.id", profilingID)
+			}
+		}
+		// Update additional build info including the pgo file path for plugin pgo build flow.
+		// The plugin only read build info keys with tango prefix, so the -pgo key can not be
+		// used by plugin pgo build flow.
+		appendBuildSetting(p.Internal.BuildInfo, "tango.pgo", filepath.Base(file))
 		// Adding -pgo breaks the sort order in BuildInfo.Settings. Restore it.
 		slices.SortFunc(p.Internal.BuildInfo.Settings, func(x, y debug.BuildSetting) int {
 			return strings.Compare(x.Key, y.Key)
