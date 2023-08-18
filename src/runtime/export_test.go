@@ -2169,3 +2169,7 @@ func gcReadPolicyLocked() (gogc int, maxHeapOut int64, goal uint64) {
 	assertLockHeld(&mheap_.lock)
 	return int(gcController.gcPercent.Load()), maxHeap, gcController.heapGoal()
 }
+
+func GetGIdInternal() int64 {
+	return getGId()
+}

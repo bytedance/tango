@@ -688,6 +688,10 @@ var depsRules = `
 	net/http, tango/features
 	< tango/dynconf;
 
+    # Goid
+    unsafe
+    < tango/runtimex;
+
 	net/http
 	< tango/memstats;
 

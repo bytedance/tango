@@ -424,3 +424,4 @@ pkg unicode, var Old_Uyghur *RangeTable #55079
 pkg unicode, var Tangsa *RangeTable #55079
 pkg unicode, var Toto *RangeTable #55079
 pkg unicode, var Vithkuqi *RangeTable #55079
+pkg tango/runtimex, func GetGId() int64 #446

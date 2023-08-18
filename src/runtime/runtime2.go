@@ -608,6 +608,8 @@ type g struct {
 // to avoid compilation error when upgrading to a higher version of Go.
 // Replacement happens during SSA generation.
 // See cmd/compile/internal/ssagen/gid_op.go
+//
+//go:linkname getGId
 func getGId() int64 {
 	return int64(getg().goid)
 }
