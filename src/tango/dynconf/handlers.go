@@ -43,6 +43,11 @@ func init() {
 	}
 }
 
+// lazyInit init pgo source lazily to reduce the init overhead of reading buildInfo.
+func lazyInit() {
+	initPGOSource()
+}
+
 func handleDynconf(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	cmd := r.FormValue("cmd")
@@ -99,6 +104,7 @@ func cmdSetConfig(args []byte) (res []byte, err error) {
 }
 
 func cmdGetConfig(args []byte) (res []byte, err error) {
+	lazyInit()
 	names := strings.Split(string(args), ",")
 	for _, name := range names {
 		if cfg := getcfg(name); cfg != nil {
@@ -113,6 +119,7 @@ func cmdGetConfig(args []byte) (res []byte, err error) {
 }
 
 func cmdListConfigs(args []byte) ([]byte, error) {
+	lazyInit()
 	res := []string{}
 	for _, cfg := range allConfigs {
 		res = append(res, cfg.String())

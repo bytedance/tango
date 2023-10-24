@@ -8,6 +8,19 @@ import "unsafe"
 
 // This variable ignores the atomic inherency of atomic.Int32
 var ptrGCPercent *int32 = (*int32)(unsafe.Pointer(&gcController.gcPercent))
+var ptrMemoryLimit *int64 = (*int64)(unsafe.Pointer(&gcController.memoryLimit))
+
+var pgoSource string
+
+// setPGOSource is used to write pgo source to runtime.pgoSource because
+// runtime/debug import runtime. So in runtime package, we can't use API
+// in runtime/debug package to read buildInfo. We need to read pgoSource
+// in another package and pass it to runtime.
+//
+//go:linkname setPGOSource
+func setPGOSource(value string) {
+	pgoSource = value
+}
 
 var rtCfgMap = map[string]any{
 	"runtime.gab,ro":              &debug.gab,
@@ -18,6 +31,7 @@ var rtCfgMap = map[string]any{
 	"runtime.gctrace,rw":          &debug.gctrace,
 	"runtime.buildVersion,ro":     &buildVersion,
 	"runtime.tangoVersion,ro":     &tangoVersion,
+	"runtime.pgoSource,ro":        &pgoSource,
 	"runtime.gcPercent,ro":        ptrGCPercent,
 	"runtime.asyncpreemptoff,ro":  &debug.asyncpreemptoff,
 	"runtime.madvdontneed,ro":     &debug.madvdontneed,
@@ -26,6 +40,7 @@ var rtCfgMap = map[string]any{
 	"runtime.optMode,ro":          &optMode,
 	"runtime.maxHeapBytes,ro":     &maxHeap,
 	"runtime.largeAllocTrace,ro":  &debug.largealloctrace,
+	"runtime.memoryLimit,ro":      ptrMemoryLimit,
 }
 
 //go:linkname rtCfgListAll

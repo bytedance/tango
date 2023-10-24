@@ -685,7 +685,7 @@ var depsRules = `
 	< tango/features;
 
 	# DynConf
-	net/http, tango/features
+	net/http, tango/features, runtime/debug, path, sync
 	< tango/dynconf;
 
     # Goid

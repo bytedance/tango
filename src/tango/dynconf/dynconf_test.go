@@ -27,34 +27,8 @@ var (
 )
 
 func TestPprofDynconf(t *testing.T) {
-	testenv.MustHaveGoBuild(t)
-
-	tmpdir := t.TempDir()
-	var port int = 8000 + rand.Int()%1024
-	binpath := path.Join(tmpdir, "pprof_dynconf")
-
-	cmd := exec.Command(testenv.GoToolPath(t), "build", "-o", binpath, "testdata/svr.go")
-	if cmd.Run() != nil {
-		t.Fatalf("Failed to compile")
-	}
-
-	// Start the server
-	go func() {
-		cmd := exec.Command(binpath, "-p", fmt.Sprintf("%d", port))
-		if cmd.Run() != nil {
-			t.Errorf("Failed to start the server.")
-		}
-	}()
-
-	// wait for the http server to start
-	time.Sleep(3 * time.Second)
-	defer func() {
-		http.Get(fmt.Sprintf("http://127.0.0.1:%d/debug/kill", port))
-	}()
-
-	httpurl = fmt.Sprintf("http://127.0.0.1:%d/debug/pprof/dynconf", port)
-	t.Logf("httpurl=%s", httpurl)
-
+	clear := buildAndRunDynconfServer(t, nil, nil)
+	defer clear()
 	t.Run("TestList", testList)
 	t.Run("TestGetAndCheck", testGetAndCheck)
 	t.Run("TestGetOptmode", testGetOptmode)
@@ -65,6 +39,22 @@ func TestPprofDynconf(t *testing.T) {
 	t.Run("TestIntOverflow", testIntOverflow)
 	t.Run("TestSetGetEquals", testSetGetEquals)
 	t.Run("TestRemoteStableness", testRemoteStableness)
+	t.Run("TestMemoryLimit", testMemoryLimit)
+}
+
+func TestPprofDynconfWithDefaultEnv(t *testing.T) {
+	clear := buildAndRunDynconfServer(t, nil, []string{
+		"GODEBUG=gctrace=1",
+		"GOGC=off",
+		"GOMEMLIMIT=4294967296",
+	})
+	defer clear()
+	expectedStrings := []string{
+		"config(rw): runtime.gctrace=1",
+		"config(ro): runtime.gcPercent=-1",
+		"config(ro): runtime.memoryLimit=4294967296",
+	}
+	listAndCheck(t, expectedStrings)
 }
 
 // retrieve the default expected values of dynconf
@@ -82,6 +72,17 @@ func getExpectedCfgs(local bool) map[string]any {
 		"runtime.harddecommit":     int32(0),
 		"runtime.maxHeapBytes":     int64(math.MaxInt64),
 		"runtime.largeAllocTrace":  int32(0),
+		"runtime.optMode":          "default",
+		"runtime.pgoSource":        "none",
+		"runtime.memoryLimit":      int64(math.MaxInt64),
+	}
+
+	if local {
+		if testenv.IsBeastModeEnabled() {
+			expectedCfgs["runtime.optMode"] = "beast"
+		} else {
+			expectedCfgs["runtime.optMode"] = "default"
+		}
 	}
 
 	if runtime.GOOS == "linux" {
@@ -117,10 +118,6 @@ func testRemoteStableness(t *testing.T) {
 }
 
 func testList(t *testing.T) {
-	strres, err := postCmd("list", "")
-	if err != nil {
-		t.Fatalf("Failed to postCmd 'list', error=%v\n", err)
-	}
 	expectedStrings := []string{
 		"config(ro): runtime.gab=0",
 		"config(ro): runtime.gabUsedBytes=0",
@@ -129,6 +126,7 @@ func testList(t *testing.T) {
 		"config(rw): runtime.gctrace=0",
 		"config(ro): runtime.buildVersion=",
 		"config(ro): runtime.tangoVersion=bm.1.",
+		"config(ro): runtime.pgoSource=none",
 		"config(ro): runtime.gcPercent=100",
 		"config(ro): runtime.optMode=default",
 		"config(ro): runtime.asyncpreemptoff=",
@@ -137,13 +135,10 @@ func testList(t *testing.T) {
 		"config(ro): runtime.maxHeapBytes=",
 		"config(ro): runtime.largeAllocTrace=",
 		"config(ro): runtime.gabThreshold=",
+		"config(ro): runtime.memoryLimit=",
 		"task: runtime.GC",
 	}
-	if !strings.HasPrefix(runtime.BVersion(), "devel ") {
-		expectedStrings = append(expectedStrings, "config(ro): runtime.buildVersion=go1.")
-		expectedStrings = append(expectedStrings, "config(ro): runtime.tangoVersion=bm.1.")
-	}
-	shouldContains(strres, expectedStrings, t)
+	listAndCheck(t, expectedStrings)
 }
 
 func testGetAndCheck(t *testing.T) {
@@ -243,6 +238,38 @@ func testSetGetEquals(t *testing.T) {
 
 // utility functions
 
+func buildAndRunDynconfServer(t *testing.T, extBuildArgs []string, envs []string) func() {
+	testenv.MustHaveGoBuild(t)
+
+	tmpdir := t.TempDir()
+	var port int = 8000 + rand.Int()%1024
+	binpath := path.Join(tmpdir, "pprof_dynconf")
+
+	args := append([]string{"build", "-o", binpath}, extBuildArgs...)
+	cmd := exec.Command(testenv.GoToolPath(t), append(args, "testdata/svr.go")...)
+	if cmd.Run() != nil {
+		t.Fatalf("Failed to compile")
+	}
+
+	// Start the server
+	go func() {
+		cmd := exec.Command(binpath, "-p", fmt.Sprintf("%d", port))
+		cmd.Env = append(cmd.Env, envs...)
+		if cmd.Run() != nil {
+			t.Errorf("Failed to start the server.")
+		}
+	}()
+
+	// wait for the http server to start
+	time.Sleep(3 * time.Second)
+
+	httpurl = fmt.Sprintf("http://127.0.0.1:%d/debug/pprof/dynconf", port)
+	t.Logf("httpurl=%s", httpurl)
+	return func() {
+		http.Get(fmt.Sprintf("http://127.0.0.1:%d/debug/kill", port))
+	}
+}
+
 func postCmd(cmd, arg string) (string, error) {
 	r, e := http.PostForm(httpurl, url.Values{
 		"cmd":  []string{cmd},
@@ -277,6 +304,15 @@ func getInt64Value(t *testing.T, k string) int64 {
 		t.Fatalf("Failed to parse: %s", s)
 	}
 	return iv
+}
+
+func listAndCheck(t *testing.T, expectedStrings []string) {
+	strres, err := postCmd("list", "")
+	if err != nil {
+		t.Fatalf("Failed to postCmd 'list', error=%v\n", err)
+	}
+
+	shouldContains(strres, expectedStrings, t)
 }
 
 func shouldContains(s string, keys []string, t *testing.T) {
@@ -324,5 +360,39 @@ func TestLocalReadAfterChange(t *testing.T) {
 	s3 := cfg.String()
 	if s2 != s3 {
 		t.Fatal("should be same")
+	}
+}
+
+func TestPprofDynconfPGO(t *testing.T) {
+	clear := buildAndRunDynconfServer(t, []string{"-pgo", "testdata/prof"}, nil)
+	defer clear()
+	t.Run("TestListPGO", testListPGO)
+}
+
+func testListPGO(t *testing.T) {
+	expectedStrings := []string{
+		"config(ro): runtime.pgoSource=prof",
+		"task: runtime.GC",
+	}
+	listAndCheck(t, expectedStrings)
+}
+
+// test change memory limit by debug.SetMemoryLimit.
+func testMemoryLimit(t *testing.T) {
+	memLimitUrl := strings.Replace(httpurl, "pprof/dynconf", "setMemoryLimit", -1)
+	key := "runtime.memoryLimit"
+	// restore original value at the end
+	defer func() {
+		http.Get(memLimitUrl + "?value=" + strconv.Itoa(math.MaxInt64))
+	}()
+	// do set
+	newValue := int64(1024 * 1024 * 1024)
+	_, err := http.Get(memLimitUrl + "?value=" + strconv.FormatInt(newValue, 10))
+	if err != nil {
+		t.Fatalf("Failed to set memorylimit")
+	}
+	value := getInt64Value(t, "runtime.memoryLimit")
+	if value != newValue {
+		t.Fatalf("get: %s=%d, but expecting %d", key, value, newValue)
 	}
 }

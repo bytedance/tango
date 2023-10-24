@@ -11,6 +11,8 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"runtime/debug"
+	"strconv"
 	"time"
 )
 
@@ -33,6 +35,15 @@ func main() {
 	http.HandleFunc("/debug/kill", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Printf("Ended by /debug/kill\n")
 		os.Exit(0)
+	})
+	http.HandleFunc("/debug/setMemoryLimit", func(w http.ResponseWriter, r *http.Request) {
+		value := r.FormValue("value")
+		if value == "" {
+			return
+		}
+		if i64, err := strconv.ParseInt(value, 10, 0); err == nil {
+			debug.SetMemoryLimit(i64)
+		}
 	})
 	addr := fmt.Sprintf("127.0.0.1:%d", port)
 	fmt.Printf("Listening on %s\n", addr)
