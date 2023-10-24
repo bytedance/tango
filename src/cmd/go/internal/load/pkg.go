@@ -3272,15 +3272,8 @@ func (p *Package) parseBeastOptions() {
 		return
 	}
 
-	opts := strings.TrimPrefix(beastOpt, beastPrefix)
-	for _, o := range strings.Split(opts, ",") {
-		if o == "" {
-			continue
-		}
-		if o == "intrinsic" {
-			p.Internal.BeastOpt.Intrinsic = 1
-			break
-		}
+	if strings.Contains(beastOpt, "intrinsic") {
+		p.Internal.BeastOpt.Intrinsic = 1
 	}
 }
 

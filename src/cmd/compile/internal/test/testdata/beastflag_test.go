@@ -437,3 +437,52 @@ func main() {
 		t.Fatalf("beast mode compile failed with %s\n", out)
 	}
 }
+
+// TestBeastSeparator tests the cases where beastArgs are split by various separator.
+func TestBeastSeparator(t *testing.T) {
+	testenv.MustHaveGoRun(t)
+
+	source := `package main
+import (
+	"fmt"
+)
+
+func main() {
+	fmt.Println("run success")
+}
+`
+	filename := "beastseparator.go"
+	workdir, err := prepareSource(t, filename, []byte(source))
+	if workdir != "" {
+		defer os.RemoveAll(workdir)
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Logf("Created workdir: %s\n", workdir)
+
+	testCases := map[string]string{
+		"bce:gabinline:intrinsic:inlbudget=240:verbose": "run success",
+		"bce gabinline intrinsic":                       "open gabinline: no such file or directory",
+		"bce:::::::gabinline:::intrinsic":               "run success",
+		"bce:gabinline,intrinsic":                       "run success",
+		"bce;gabinline##\nintrinsic":                    "compile: unknown beast option bce;gabinline##",
+	}
+
+	runCase := func(t *testing.T, flag, output string) {
+		cmd := exec.Command(testenv.GoToolPath(t), "run", "-gcflags=-beast="+flag, filename)
+		cmd.Dir = workdir
+		out, err := cmd.CombinedOutput()
+		if err == nil && !strings.Contains(string(out), "run success") {
+			t.Fatalf("beast mode compile failed with %s\n", out)
+		}
+		if err != nil && !strings.Contains(string(out), output) {
+			t.Fatalf("beast mode should compile failed with %s\n", out)
+		}
+	}
+
+	for flag, output := range testCases {
+		runCase(t, flag, output)
+	}
+}
