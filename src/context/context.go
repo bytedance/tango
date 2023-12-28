@@ -1,6 +1,9 @@
 // Copyright 2014 The Go Authors. All rights reserved.
+// Copyright (c) 2023 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2023-12-28.
 
 // Package context defines the Context type, which carries deadlines,
 // cancellation signals, and other request-scoped values across API boundaries
@@ -772,7 +775,7 @@ func (c *valueCtx) Value(key any) any {
 	return value(c.Context, key)
 }
 
-func value(c Context, key any) any {
+func valueDefault(c Context, key any) any {
 	for {
 		switch ctx := c.(type) {
 		case *valueCtx:

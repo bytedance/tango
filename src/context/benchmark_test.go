@@ -1,6 +1,9 @@
 // Copyright 2014 The Go Authors. All rights reserved.
+// Copyright (c) 2023 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2023-12-28.
 
 package context_test
 
@@ -8,6 +11,7 @@ import (
 	. "context"
 	"fmt"
 	"runtime"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -206,5 +210,86 @@ func BenchmarkErrCanceled(b *testing.B) {
 		if err := ctx.Err(); err == nil {
 			b.Fatalf("ctx.Err() = %v", err)
 		}
+	}
+}
+
+func BenchmarkDeepValueNewGoRoutineStruct(b *testing.B) {
+	for _, depth := range []int{10, 20, 30, 50, 100} {
+		ctx := Background()
+		for i := 0; i < depth; i++ {
+			ctx = WithValue(ctx, struct{}{}, i)
+		}
+
+		b.Run(fmt.Sprintf("depth=%d", depth), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				var wg sync.WaitGroup
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					ctx.Value(CtxKeyInvalid{})
+				}()
+				wg.Wait()
+			}
+		})
+	}
+}
+
+func BenchmarkDeepValueSameGoRoutineStruct(b *testing.B) {
+	for _, depth := range []int{10, 20, 30, 50, 100} {
+		ctx := Background()
+		for i := 0; i < depth; i++ {
+			ctx = WithValue(ctx, struct{}{}, i)
+		}
+
+		b.Run(fmt.Sprintf("depth=%d", depth), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				ctx.Value(CtxKeyInvalid{})
+			}
+		})
+	}
+}
+
+func BenchmarkDeepValueSameGoRoutineString(b *testing.B) {
+	for _, depth := range []int{10, 20, 30, 50, 100} {
+		ctx := Background()
+		for i := 0; i < depth; i++ {
+			ctx = WithValue(ctx, strconv.Itoa(i), i)
+		}
+
+		b.Run(fmt.Sprintf("depth=%d", depth), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				ctx.Value("-1")
+			}
+		})
+	}
+}
+
+func BenchmarkDeepValueSameGoRoutineIntFindString(b *testing.B) {
+	for _, depth := range []int{10, 20, 30, 50, 100} {
+		ctx := Background()
+		for i := 0; i < depth; i++ {
+			ctx = WithValue(ctx, i, i)
+		}
+
+		b.Run(fmt.Sprintf("depth=%d", depth), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				ctx.Value(-1)
+			}
+		})
+	}
+}
+
+func BenchmarkDeepValueSameGoRoutineStringFindInt(b *testing.B) {
+	for _, depth := range []int{10, 20, 30, 50, 100} {
+		ctx := Background()
+		for i := 0; i < depth; i++ {
+			ctx = WithValue(ctx, strconv.Itoa(i), i)
+		}
+
+		b.Run(fmt.Sprintf("depth=%d", depth), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				ctx.Value(-1)
+			}
+		})
 	}
 }
