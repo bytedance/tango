@@ -42,6 +42,7 @@ var stdPkgs = []string{
 	"structs",
 	"sync",
 	"syscall",
+	"tango",
 	"testing",
 	"time",
 	"unicode",
