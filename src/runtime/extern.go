@@ -371,11 +371,12 @@ func GOROOT() string {
 // This is accessed by "go version <binary>".
 var buildVersion string
 
-var tangoVersion = sys.TangoVersion
-
-var optMode = optmode
-
-var bVersion = Version() + "." + tangoVersion
+var (
+	tangoVersion = sys.TangoVersion
+	optMode      = optmode
+	bVersion     = Version() + "." + tangoVersion
+	beastFlag    = ""
+)
 
 // BVersion returns the version string of Tango (Bytedance-modified Go)
 func BVersion() string {

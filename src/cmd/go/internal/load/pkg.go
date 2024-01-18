@@ -49,6 +49,7 @@ import (
 	"cmd/go/internal/str"
 	"cmd/go/internal/trace"
 	"cmd/go/internal/vcs"
+	"cmd/internal/flag_beast"
 	"cmd/internal/par"
 	"cmd/internal/pathcache"
 	"cmd/internal/pkgpattern"
@@ -3246,12 +3247,20 @@ func setToolFlags(loaderstate *modload.State, pkgs ...*Package) {
 		p.Internal.Asmflags = BuildAsmflags.For(loaderstate, p)
 		p.Internal.Gcflags = BuildGcflags.For(loaderstate, p)
 		p.Internal.Ldflags = BuildLdflags.For(loaderstate, p)
+		beastStr := flag_beast.GetBeastStr(p.Internal.Gcflags)
+		var beastOptions []string
 		if cfg.Optmode == "beast" && !cfg.BuildASan {
-			beastOptions := fmt.Sprintf("-beast=bce,inlbudget=%d,gabinline,intrinsic", beastInlBudget)
+			beastOptions = append(beastOptions, "bce", "gabinline", "intrinsic",
+				"inlbudget="+strconv.Itoa(beastInlBudget))
 			if cfg.BuildV {
-				beastOptions = beastOptions + ",verbose"
+				beastOptions = append(beastOptions, "verbose")
 			}
-			p.Internal.Gcflags = append(p.Internal.Gcflags, beastOptions)
+		}
+		if len(beastOptions) > 0 {
+			if beastStr != "" {
+				beastOptions = append(beastOptions, beastStr)
+			}
+			p.Internal.Gcflags = append(p.Internal.Gcflags, "-beast="+strings.Join(beastOptions, ","))
 			p.Internal.Ldflags = append(p.Internal.Ldflags, "-enablebeast")
 		}
 		p.parseBeastOptions()
@@ -3260,21 +3269,8 @@ func setToolFlags(loaderstate *modload.State, pkgs ...*Package) {
 }
 
 func (p *Package) parseBeastOptions() {
-	beastPrefix := "-beast="
-	var beastOpt string
-	for _, gcflag := range p.Internal.Gcflags {
-		if strings.HasPrefix(gcflag, beastPrefix) {
-			beastOpt = gcflag
-			break
-		}
-	}
-	if beastOpt == "" {
-		return
-	}
-
-	if strings.Contains(beastOpt, "intrinsic") {
-		p.Internal.BeastOpt.Intrinsic = 1
-	}
+	beastOpt := flag_beast.GetBeastStr(p.Internal.Gcflags)
+	p.Internal.BeastOpt.Intrinsic = flag_beast.ParseBeastArguments(beastOpt)["intrinsic"]
 }
 
 // GoFilesPackage creates a package for building a collection of Go files

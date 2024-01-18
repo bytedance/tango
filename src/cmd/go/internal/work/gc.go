@@ -1,6 +1,9 @@
 // Copyright 2011 The Go Authors. All rights reserved.
+// Copyright (c) 2024 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2024-01-18.
 
 package work
 
@@ -23,6 +26,7 @@ import (
 	"cmd/go/internal/gover"
 	"cmd/go/internal/load"
 	"cmd/go/internal/str"
+	"cmd/internal/flag_beast"
 	"cmd/internal/quoted"
 	"crypto/sha1"
 )
@@ -641,6 +645,11 @@ func (gcToolchain) ld(b *Builder, root *Action, targetPath, importcfg, mainpkg s
 	}
 	ldflags = append(ldflags, forcedLdflags...)
 	ldflags = append(ldflags, root.Package.Internal.Ldflags...)
+	// Record the beast flag in runtime, so that the features that need to be
+	// enabled at runtime can read it.
+	if beastStr := flag_beast.GetBeastFlag(root.Package.Internal.Gcflags); beastStr != "" {
+		ldflags = append(ldflags, "-X=runtime.beastFlag="+beastStr)
+	}
 	ldflags, err := setextld(ldflags, compiler)
 	if err != nil {
 		return err

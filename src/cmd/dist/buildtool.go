@@ -1,6 +1,9 @@
 // Copyright 2015 The Go Authors. All rights reserved.
+// Copyright (c) 2024 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2024-01-18.
 
 // Build toolchain using Go bootstrap version.
 //
@@ -43,6 +46,7 @@ var bootstrapDirs = []string{
 	"cmd/internal/codesign",
 	"cmd/internal/dwarf",
 	"cmd/internal/edit",
+	"cmd/internal/flag_beast",
 	"cmd/internal/gcprog",
 	"cmd/internal/goobj",
 	"cmd/internal/hash",

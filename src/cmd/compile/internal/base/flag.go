@@ -8,7 +8,6 @@
 package base
 
 import (
-	"bytes"
 	"cmd/internal/cov/covcmd"
 	"cmd/internal/telemetry/counter"
 	"encoding/json"
@@ -20,9 +19,9 @@ import (
 	"os"
 	"reflect"
 	"runtime"
-	"strconv"
 	"strings"
 
+	"cmd/internal/flag_beast"
 	"cmd/internal/obj"
 	"cmd/internal/objabi"
 	"cmd/internal/sys"
@@ -168,23 +167,7 @@ func parseBeastOption(beastStr string) {
 		"intrinsic": &Flag.Cfg.BeastOpt.Intrinsic,
 		"verbose":   &Flag.Cfg.BeastOpt.Verbose,
 	}
-	// parse -beast argument
-	for _, oname := range parseBeastStr([]byte(beastStr)) {
-		if oname == "" {
-			continue
-		}
-		val, valstring := 1, ""
-		if i := strings.IndexAny(oname, "="); i >= 0 {
-			var err error
-			oname, valstring = oname[:i], oname[i+1:]
-			val, err = strconv.Atoi(valstring)
-			if err != nil {
-				val = 1
-			}
-			if val < 0 {
-				log.Fatalf("illegal option value %d", val)
-			}
-		}
+	for oname, val := range flag_beast.ParseBeastArguments(beastStr) {
 		if opt, ok := beastVars[oname]; ok {
 			*opt = val
 		} else {
@@ -199,27 +182,6 @@ func addEnv(s string) {
 		log.Fatal("-env argument must be of the form key=value")
 	}
 	os.Setenv(s[:i], s[i+1:])
-}
-
-func parseBeastStr(beastStr []byte) (res []string) {
-	beastSeps := ":,"
-	idx := 0
-	for idx < len(beastStr) {
-		if strings.Contains(beastSeps, string(beastStr[idx])) {
-			idx++
-			continue
-		}
-		start := idx
-		idx = bytes.IndexAny(beastStr[idx:], beastSeps)
-		if idx == -1 {
-			res = append(res, string(beastStr[start:]))
-			break
-		}
-		idx += start
-		res = append(res, string(beastStr[start:idx]))
-		idx++
-	}
-	return res
 }
 
 // ParseFlags parses the command-line flags into Flag.
