@@ -587,6 +587,25 @@ func relocateSpecials(src uintptr, dest uintptr, size uintptr) {
 	}
 }
 
+// Check if the key of a map is a pointer or is an object with a pointer.
+// Go uses AES encoding of the raw memory of an object as its hash code.
+// Since GAB evacuation relocates objects, the address of an object is
+// altered. Therefore, for objects containing pointers to GAB objects,
+// their content changed and their hash code also changed. Consequently,
+// despite an object being in the map, one may fail to get it from the
+// hash map according to the changed hash code.
+// To solve this, map buckets whose keys contain pointers are marked as
+// frozen. During GC marking, GAB objects pointed by frozen buckets
+// are over-approximately marked as pinned, so that they will not be
+// copied by balanced GC.
+// Meanwhile, when a map is cloned by calling maps.Clone(), cloned map
+// buckets are also marked as frozen if the original ones are frozen.
+func pinMapBucket(t *abi.MapType, bucket unsafe.Pointer) {
+	if t.Key.PtrBytes != 0 {
+		frozenBitsForAddr(uintptr(bucket)).setMarked()
+	}
+}
+
 func frozenBitsForAddr(p uintptr) markBits {
 	s := spanOf(p)
 	objIndex := s.objIndex(p)

@@ -166,3 +166,20 @@ func BalancedGC2GAB() {
 func GetGabSysMemUsage() uint64 {
 	return memstats.gab_sys.load()
 }
+
+func CheckMapFrozenBit[M ~map[K]V, K comparable, V any](m M) bool {
+	p := (**hmap)(unsafe.Pointer(&m))
+	bucket := uintptr((*(*p)).buckets)
+	if bucket == 0 {
+		return false
+	}
+	s := spanOf(bucket)
+	if s.frozenBits == nil {
+		return false
+	}
+	return frozenBitsForAddr(bucket).isMarked()
+}
+
+func GetGabMaxAllocSize() int {
+	return gabMaxAllocSize
+}

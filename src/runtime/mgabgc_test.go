@@ -6,8 +6,10 @@ package runtime_test
 
 import (
 	"fmt"
+	"internal/abi"
 	"internal/testenv"
 	"log"
+	"maps"
 	"math"
 	"math/rand"
 	"os"
@@ -498,5 +500,131 @@ func TestGabPacer(t *testing.T) {
 		log.Fatalf("GAB pacer error is too large %f, threshold %f\n", error, epsilon)
 	} else {
 		log.Printf("GAB pacer error %f, threshold %f", error, epsilon)
+	}
+}
+
+// If the size of map key exceeds 128 B, the pointer of the key object
+// is stored in the map buckets, rather than the large object itself.
+// Coincidentally, the threshold of GAB objects is also 128 B. Therefore,
+// indirect keys are not allocated in GABs. Consequently, those map keys
+// do not need to be pinned, since they are not allocated in GABs and
+// are not copied by balanced GC.
+// If either the threshold of GAB objects or map indirect key is changed,
+// indirect keys should be reconsidered to be pinned. This test case
+// checks the threshold of both GAB objects and indirect keys.
+func TestGabThreshold(t *testing.T) {
+	if !isEvacSupported() {
+		t.Skip("Skip balanced GC test on platforms other than linux/amd64 and darwin/amd64")
+	}
+
+	gabMaxAllocSize := runtime.GetGabMaxAllocSize()
+	maxKeySize := abi.SwissMapMaxKeyBytes
+	if gabMaxAllocSize != maxKeySize {
+		t.Fatal("The threshold of GAB objects should be the same as the threshold of indirect map key")
+	}
+}
+
+type IndirectKey struct {
+	arr [abi.SwissMapMaxKeyBytes + 1]int
+}
+
+type IndirectValue struct {
+	arr [abi.SwissMapMaxElemBytes + 1]int
+}
+
+func makeIndirectKeyNonFrozenMap() map[IndirectKey]int {
+	m := make(map[IndirectKey]int)
+	return m
+}
+
+func makeIndirectElemFrozenMap() map[*int]IndirectValue {
+	m := make(map[*int]IndirectValue)
+	return m
+}
+
+func makeFrozenMap() map[*int]*IndirectValue {
+	m := make(map[*int]*IndirectValue)
+	return m
+}
+
+func makeNonFrozenMap() map[int]*IndirectValue {
+	m := make(map[int]*IndirectValue)
+	return m
+}
+
+func TestGabMapClone(t *testing.T) {
+	if *flagQuick {
+		t.Skip("-quick")
+	}
+	if !isEvacSupported() {
+		t.Skip("Skip balanced GC test on platforms other than linux/amd64 and darwin/amd64")
+	}
+	maxHeap := 4 << 30
+	var envs = []string{
+		fmt.Sprintf("MY_MEM_LIMIT=%d", maxHeap),
+		"GODEBUG=gab=2,gcHeapPercent=50,gctrace=1",
+		"GOGABOPT=evacuation=1,trace=1",
+	}
+
+	if !testGabInChildProcEnv(t, "GabMapClone", envs...) {
+		return
+	}
+
+	idx := 0
+
+	// Make a map with indirect key. This map bucket is not frozen.
+	m0 := makeIndirectKeyNonFrozenMap()
+	indirectKey := IndirectKey{}
+	m0[indirectKey] = 0
+	if runtime.CheckMapFrozenBit(m0) {
+		t.Fatal("The map bucket is expected not to be frozen.")
+	}
+
+	// Make a map with indirect value.
+	m1 := makeIndirectElemFrozenMap()
+	arr := IndirectValue{}
+	m1[&idx] = arr
+	if !runtime.CheckMapFrozenBit(m1) {
+		t.Fatal("The map bucket is expected to be frozen.")
+	}
+	clonedMap1 := maps.Clone(m1)
+	if !runtime.CheckMapFrozenBit(clonedMap1) {
+		t.Fatal("The cloned map bucket is expected to be frozen.")
+	}
+
+	// 1. Make a map which is expected to be frozen.
+	m2 := makeFrozenMap()
+	arr = IndirectValue{}
+	m2[&idx] = &arr
+	if !runtime.CheckMapFrozenBit(m2) {
+		t.Fatal("The map bucket is expected to be frozen.")
+	}
+	clonedMap2 := maps.Clone(m2)
+	if !runtime.CheckMapFrozenBit(clonedMap2) {
+		t.Fatal("The cloned map bucket is expected to be frozen.")
+	}
+
+	// 2. Make a non-frozen map. Both the original and cloned map
+	// are expected NOT to be frozen. It is a non-frozen map
+	// because its key is an integer.
+	m3 := makeNonFrozenMap()
+	if runtime.CheckMapFrozenBit(m3) {
+		t.Fatal("The map bucket is expected not to be frozen.")
+	}
+	// Test a map without any map buckets.
+	clonedMap3 := maps.Clone(m3)
+	if runtime.CheckMapFrozenBit(clonedMap3) {
+		t.Fatal("Cloning an empty map should be safe.")
+	}
+
+	// 3. Same as the previous case. Initialize the non-frozen map.
+	arr = IndirectValue{}
+	m3[idx] = &arr
+	if runtime.CheckMapFrozenBit(m3) {
+		t.Fatal("The map bucket is expected not to be pinned.")
+	}
+	clonedMap3 = maps.Clone(m3)
+	if runtime.CheckMapFrozenBit(clonedMap3) {
+		t.Fatal("The cloned map bucket is expected not to be pinned.")
 	}
 }
