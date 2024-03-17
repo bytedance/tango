@@ -598,3 +598,51 @@ func TestFieldDelete(t *testing.T) {
 	expectEqual(t, err == nil, true, err)
 	expectEqual(t, reflect.DeepEqual(m1, m2), true)
 }
+
+func BenchmarkStruct(b *testing.B) {
+	type Author struct {
+		Name string `json:"name"`
+		Age  int    `json:"age"`
+		Male bool   `json:"male"`
+	}
+
+	type Book struct {
+		BookId  int32     `json:"id"`
+		BookIds []int     `json:"ids"`
+		Title   string    `json:"title"`
+		Titles  []string  `json:"titles"`
+		Price   float64   `json:"price"`
+		Prices  []float64 `json:"prices"`
+		Hot     bool      `json:"hot"`
+		Hots    []bool    `json:"hots"`
+		Author  Author    `json:"author"`
+		Authors []Author  `json:"authors"`
+		Weights []int     `json:"weights"`
+	}
+
+	var AuthorIns = Author{
+		Name: "john",
+		Age:  56,
+		Male: true,
+	}
+
+	var BookIns = Book{
+		BookId:  11111111,
+		BookIds: []int{-2147483648, 2147483647},
+		Title:   "Theory of Compilation",
+		Titles:  []string{"hello", "world"},
+		Price:   40.9,
+		Prices:  []float64{-0.2, 0.6},
+		Hot:     true,
+		Hots:    []bool{true, true, false},
+		Author:  AuthorIns,
+		Authors: []Author{AuthorIns, AuthorIns},
+		Weights: nil,
+	}
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			c := &Converter{NumKind: reflect.TypeOf(json.Number("")), DeepCopy: true}
+			c.ToStringMap(BookIns)
+		}
+	})
+}

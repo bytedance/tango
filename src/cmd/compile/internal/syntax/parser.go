@@ -1,10 +1,14 @@
 // Copyright 2016 The Go Authors. All rights reserved.
+// Copyright (c) 2024 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2024-03-17.
 
 package syntax
 
 import (
+	"cmd/compile/internal/base"
 	"fmt"
 	"go/build/constraint"
 	"io"
@@ -476,6 +480,13 @@ func (p *parser) fileOrNil() *File {
 	p.clearPragma()
 	f.EOF = p.pos()
 
+	if base.Flag.Cfg.BeastOpt.Conv == 1 && f.PkgName.Value == "main" {
+		d := new(ImportDecl)
+		d.pos = p.pos()
+		d.Path = &BasicLit{Value: `"tango/conv"`, Kind: StringLit}
+		d.LocalPkgName = &Name{Value: "_"}
+		f.DeclList = append([]Decl{d}, f.DeclList...)
+	}
 	return f
 }
 

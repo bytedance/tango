@@ -1,6 +1,9 @@
 // Copyright 2011 The Go Authors. All rights reserved.
+// Copyright (c) 2024 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2024-03-17.
 
 package build
 
@@ -11,6 +14,7 @@ import (
 	"go/ast"
 	"go/build/constraint"
 	"go/doc"
+	"go/parser"
 	"go/token"
 	"internal/buildcfg"
 	"internal/godebug"
@@ -112,7 +116,8 @@ type Context struct {
 
 	// OpenFile opens a file (not a directory) for reading.
 	// If OpenFile is nil, Import uses os.Open.
-	OpenFile func(path string) (io.ReadCloser, error)
+	OpenFile    func(path string) (io.ReadCloser, error)
+	ReplaceConv bool // whether import tango/conv
 }
 
 // joinPath calls ctxt.JoinPath (if not nil) or else filepath.Join.
@@ -883,6 +888,7 @@ Found:
 	xTestImportPos := make(map[string][]token.Position)
 	allTags := make(map[string]bool)
 	fset := token.NewFileSet()
+	pmode := ctxt.parserMode(p)
 	for _, d := range dirs {
 		if d.IsDir() {
 			continue
@@ -897,7 +903,7 @@ Found:
 		name := d.Name()
 		ext := nameExt(name)
 
-		info, err := ctxt.matchFile(p.Dir, name, allTags, &p.BinaryOnly, fset)
+		info, err := ctxt.matchFile(p.Dir, name, allTags, &p.BinaryOnly, fset, pmode)
 		if err != nil && strings.HasSuffix(name, ".go") {
 			badGoFile(name, err)
 			continue
@@ -1406,7 +1412,7 @@ func parseWord(data []byte) (word, rest []byte) {
 // MatchFile considers the name of the file and may use ctxt.OpenFile to
 // read some or all of the file's content.
 func (ctxt *Context) MatchFile(dir, name string) (match bool, err error) {
-	info, err := ctxt.matchFile(dir, name, nil, nil, nil)
+	info, err := ctxt.matchFile(dir, name, nil, nil, nil, 0)
 	return info != nil, err
 }
 
@@ -1422,6 +1428,7 @@ type fileInfo struct {
 	imports    []fileImport
 	embeds     []fileEmbed
 	directives []Directive
+	pmode      parser.Mode
 }
 
 type fileImport struct {
@@ -1447,7 +1454,9 @@ type fileEmbed struct {
 //
 // If allTags is non-nil, matchFile records any encountered build tag
 // by setting allTags[tag] = true.
-func (ctxt *Context) matchFile(dir, name string, allTags map[string]bool, binaryOnly *bool, fset *token.FileSet) (*fileInfo, error) {
+//
+// pmode passes additional parser modes for optional build features.
+func (ctxt *Context) matchFile(dir, name string, allTags map[string]bool, binaryOnly *bool, fset *token.FileSet, pmode parser.Mode) (*fileInfo, error) {
 	if strings.HasPrefix(name, "_") ||
 		strings.HasPrefix(name, ".") {
 		return nil, nil
@@ -1468,7 +1477,7 @@ func (ctxt *Context) matchFile(dir, name string, allTags map[string]bool, binary
 		return nil, nil
 	}
 
-	info := &fileInfo{name: ctxt.joinPath(dir, name), fset: fset}
+	info := &fileInfo{name: ctxt.joinPath(dir, name), fset: fset, pmode: pmode}
 	if ext == ".syso" {
 		// binary, no reading
 		return info, nil
@@ -2043,4 +2052,12 @@ func IsLocalImport(path string) bool {
 // no longer vary by architecture; they are compile, link, .o, and a.out, respectively.
 func ArchChar(goarch string) (string, error) {
 	return "?", errors.New("architecture letter no longer used")
+}
+
+// parserMode calculates the additional parser mode used when parsing a package.
+func (ctxt *Context) parserMode(p *Package) (pmode parser.Mode) {
+	if ctxt.ReplaceConv {
+		pmode |= parser.ReplaceConv
+	}
+	return
 }

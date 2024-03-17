@@ -22,20 +22,25 @@ var (
 	tcFloat64Type         *_type
 	tcJsonNumberType      *_type
 	tcStringType          *_type // runtime.stringType is not equal to this.
+	tcTimeType            *_type
 	tcBoolType            *_type
 	tcInterfaceType       *_type
 	tcStringEfaceMapType  *_type
 	tcJsonType            *interfacetype
 	tcTextType            *interfacetype
-	tcStructFieldsCache   tcCache // map[reflect.Type]*tcStructFields.
+	tcDeepCopyType        *interfacetype
+	tcStructFieldsCache   unsafe.Pointer // map[*type]*tcStructFields.
 	tcEscapeFloatSci      func(f float64, format byte, bitSize int) unsafe.Pointer
 	tcParseFloat          func(s string, bitSize int) (float64, error)
-	tcExtractStructFields func(t iface) ([]bool, [][]int, []string, []bool)
+	tcExtractStructFields func(t iface) ([]bool, [][]int, []string, []bool, []iface, []bool, []bool)
 	tcGetConverter        func() any
 	tcPutConverter        func(any)
 	tcParseInterface      func(b []byte, useNumber bool) any
 	tcMarshalJson         func(i iface) ([]byte, error)
 	tcMarshalText         func(i iface) ([]byte, error)
+	tcInitCache           func(m unsafe.Pointer)
+	tcLoadCache           func(m unsafe.Pointer, t1, t2 *_type) any
+	tcStoreCache          func(m unsafe.Pointer, t1, t2 *_type, v any)
 )
 
 //go:linkname tcInitValues
@@ -63,6 +68,8 @@ func tcInitValues() {
 	tcNum = []string{"first", "second"}
 	tcInitMcountOffset()
 	tcInitBasicTypes()
+	tcInitCache(unsafe.Pointer(&tcStructFieldsCache))
+	tcInitCache(unsafe.Pointer(&tcStructToStructCache))
 }
 
 func tcInitMcountOffset() {
@@ -133,7 +140,7 @@ func tcInitBasicTypes() {
 }
 
 //go:linkname tcInitTypes
-func tcInitTypes(jsonNumberReflectType, bigIntTextMarshal, bigIntJsonMarshaler iface) {
+func tcInitTypes(jsonNumberReflectType, bigIntTextMarshal, bigIntJsonMarshaler iface, time interface{}) {
 	tcReflectTypeItab = jsonNumberReflectType.tab
 	tcJsonNumberType = (*_type)(jsonNumberReflectType.data)
 	tcStringType = tcTypeOf("")
@@ -141,18 +148,25 @@ func tcInitTypes(jsonNumberReflectType, bigIntTextMarshal, bigIntJsonMarshaler i
 	tcFloat64Type = tcTypeOf(float64(0))
 	tcBoolType = tcTypeOf(true)
 	tcStringEfaceMapType = tcTypeOf(map[string]interface{}{})
-	tcStructFieldsCache.data = make(map[any]any)
 	tcInterfaceType = tcTypeOf(eface{})
-	tcStructToStructCache.data = make(map[any]any)
+	tcTimeType = tcTypeOf(time)
 	tcTextType = bigIntTextMarshal.tab.Inter
 	tcJsonType = bigIntJsonMarshaler.tab.Inter
+	tcDeepCopyType = tcGetInterfaceType((*tcDeepCopyFn)(nil))
+}
+
+func tcGetInterfaceType(dpFn interface{}) *interfacetype {
+	return (*interfacetype)((unsafe.Pointer)((*ptrtype)((unsafe.Pointer)((*eface)((unsafe.Pointer)(&dpFn))._type)).Elem))
 }
 
 //go:linkname tcInitFuncs
 func tcInitFuncs(escapeFloatSci func(f float64, format byte, bitSize int) unsafe.Pointer, getConverter func() any,
 	putConverter func(any), parseFloat func(s string, bitSize int) (float64, error),
-	extractStructFields func(t iface) ([]bool, [][]int, []string, []bool), parseInterface func(b []byte, useNumber bool) any,
-	marshalJson func(i iface) ([]byte, error), marshalText func(i iface) ([]byte, error)) {
+	extractStructFields func(t iface) ([]bool, [][]int, []string, []bool, []iface, []bool, []bool),
+	parseInterface func(b []byte, useNumber bool) any,
+	marshalJson func(i iface) ([]byte, error), marshalText func(i iface) ([]byte, error),
+	initCache func(m unsafe.Pointer), loadCache func(m unsafe.Pointer, t1, t2 *_type) any,
+	storeCache func(m unsafe.Pointer, t1, t2 *_type, v any)) {
 	tcEscapeFloatSci = escapeFloatSci
 	tcGetConverter = getConverter
 	tcPutConverter = putConverter
@@ -161,27 +175,9 @@ func tcInitFuncs(escapeFloatSci func(f float64, format byte, bitSize int) unsafe
 	tcParseInterface = parseInterface
 	tcMarshalJson = marshalJson
 	tcMarshalText = marshalText
-}
-
-type tcCache struct {
-	lock mutex
-	data map[any]any
-}
-
-func (c *tcCache) load(key any) any {
-	lock(&c.lock)
-	if res, ok := c.data[key]; ok {
-		unlock(&c.lock)
-		return res
-	}
-	unlock(&c.lock)
-	return nil
-}
-
-func (c *tcCache) store(key, value any) {
-	lock(&c.lock)
-	c.data[key] = value
-	unlock(&c.lock)
+	tcInitCache = initCache
+	tcLoadCache = loadCache
+	tcStoreCache = storeCache
 }
 
 type tcStructFields struct {
@@ -191,25 +187,30 @@ type tcStructFields struct {
 }
 
 type tcField struct {
-	omitEmpty  bool
-	export     bool
-	typ        *_type
-	structType *_type    // structType indicates which struct type a field belongs to.
-	offset     []uintptr // offset within the type.
-	key        string
-	hash       uintptr
-	index      uintptr
-	bucket     uintptr
-	table      uintptr
-	tophash    uint8
+	omitEmpty    bool
+	export       bool
+	ignoreJson   bool
+	ignoreCopier bool
+	mustDelete   bool
+	typ          *_type
+	structType   *_type    // structType indicates which struct type a field belongs to.
+	offset       []uintptr // offset within the type.
+	key          string
+	hash         uintptr
+	index        uintptr
+	bucket       uintptr
+	table        uintptr
+	tophash      uint8
 }
 
 type tcConverter struct {
-	numberKind uint8
-	deepCopy   bool
-	context    eface
-	ssBuffer   tcBuffer[stringStruct]
-	bBuffer    tcBuffer[byte]
+	numberKind  uint8
+	deepCopy    bool
+	context     eface
+	ssBuffer    tcBuffer[stringStruct]
+	bBuffer     tcBuffer[byte]
+	replaceFunc uint8
+	stackLevel  uint32
 }
 
 type tcBuffer[T any] struct {
@@ -257,7 +258,7 @@ func tcToStringMap(from interface{}, preferredNumberKind iface, deepCopy bool) (
 	} else if data == nil {
 		return nil, nil
 	}
-	c := tcGetConverter().(*tcConverter)
+	c := tcGetInitializedConverter(deepCopy)
 	switch (*_type)(preferredNumberKind.data) {
 	case tcInterfaceType, nil:
 		c.numberKind = tcToOrig
@@ -268,7 +269,6 @@ func tcToStringMap(from interface{}, preferredNumberKind iface, deepCopy bool) (
 	default:
 		return nil, tcUnsupportedConvertError(tcTypeName((*_type)(preferredNumberKind.data)))
 	}
-	c.deepCopy = deepCopy
 	var (
 		ie  eface
 		err error
@@ -291,6 +291,13 @@ func tcToStringMap(from interface{}, preferredNumberKind iface, deepCopy bool) (
 	} else {
 		return tm, nil
 	}
+}
+
+func tcGetInitializedConverter(deepCopy bool) *tcConverter {
+	c := tcGetConverter().(*tcConverter)
+	c.deepCopy = deepCopy
+	c.stackLevel = 0
+	return c
 }
 
 func tcPackReflectType(t *_type) (res iface) {
@@ -376,38 +383,36 @@ func (c *tcConverter) unpackInterface(p unsafe.Pointer, t *_type) (unsafe.Pointe
 	return tcUnpackEface(p)
 }
 
-func tcIndexToOffset(t *_type, index []int) ([]uintptr, *_type, *_type) {
+func tcIndexToOffset(t *_type, index []int) ([]uintptr, *_type) {
 	offset := make([]uintptr, 0, len(index))
 	o := uintptr(0)
-	belonging := t
 	for _, i := range index {
 		for t.Kind() == abi.Pointer {
 			offset = append(offset, o)
 			o = 0
 			t = (*ptrtype)(unsafe.Pointer(t)).Elem
-			belonging = t // belonging must be struct type.
 		}
 		f := (*structtype)(unsafe.Pointer(t)).Fields[i]
 		o += f.Offset
 		t = f.Typ
 	}
 	offset = append(offset, o)
-	return offset, belonging, t
+	return offset, t
 }
 
 func (c *tcConverter) getCachedStructFields(tt *_type) *tcStructFields {
-	// Type of t.tab._type is *reflect.rtype.
-	if f := tcStructFieldsCache.load(eface{tcReflectTypeItab.Type, unsafe.Pointer(tt)}); f != nil {
+	if f := tcLoadCache(tcStructFieldsCache, tt, nil); f != nil {
 		return f.(*tcStructFields)
 	}
 	t := tcPackReflectType(tt)
 	sf := c.typeFastMapConvFields(t)
-	tcStructFieldsCache.store(eface{tcReflectTypeItab.Type, unsafe.Pointer(tt)}, sf)
+	tcStoreCache(tcStructFieldsCache, tt, nil, sf)
 	return sf
 }
 
 func (c *tcConverter) typeFastMapConvFields(t iface) *tcStructFields {
-	omitemptyRes, indexRes, nameRes, exportRes := tcExtractStructFields(t)
+	omitemptyRes, indexRes, nameRes, exportRes, belongStructType, ignoreJsonRes,
+		ignoreCopierRes := tcExtractStructFields(t)
 	var fmcStruct = new(tcStructFields)
 	fmcStruct.fields = make([]tcField, len(omitemptyRes))
 	fmcStruct.nameIndex = make(map[string]int, len(omitemptyRes))
@@ -417,11 +422,14 @@ func (c *tcConverter) typeFastMapConvFields(t iface) *tcStructFields {
 		fmcStruct.fields[i].omitEmpty = omitemptyRes[i]
 		fmcStruct.fields[i].export = exportRes[i]
 		var seed = tcGetSeed(fmcStruct.proto)
+		fmcStruct.fields[i].ignoreJson = ignoreJsonRes[i]
+		fmcStruct.fields[i].ignoreCopier = ignoreCopierRes[i]
 		fmcStruct.fields[i].key = nameRes[i]
+		fmcStruct.fields[i].structType = (*_type)(belongStructType[i].data)
 		// First: record hash value.
 		fmcStruct.fields[i].hash = stringHash(fmcStruct.fields[i].key, seed)
 		// Second: convert index to offset.
-		fmcStruct.fields[i].offset, fmcStruct.fields[i].structType, fmcStruct.fields[i].typ = tcIndexToOffset((*_type)(t.data), indexRes[i])
+		fmcStruct.fields[i].offset, fmcStruct.fields[i].typ = tcIndexToOffset((*_type)(t.data), indexRes[i])
 		// Thirdly: map index and field.
 		if _, ok := fmcStruct.nameIndex[fmcStruct.fields[i].key]; !ok {
 			// Considering that anonymous nested classes may have fields with the same name,
@@ -649,7 +657,7 @@ func tcTypeName(ft *_type) string {
 }
 
 func tcNeedSkip(f *tcField) bool {
-	return !f.export
+	return !f.export || f.ignoreJson
 }
 
 // p is the start of the array.
@@ -916,6 +924,7 @@ type tcUnsupportedTypeError string
 type tcBadStateError int
 type tcUnsupportedConvertError string
 type tcIllegalConvertError string
+type tcCircularReference string
 
 var tcNum []string
 
@@ -950,6 +959,10 @@ func (err tcUnsupportedConvertError) Error() string {
 
 func (err tcIllegalConvertError) Error() string {
 	return "Illegal conversion: " + string(err)
+}
+
+func (err tcCircularReference) Error() string {
+	return "There may be circular references in the objects to be copied"
 }
 
 func tcIsEmptyValue(p unsafe.Pointer, t *_type) bool {

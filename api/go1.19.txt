@@ -312,3 +312,6 @@ pkg tango/conv, type Converter struct, NumKind reflect.Type #379
 pkg tango/conv, type Converter struct, DeepCopy bool #379
 pkg tango/conv, method (*Converter) ToStringMap(interface{}) (map[string]interface{}, error) #379
 pkg tango/conv, method (*Converter) TypeToType(interface{}, interface{}) error #379
+pkg go/build, type Context struct, ReplaceConv bool #512
+pkg go/parser, const ReplaceConv = 128 #512
+pkg go/parser, const ReplaceConv Mode #512

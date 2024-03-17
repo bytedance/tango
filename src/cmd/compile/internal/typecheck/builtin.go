@@ -263,10 +263,11 @@ var runtimeDecls = [...]struct {
 	{"fmt_stringcopy", funcTag, 171},
 	{"fmt_stringer", funcTag, 172},
 	{"fmt_error", funcTag, 172},
+	{"tcTypeToType", funcTag, 174},
 }
 
 func runtimeTypes() []*types.Type {
-	var typs [173]*types.Type
+	var typs [175]*types.Type
 	typs[0] = types.ByteType
 	typs[1] = types.NewPtr(typs[0])
 	typs[2] = types.Types[types.TANY]
@@ -440,6 +441,8 @@ func runtimeTypes() []*types.Type {
 	typs[170] = newSig(params(typs[168], typs[24]), params(typs[30]))
 	typs[171] = newSig(params(typs[30]), params(typs[30]))
 	typs[172] = newSig(params(typs[2]), params(typs[30]))
+	typs[173] = types.ErrorType
+	typs[174] = newSig(params(typs[10], typs[10], typs[6], typs[71]), params(typs[173]))
 	return typs[:]
 }
 

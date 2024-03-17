@@ -1,11 +1,15 @@
 // Copyright 2018 The Go Authors. All rights reserved.
+// Copyright (c) 2024 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2024-03-17.
 
 package load
 
 import (
 	"bytes"
+	"cmd/go/internal/cfg"
 	"context"
 	"errors"
 	"fmt"
@@ -317,6 +321,9 @@ func TestPackagesAndErrors(loaderstate *modload.State, ctx context.Context, done
 	}
 	for _, d := range ldDeps {
 		deps = append(deps, d)
+	}
+	if cfg.BuildContext.ReplaceConv {
+		deps = append(deps, "tango/conv")
 	}
 	for _, dep := range deps {
 		if dep == ptest.ImportPath {

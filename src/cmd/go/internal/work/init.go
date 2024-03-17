@@ -14,7 +14,9 @@ import (
 	"cmd/go/internal/base"
 	"cmd/go/internal/cfg"
 	"cmd/go/internal/fsys"
+	"cmd/go/internal/load"
 	"cmd/go/internal/modload"
+	"cmd/internal/flag_beast"
 	"cmd/internal/quoted"
 	"fmt"
 	"internal/platform"
@@ -118,7 +120,7 @@ func BuildInit(loaderstate *modload.State) {
 		base.Fatalf(`-covermode must be "atomic", not %q, when -race is enabled`, cfg.BuildCoverMode)
 	}
 
-	buildTagsInit()
+	buildTagsInit(loaderstate)
 }
 
 // fuzzInstrumentFlags returns compiler flags that enable fuzzing instrumentation
@@ -142,9 +144,7 @@ var defBuildTags = []string{
 	"bytedance_tango",
 }
 
-func buildTagsInit() {
-	// If we enable function profiling, make sure the "fprof" exists
-	// in BuildContext.BuildTags.
+func buildTagsInit(loaderstate *modload.State) {
 	// set all the built-in tags
 	for _, t := range defBuildTags {
 		// check if command line specified tags conflicts with built-in ones
@@ -163,6 +163,11 @@ func buildTagsInit() {
 		} else if cfg.Optmode != "" {
 			fmt.Fprintf(os.Stderr, "Warning: current opt flag only supports beast, but got -opt=%s\n", cfg.Optmode)
 		}
+	}
+	if flag_beast.ParseBeastArguments(
+		flag_beast.GetBeastStr(load.BuildGcflags.For(loaderstate, &load.Package{})))["conv"] == 1 ||
+		cfg.Optmode == "beast" {
+		cfg.BuildContext.ReplaceConv = true
 	}
 }
 

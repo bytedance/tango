@@ -1,6 +1,9 @@
 // Copyright 2011 The Go Authors. All rights reserved.
+// Copyright (c) 2024 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2024-03-17.
 
 // This file is a lightly modified copy go/build/build.go with unused parts
 // removed.
@@ -106,7 +109,8 @@ type Context struct {
 
 	// OpenFile opens a file (not a directory) for reading.
 	// If OpenFile is nil, Import uses os.Open.
-	OpenFile func(path string) (io.ReadCloser, error)
+	OpenFile    func(path string) (io.ReadCloser, error)
+	ReplaceConv bool // whether import tango/conv
 }
 
 // joinPath calls ctxt.JoinPath (if not nil) or else filepath.Join.

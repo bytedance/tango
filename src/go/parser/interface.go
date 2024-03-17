@@ -1,6 +1,9 @@
 // Copyright 2009 The Go Authors. All rights reserved.
+// Copyright (c) 2024 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2024-03-17.
 
 // This file contains the exported entry points for invoking the parser.
 
@@ -54,6 +57,7 @@ const (
 	DeclarationErrors                                 // report declaration errors
 	SpuriousErrors                                    // same as AllErrors, for backward-compatibility
 	SkipObjectResolution                              // skip deprecated identifier resolution; see ParseFile
+	ReplaceConv                                       // import tango/conv
 	AllErrors            = SpuriousErrors             // report all errors (not just the first 10 on different lines)
 )
 

@@ -486,6 +486,12 @@ func isDebugFn(fn *ir.Func) bool {
 
 func (v *hairyVisitor) tooHairy(fn *ir.Func) bool {
 	v.do = v.doNode // cache closure
+	if base.Flag.Cfg.BeastOpt.Conv != 0 {
+		// Here, we need to set the replaced function as non-inline,
+		// because we need to replace these functions with the corresponding functions in the runtime after the
+		// typecheck is finished.
+		v.rcMakeReplacedFuncNotInlinable(fn)
+	}
 	if ir.DoChildren(fn, v.do) {
 		return true
 	}

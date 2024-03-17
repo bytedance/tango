@@ -326,3 +326,6 @@ func fmt_uhex(*[24]byte, uint64) string
 func fmt_stringcopy(string) string
 func fmt_stringer(any) string
 func fmt_error(any) string
+
+// tango/conv
+func tcTypeToType(from, to interface{}, deepCopy bool, replaceFunc uint8) error

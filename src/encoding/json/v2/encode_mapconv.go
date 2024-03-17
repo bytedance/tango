@@ -20,7 +20,7 @@ const tcMaxVisitedCount = 30
 // the code for doing sort. Also, we change the code for handling "-".
 //
 //go:linkname tcExtractStructFields
-func tcExtractStructFields(t reflect.Type) ([]bool, [][]int, []string, []bool) {
+func tcExtractStructFields(t reflect.Type) ([]bool, [][]int, []string, []bool, []reflect.Type, []bool, []bool) {
 	// Anonymous fields to explore at the current level and the next.
 	var currentType []reflect.Type
 	var currentIndex [][]int
@@ -31,10 +31,15 @@ func tcExtractStructFields(t reflect.Type) ([]bool, [][]int, []string, []bool) {
 	visited := map[reflect.Type]int{}
 
 	// Fields found.
-	var omitemptyRes []bool
-	var indexRes [][]int
-	var nameRes []string
-	var exportRes []bool
+	var (
+		omitemptyRes     []bool
+		indexRes         [][]int
+		nameRes          []string
+		exportRes        []bool
+		belongStructType []reflect.Type
+		ignoreJsonRes    []bool
+		ignoreCopierRes  []bool
+	)
 
 	for len(nextType) > 0 {
 		currentType, nextType = nextType, currentType[:0]
@@ -55,6 +60,8 @@ func tcExtractStructFields(t reflect.Type) ([]bool, [][]int, []string, []bool) {
 					opts.name = sf.Name
 					exp = false
 				}
+				copierName, _, _ := consumeTagOption(sf.Tag.Get("copier"))
+
 				index := make([]int, len(currentIndex[idx])+1)
 				copy(index, currentIndex[idx])
 				index[len(currentIndex[idx])] = i
@@ -75,6 +82,9 @@ func tcExtractStructFields(t reflect.Type) ([]bool, [][]int, []string, []bool) {
 					indexRes = append(indexRes, index)
 					omitemptyRes = append(omitemptyRes, opts.omitempty)
 					exportRes = append(exportRes, exp)
+					belongStructType = append(belongStructType, f)
+					ignoreJsonRes = append(ignoreJsonRes, ignore)
+					ignoreCopierRes = append(ignoreCopierRes, copierName == "-" && exp)
 					continue
 				}
 
@@ -84,7 +94,7 @@ func tcExtractStructFields(t reflect.Type) ([]bool, [][]int, []string, []bool) {
 			}
 		}
 	}
-	return omitemptyRes, indexRes, nameRes, exportRes
+	return omitemptyRes, indexRes, nameRes, exportRes, belongStructType, ignoreJsonRes, ignoreCopierRes
 }
 
 //go:linkname tcStringBytes

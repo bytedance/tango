@@ -1,6 +1,9 @@
 // Copyright 2016 The Go Authors. All rights reserved.
+// Copyright (c) 2024 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2024-03-17.
 
 //go:build ignore
 
@@ -167,6 +170,8 @@ func (i *typeInterner) mktype(t ast.Expr) string {
 			return "types.ByteType"
 		case "rune":
 			return "types.RuneType"
+		case "error":
+			return "types.ErrorType"
 		}
 		return fmt.Sprintf("types.Types[types.T%s]", strings.ToUpper(t.Name))
 	case *ast.SelectorExpr:

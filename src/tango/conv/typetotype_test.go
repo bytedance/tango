@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"text/template"
 	"time"
 	"unsafe"
 )
@@ -662,4 +663,102 @@ func TestEmptyMapWithBuckets(t *testing.T) {
 	if !reflect.DeepEqual(tm1, tm2) {
 		t.Fatal("TypeToType failed.")
 	}
+}
+
+func TestStackOverFlow(t *testing.T) {
+	check := func(a interface{}) {
+		var b interface{}
+		err := defaultConvert.TypeToType(a, &b)
+		if err == nil {
+			t.Fatal("TypeToType failed.")
+		}
+		expectEqual(t, strings.Contains(err.Error(), "There may be circular references in the objects to be copied"),
+			true, err)
+	}
+	t.Run("ptr", func(t *testing.T) {
+		type A struct {
+			F1 *A
+		}
+		a := &A{}
+		a.F1 = a
+		check(a)
+	})
+	t.Run("slice", func(t *testing.T) {
+		type A []A
+		a := make([]A, 1)
+		a[0] = a
+		check(a)
+	})
+	t.Run("map", func(t *testing.T) {
+		type A map[string]A
+		a := make(map[string]A)
+		a["aa"] = a
+		check(a)
+	})
+
+	const structTpl = `package main
+import "tango/conv"
+{{range $i := .}}
+type Struct{{$i}} struct {
+	Struct{{add $i 1}}
+	F1 []int
+	F2 map[string]string
+	F3 *string
+}
+{{end}}
+type Struct1001 struct {
+	F1 []int
+	F2 map[string]string
+	F3 *string
+}
+func main() {
+	s1 := Struct0{}
+	str := "aa"
+	s1.F1 = make([]int, 1)
+	s1.F2 = map[string]string{"aa":"aa"}
+	s1.F3 = &str
+{{range $i := .}}
+	s1.Struct{{add $i 1}}.F1 = make([]int, 1)
+	s1.Struct{{add $i 1}}.F2 = map[string]string{"aa":"aa"}
+	s1.Struct{{add $i 1}}.F3 = &str
+{{end}}
+	var s3 any
+	err := (&conv.Converter{}).TypeToType(s1, &s3)
+	if err != nil {
+		panic(err)
+	}
+}
+`
+	add := func(a, b int) int {
+		return a + b
+	}
+	tpl, err := template.New("structs").Funcs(template.FuncMap{"add": add}).Parse(structTpl)
+	if err != nil {
+		panic(err)
+	}
+	t.Run("1001 nested ptr map slice", func(t *testing.T) {
+		// Create a slice of integers from 0 to 1000 for generating struct layers
+		layers := make([]int, 1001)
+		for i := range layers {
+			layers[i] = i
+		}
+		// Create a file to write the generated code
+		dir := t.TempDir()
+		t.Logf("gen dir: %s", dir)
+		f, err := os.Create(path.Join(dir, "main.go"))
+		if err != nil {
+			panic(err)
+		}
+		defer os.Remove(f.Name())
+		// Execute the template to generate code and write to the file
+		if err := tpl.Execute(f, layers); err != nil {
+			panic(err)
+		}
+		cmd := exec.Command("go", "run", "main.go")
+		cmd.Dir = dir
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatal(string(out))
+		}
+	})
 }

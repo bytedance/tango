@@ -12,7 +12,7 @@ import (
 )
 
 //go:linkname extractStructFields encoding/json.tcExtractStructFields
-func extractStructFields(t reflect.Type) ([]bool, [][]int, []string, []bool)
+func extractStructFields(t reflect.Type) ([]bool, [][]int, []string, []bool, []reflect.Type, []bool, []bool)
 
 //go:linkname stringBytes encoding/json.tcStringBytes
 func stringBytes(s []byte) (res []byte)

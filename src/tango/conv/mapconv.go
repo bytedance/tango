@@ -103,5 +103,5 @@ func (c *Converter) ToStringMap(from interface{}) (map[string]interface{}, error
 // X, Y can be any of uint8, uint16, uint32, uint64, int, int8, int16, int32, int64, uint, uintptr, float32, float64.
 // 5.The second argument should be pointer type.
 func (c *Converter) TypeToType(from interface{}, to interface{}) error {
-	return typeToType(from, to, c.DeepCopy)
+	return typeToType(from, to, c.DeepCopy, 0)
 }

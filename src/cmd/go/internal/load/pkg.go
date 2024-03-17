@@ -939,7 +939,7 @@ func loadPackageData(loaderstate *modload.State, ctx context.Context, path, pare
 					modroot = gorootSrcCmd
 				}
 			}
-			if modroot != "" {
+			if modroot != "" && !cfg.BuildContext.ReplaceConv {
 				if rp, err := modindex.GetPackage(modroot, r.dir); err == nil {
 					data.p, data.err = rp.Import(cfg.BuildContext, buildMode)
 					goto Happy
@@ -3311,7 +3311,7 @@ func setToolFlags(loaderstate *modload.State, pkgs ...*Package) {
 		var beastOptions []string
 		if cfg.Optmode == "beast" && !cfg.BuildASan {
 			beastOptions = append(beastOptions, "bce", "gabinline", "intrinsic", "amdver=3", "makeslicecopy",
-				"inlbudget="+strconv.Itoa(beastInlBudget))
+				"inlbudget="+strconv.Itoa(beastInlBudget), "conv")
 			if cfg.BuildV {
 				beastOptions = append(beastOptions, "verbose")
 			}

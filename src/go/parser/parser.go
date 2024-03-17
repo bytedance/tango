@@ -1,6 +1,9 @@
 // Copyright 2009 The Go Authors. All rights reserved.
+// Copyright (c) 2024 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2024-03-17.
 
 // Package parser implements a parser for Go source files.
 //
@@ -2873,6 +2876,33 @@ func (p *parser) parseDecl(sync map[token.Token]bool) ast.Decl {
 // ----------------------------------------------------------------------------
 // Source files
 
+func (p *parser) needImportTangoConv(pkgName string) bool {
+	if p.mode&ReplaceConv == 0 {
+		return false
+	}
+	return pkgName == "main"
+}
+
+func (p *parser) createImport(imp string) *ast.GenDecl {
+	spec := &ast.ImportSpec{
+		Doc:     nil,
+		Name:    nil,
+		Path:    &ast.BasicLit{ValuePos: p.pos, Kind: token.STRING, Value: imp},
+		Comment: nil,
+	}
+	p.imports = append(p.imports, spec)
+
+	var lparen, rparen token.Pos
+	return &ast.GenDecl{
+		Doc:    nil,
+		TokPos: p.pos,
+		Tok:    token.IMPORT,
+		Lparen: lparen,
+		Specs:  []ast.Spec{spec},
+		Rparen: rparen,
+	}
+}
+
 func (p *parser) parseFile() *ast.File {
 	if p.trace {
 		defer un(trace(p, "File"))
@@ -2890,7 +2920,8 @@ func (p *parser) parseFile() *ast.File {
 	// Go spec: The package clause is not a declaration;
 	// the package name does not appear in any scope.
 	ident := p.parseIdent()
-	if ident.Name == "_" && p.mode&DeclarationErrors != 0 {
+	pkgName := ident.Name
+	if pkgName == "_" && p.mode&DeclarationErrors != 0 {
 		p.error(p.pos, "invalid package name _")
 	}
 	p.expectSemi()
@@ -2920,6 +2951,10 @@ func (p *parser) parseFile() *ast.File {
 
 				decls = append(decls, p.parseDecl(declStart))
 			}
+		}
+
+		if p.needImportTangoConv(pkgName) {
+			decls = append(decls, p.createImport(`"tango/conv"`))
 		}
 	}
 

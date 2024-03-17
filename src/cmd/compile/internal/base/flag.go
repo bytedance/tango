@@ -158,6 +158,7 @@ type CmdFlags struct {
 			MakeSliceCopy int
 			AmdVersion    int
 			FmtRewrite    int
+			Conv          int // replace deepcopy library in inline.rcPackages with tango/conv
 		}
 	}
 }
@@ -172,6 +173,7 @@ func parseBeastOption(beastStr string) {
 		"verbose":       &Flag.Cfg.BeastOpt.Verbose,
 		"makeslicecopy": &Flag.Cfg.BeastOpt.MakeSliceCopy,
 		"fmtrewrite":    &Flag.Cfg.BeastOpt.FmtRewrite,
+		"conv":          &Flag.Cfg.BeastOpt.Conv,
 	}
 	for oname, val := range flag_beast.ParseBeastArguments(beastStr) {
 		if opt, ok := beastVars[oname]; ok {

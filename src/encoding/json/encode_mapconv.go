@@ -20,7 +20,7 @@ const tcMaxVisitedCount = 30
 // the code for doing sort. Also, we change the code for handling "-".
 //
 //go:linkname tcExtractStructFields
-func tcExtractStructFields(t reflect.Type) ([]bool, [][]int, []string, []bool) {
+func tcExtractStructFields(t reflect.Type) ([]bool, [][]int, []string, []bool, []reflect.Type, []bool, []bool) {
 	// Anonymous fields to explore at the current level and the next.
 	var currentType []reflect.Type
 	var currentIndex [][]int
@@ -31,10 +31,15 @@ func tcExtractStructFields(t reflect.Type) ([]bool, [][]int, []string, []bool) {
 	visited := map[reflect.Type]int{}
 
 	// Fields found.
-	var omitemptyRes []bool
-	var indexRes [][]int
-	var nameRes []string
-	var exportRes []bool
+	var (
+		omitemptyRes     []bool
+		indexRes         [][]int
+		nameRes          []string
+		exportRes        []bool
+		belongStructType []reflect.Type
+		ignoreJsonRes    []bool
+		ignoreCopierRes  []bool
+	)
 
 	for len(nextType) > 0 {
 		currentType, nextType = nextType, currentType[:0]
@@ -49,16 +54,20 @@ func tcExtractStructFields(t reflect.Type) ([]bool, [][]int, []string, []bool) {
 			// Scan f for fields to include.
 			for i := 0; i < f.NumField(); i++ {
 				sf := f.Field(i)
-				tag := sf.Tag.Get("json")
-				name, opts := parseTag(tag)
-				if !isValidTag(name) {
-					name = ""
+				jsonTag := sf.Tag.Get("json")
+				jsonName, opts := parseTag(jsonTag)
+				if !isValidTag(jsonName) {
+					jsonName = ""
 				}
 				export := sf.IsExported()
-				if name == "-" {
-					name = sf.Name
-					export = false
+				ignore := false
+				if jsonName == "-" {
+					jsonName = sf.Name
+					ignore = true
 				}
+				copierTag := sf.Tag.Get("copier")
+				copierName, _ := parseTag(copierTag)
+
 				index := make([]int, len(currentIndex[idx])+1)
 				copy(index, currentIndex[idx])
 				index[len(currentIndex[idx])] = i
@@ -70,15 +79,18 @@ func tcExtractStructFields(t reflect.Type) ([]bool, [][]int, []string, []bool) {
 				}
 
 				// Record found field and index sequence.
-				if name != "" || !sf.Anonymous || ft.Kind() != reflect.Struct {
-					if name == "" {
-						name = sf.Name
+				if jsonName != "" || !sf.Anonymous || ft.Kind() != reflect.Struct {
+					if jsonName == "" {
+						jsonName = sf.Name
 					}
 
-					nameRes = append(nameRes, name)
+					nameRes = append(nameRes, jsonName)
 					indexRes = append(indexRes, index)
 					omitemptyRes = append(omitemptyRes, opts.Contains("omitempty"))
 					exportRes = append(exportRes, export)
+					belongStructType = append(belongStructType, f)
+					ignoreJsonRes = append(ignoreJsonRes, ignore)
+					ignoreCopierRes = append(ignoreCopierRes, copierName == "-" && export)
 					continue
 				}
 
@@ -88,7 +100,7 @@ func tcExtractStructFields(t reflect.Type) ([]bool, [][]int, []string, []bool) {
 			}
 		}
 	}
-	return omitemptyRes, indexRes, nameRes, exportRes
+	return omitemptyRes, indexRes, nameRes, exportRes, belongStructType, ignoreJsonRes, ignoreCopierRes
 }
 
 //go:linkname tcStringBytes

@@ -273,6 +273,10 @@ func Main(archInit func(*ssagen.ArchInfo)) {
 	symABIs.GenABIWrappers()
 
 	deadlocals.Funcs(typecheck.Target.Funcs)
+	// Since the type of tcTypeToType lacks package information, this stage must be after Export.
+	// Since a large number of temporary variables are declared, replacement needs to be completed
+	// before escape analysis to allow escape analysis to determine the lifetime of temporary variables.
+	inline.ReplaceConv()
 
 	// Escape analysis.
 	// Required for moving heap allocations onto stack,
