@@ -92,6 +92,7 @@ var tangoTestKv = []string{
 	"\"BVERSION\":\"" + runtime.BVersion() + "\"",
 	"\"GOROOT\":\"" + runtime.GOROOT() + "\"",
 	"\"GOMAXPROCS\":\"" + strconv.Itoa(runtime.GOMAXPROCS(-1)) + "\"",
+	"\"VCS_REVISION\"",
 }
 
 func checkMsgJson(t *testing.T, msg string) {

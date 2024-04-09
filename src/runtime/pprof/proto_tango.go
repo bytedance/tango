@@ -8,7 +8,10 @@ import (
 	"encoding/json"
 	"os"
 	"runtime"
+	"runtime/debug"
 	"strconv"
+	"strings"
+	"sync"
 )
 
 const (
@@ -31,10 +34,11 @@ var tangoInfoEnvs = []string{
 func (b *profileBuilder) pbTangoInfo() {
 	// 1. Static information
 	data := map[string]string{
-		"TI_VERSION": tangoInfoVersion,
-		"BVERSION":   runtime.BVersion(),
-		"GOROOT":     tangoInfoGoRoot,
-		"GOMAXPROCS": strconv.Itoa(runtime.GOMAXPROCS(-1)),
+		"TI_VERSION":   tangoInfoVersion,
+		"BVERSION":     runtime.BVersion(),
+		"GOROOT":       tangoInfoGoRoot,
+		"GOMAXPROCS":   strconv.Itoa(runtime.GOMAXPROCS(-1)),
+		"VCS_REVISION": getVCSRevision(),
 	}
 
 	// 2. Envs once they exist.
@@ -69,4 +73,23 @@ func genTangoInfoJson(data *map[string]string) (string, error) {
 	}
 
 	return tangoInfoTag + ":" + string(js), nil
+}
+
+// Saves the VCS Revision
+var vcsRevision string
+var vcsRevisionOnce sync.Once
+
+// Fetchs the VCS Revision from ReadBuildInfo()
+func getVCSRevision() string {
+	vcsRevisionOnce.Do(func() {
+		if info, ok := debug.ReadBuildInfo(); ok {
+			for _, setting := range info.Settings {
+				if setting.Key == "vcs.revision" {
+					vcsRevision = strings.TrimSpace(setting.Value)
+					return
+				}
+			}
+		}
+	})
+	return vcsRevision
 }

@@ -697,7 +697,7 @@ var depsRules = `
 
 	# Profiling
 	internal/runtime/pprof/label, runtime, context < internal/runtime/pprof;
-	FMT, compress/gzip, encoding/binary, encoding/json, sort, text/tabwriter, internal/runtime/pprof, internal/runtime/pprof/label
+	FMT, compress/gzip, encoding/binary, encoding/json, sort, text/tabwriter, internal/runtime/pprof, internal/runtime/pprof/label, runtime/debug
 	< runtime/pprof;
 
 	OS, compress/gzip, internal/lazyregexp
