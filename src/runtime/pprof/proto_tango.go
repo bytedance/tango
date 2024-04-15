@@ -12,11 +12,12 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	_ "unsafe" // for go:linkname
 )
 
 const (
 	tangoInfoTag     = "TANGO_INFO_JSON" // begins with it
-	tangoInfoVersion = "1.0"             // tango info version
+	tangoInfoVersion = "1.1"             // tango info version
 )
 
 // Save the result of runtime.GOROOT()
@@ -30,6 +31,9 @@ var tangoInfoEnvs = []string{
 	"MY_CPU_REQUEST",
 }
 
+//go:linkname stackMin runtime.getStackMin
+func stackMin() int
+
 // Encodes the comments for tangoInfo.
 func (b *profileBuilder) pbTangoInfo() {
 	// 1. Static information
@@ -39,6 +43,7 @@ func (b *profileBuilder) pbTangoInfo() {
 		"GOROOT":       tangoInfoGoRoot,
 		"GOMAXPROCS":   strconv.Itoa(runtime.GOMAXPROCS(-1)),
 		"VCS_REVISION": getVCSRevision(),
+		"STACK_MIN":    strconv.Itoa(stackMin()),
 	}
 
 	// 2. Envs once they exist.

@@ -1,6 +1,9 @@
 // Copyright 2024 The Go Authors. All rights reserved.
+// Copyright (c) 2024 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2024-04-15.
 
 // Package pgo contains the compiler-agnostic portions of PGO profile handling.
 // Notably, parsing pprof profiles and serializing/deserializing from a custom
@@ -17,6 +20,10 @@ type Profile struct {
 	// NamedEdgeMap contains all unique call edges in the profile and their
 	// edge weight.
 	NamedEdgeMap NamedEdgeMap
+
+	// TangoInfo contains some extra info parsed from original profile file which
+	// can be used for tango PGO enhancement features.
+	TangoInfo map[string]string
 }
 
 // NamedCallEdge identifies a call edge by linker symbol names and call site

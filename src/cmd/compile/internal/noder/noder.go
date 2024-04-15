@@ -1,10 +1,14 @@
 // Copyright 2016 The Go Authors. All rights reserved.
+// Copyright (c) 2024 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2024-04-15.
 
 package noder
 
 import (
+	"cmd/internal/pgo"
 	"errors"
 	"fmt"
 	"internal/buildcfg"
@@ -73,6 +77,20 @@ func LoadPackage(filenames []string) {
 		lines += p.file.EOF.Line()
 	}
 	base.Timer.AddEvent(int64(lines), "lines")
+
+	// The entry point of PGO stack size optimization.
+	// Rewrite the runtime package's stackMin constant in AST.
+	if optStackSizeEnabled() {
+		newStackSize, err := pgo.OptStackSize(base.Flag.PgoProfile)
+		if err != nil {
+			base.Warn("error parsing pgo stack size : %v", err)
+		}
+		if newStackSize != "" {
+			if ok := rewriteStackMin(noders, newStackSize); ok && base.Debug.PGODebug > 0 {
+				base.Warn("pgo stack size optimization rewrites stackMin to %s from profile\n", newStackSize)
+			}
+		}
+	}
 
 	unified(m, noders)
 }

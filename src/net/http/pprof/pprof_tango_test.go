@@ -20,6 +20,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	_ "unsafe" // for go:linkname
 )
 
 // Copied from runtime/pprof/proto_tango.go
@@ -28,8 +29,11 @@ import (
 // Need to update once the format is changed.
 const (
 	tangoInfoTag     = "TANGO_INFO_JSON" // begins with it
-	tangoInfoVersion = "1.0"             // tango info version
+	tangoInfoVersion = "1.1"             // tango info version
 )
+
+//go:linkname stackMin runtime.getStackMin
+func stackMin() int
 
 // Copied from runtime/pprof/proto_tango.go
 // Need to update once the format is changed.
@@ -38,6 +42,7 @@ var tangoTestKv = map[string]string{
 	"BVERSION":   runtime.BVersion(),
 	"GOROOT":     runtime.GOROOT(),
 	"GOMAXPROCS": strconv.Itoa(runtime.GOMAXPROCS(-1)),
+	"STACK_MIN":  strconv.Itoa(stackMin()),
 }
 
 // Copied from runtime/pprof/proto_tango.go

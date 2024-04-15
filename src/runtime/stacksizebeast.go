@@ -7,8 +7,17 @@
 
 package runtime
 
+import _ "unsafe"
+
 const (
 	// The minimum size of stack used by Go code
 	stackMin = 8192
 	optmode  = "beast"
 )
+
+// getStackMin exports stackMin to runtime/pprof via linkname
+//
+//go:linkname getStackMin
+func getStackMin() int {
+	return stackMin
+}

@@ -1,11 +1,15 @@
 // Copyright 2024 The Go Authors. All rights reserved.
+// Copyright (c) 2024 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2024-04-15.
 
 package pgo
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"io"
 	"strconv"
@@ -25,7 +29,16 @@ func IsSerialized(r *bufio.Reader) (bool, error) {
 		return false, fmt.Errorf("error reading profile header: %w", err)
 	}
 
-	return string(hdr) == serializationHeader, nil
+	if string(hdr) == serializationHeader {
+		return true, nil
+	}
+
+	hdr, err = r.Peek(len(tangoSerializationHeader))
+	if err != nil {
+		return false, fmt.Errorf("error reading profile header: %w", err)
+	}
+
+	return string(hdr) == tangoSerializationHeader, nil
 }
 
 // FromSerialized parses a profile from serialization output of Profile.WriteTo.
@@ -41,12 +54,20 @@ func FromSerialized(r io.Reader) (*Profile, error) {
 		}
 		return nil, fmt.Errorf("preprocessed profile missing header")
 	}
-	if gotHdr := scanner.Text() + "\n"; gotHdr != serializationHeader {
-		return nil, fmt.Errorf("preprocessed profile malformed header; got %q want %q", gotHdr, serializationHeader)
+	if gotHdr := scanner.Text() + "\n"; gotHdr != serializationHeader && gotHdr != tangoSerializationHeader {
+		return nil, fmt.Errorf("preprocessed profile malformed header; got %q want %q or %q", gotHdr, serializationHeader, tangoSerializationHeader)
 	}
 
 	for scanner.Scan() {
 		readStr := scanner.Text()
+		// skip the TANGO INFO: header lines
+		if strings.HasPrefix(readStr, tangoInfoHeader) {
+			err := json.Unmarshal([]byte(strings.TrimPrefix(readStr, tangoInfoHeader)), &d.TangoInfo)
+			if err != nil {
+				return nil, fmt.Errorf("preprocessed profile error parsing tango info: %w", err)
+			}
+			continue
+		}
 
 		callerName := readStr
 

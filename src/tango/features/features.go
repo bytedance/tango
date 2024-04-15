@@ -53,7 +53,7 @@ func initFeatures() {
 	featuresVersion[featureDynconf] = "1.2"
 	featuresVersion[featureMemstats] = "1.0"
 	featuresVersion[featureBversion] = "1.0"
-	featuresVersion[featureTangoinfo] = "1.0"
+	featuresVersion[featureTangoinfo] = "1.1"
 }
 
 type tangoFeatures interface {

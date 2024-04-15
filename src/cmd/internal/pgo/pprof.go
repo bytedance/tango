@@ -1,6 +1,9 @@
 // Copyright 2024 The Go Authors. All rights reserved.
+// Copyright (c) 2024 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2024-04-15.
 
 // Package pgo contains the compiler-agnostic portions of PGO profile handling.
 // Notably, parsing pprof profiles and serializing/deserializing from a custom
@@ -59,9 +62,12 @@ func FromPProf(r io.Reader) (*Profile, error) {
 		return emptyProfile(), nil // accept but ignore profile with no samples.
 	}
 
+	tangoInfo := createTangoInfo(p, valueIndex)
+
 	return &Profile{
 		TotalWeight:  totalWeight,
 		NamedEdgeMap: namedEdgeMap,
+		TangoInfo:    tangoInfo,
 	}, nil
 }
 
@@ -137,4 +143,10 @@ func postProcessNamedEdgeMap(weight map[NamedCallEdge]int64, weightVal int64) (e
 	totalWeight = weightVal
 
 	return edgeMap, totalWeight, nil
+}
+
+func createTangoInfo(profile *profile.Profile, valueIndex int) map[string]string {
+	return map[string]string{
+		"StackSize": parseStackSizeFromProfile(profile, valueIndex),
+	}
 }

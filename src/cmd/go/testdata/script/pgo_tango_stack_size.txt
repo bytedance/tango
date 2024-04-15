@@ -1,0 +1,104 @@
+# Test PGO stack size optimizations in Tango
+
+# this test rebuild runtime with different flags, skip in short mode
+[short] skip
+
+# generate cpu.prof with high runtime.copystack usage
+go run test_copystack.go
+# check the initial stack size is the default value 2048 in go runtime
+stdout 'initial stack size is 2048'
+
+# build with default PGO, assert the initial stack size is still 2048
+go build -pgo ./cpu.prof -gcflags=all='-d=pgodebug=1,pgostacksize=0' -o copystack test_copystack.go
+# check the stackMin constant is not rewritten by compile
+! stderr 'pgo stack size optimization rewrites stackMin to 32768 from profile'
+exec ./copystack
+# check the initial stack size is still 2048
+stdout 'the initial stack size is 2048'
+
+# build with PGO's stack size optimization, adjust initial stack size from profile
+go build -pgo ./cpu.prof -gcflags=all='-d=pgodebug=1,pgostacksize=1' -o copystack test_copystack.go
+# check the stackMin constant is rewritten by compile
+stderr 'pgo stack size optimization rewrites stackMin to 32768 from profile'
+exec ./copystack
+# check the initial stack size is changed to 32768 by PGO
+stdout 'the initial stack size is 32768'
+
+# build with PGO's stack size optimization again, continue to use the optimized stack size from profile
+go build -pgo ./cpu.prof -gcflags=all='-d=pgodebug=1,pgostacksize=1' -o copystack test_copystack.go
+# check the stackMin constant is rewritten by compile
+stderr 'pgo stack size optimization rewrites stackMin to 32768 from profile'
+exec ./copystack
+# check the initial stack size is still 32768
+stdout 'the initial stack size is 32768'
+
+
+-- prof --
+-- test_copystack.go --
+package main
+
+import (
+	"fmt"
+	"io"
+	"log"
+	"os"
+	"runtime/pprof"
+	"sync"
+	"time"
+	_ "unsafe"
+)
+
+func GrowStack(v int) int {
+	if v == 0 {
+		return v
+	}
+	data := [64]int{12}
+
+	return GrowStack(v-1) + data[0]
+}
+
+func Workers() {
+	wg := sync.WaitGroup{}
+	n := 1000000
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func() {
+			GrowStack(16)
+			wg.Done()
+		}()
+	}
+	wg.Wait()
+}
+
+//go:linkname stackMin runtime.getStackMin
+func stackMin() int
+
+func main() {
+	runWithProfiling("cpu.prof", Workers)
+	fmt.Printf("the initial stack size is %d\n", stackMin())
+}
+
+type tangoInfoWriter struct {
+	io.Writer
+}
+
+func (w tangoInfoWriter) NeedTangoInfo() bool {
+	return true
+}
+
+func runWithProfiling(filename string, fn func()) time.Duration {
+	f, err := os.Create(filename)
+	if err != nil {
+		log.Fatal("fail to create CPU profile: ", err)
+	}
+	defer f.Close()
+
+	if err := pprof.StartCPUProfile(tangoInfoWriter{f}); err != nil {
+		log.Fatal("fail to start CPU profile: ", err)
+	}
+	defer pprof.StopCPUProfile()
+	t := time.Now()
+	fn()
+	d := time.Now().Sub(t)
+	return d
+}
