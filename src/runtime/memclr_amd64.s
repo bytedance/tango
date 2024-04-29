@@ -1,6 +1,9 @@
 // Copyright 2014 The Go Authors. All rights reserved.
+// Copyright (c) 2024 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2024-04-29.
 
 //go:build !plan9
 
@@ -36,11 +39,24 @@ tail:
 	JBE	_17through32
 	CMPQ	BX, $64
 	JBE	_33through64
+#ifdef GOAMD64_v3
+	MOVB	runtime·memmoveBits(SB), CX
+	CMPB	CX, $const_avxSupported
+	JEQ	avxUnaligned
+#endif
 	CMPQ	BX, $128
 	JBE	_65through128
 	CMPQ	BX, $256
 	JBE	_129through256
-
+#ifdef GOAMD64_v3
+	JMP next
+avxUnaligned:
+	CMPQ	BX, $128
+	JBE	_65through128_avx
+	CMPQ	BX, $256
+	JBE	_129through256_avx
+next:
+#endif
 	CMPB	internal∕cpu·X86+const_offsetX86HasERMS(SB), $1 // enhanced REP MOVSB/STOSB
 	JNE	skip_erms
 
@@ -216,3 +232,26 @@ _129through256:
 	MOVOU	X15, -32(DI)(BX*1)
 	MOVOU	X15, -16(DI)(BX*1)
 	RET
+
+#ifdef GOAMD64_v3
+_65through128_avx:
+	VPXOR X15, X15, X15
+	VMOVDQU Y15, (DI)
+	VMOVDQU Y15, 32(DI)
+	VMOVDQU Y15, -64(DI)(BX*1)
+	VMOVDQU Y15, -32(DI)(BX*1)
+	VZEROUPPER
+	RET
+_129through256_avx:
+	VPXOR X15, X15, X15
+	VMOVDQU Y15, (DI)
+	VMOVDQU Y15, 32(DI)
+	VMOVDQU Y15, 64(DI)
+	VMOVDQU Y15, 96(DI)
+	VMOVDQU Y15, -128(DI)(BX*1)
+	VMOVDQU Y15, -96(DI)(BX*1)
+	VMOVDQU Y15, -64(DI)(BX*1)
+	VMOVDQU Y15, -32(DI)(BX*1)
+	VZEROUPPER
+	RET
+#endif

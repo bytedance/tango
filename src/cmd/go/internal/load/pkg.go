@@ -3319,6 +3319,7 @@ func setToolFlags(loaderstate *modload.State, pkgs ...*Package) {
 			// pass this environment variable to the generated sub-command.
 			if os.Getenv("GOAMD64") < "v3" {
 				os.Setenv("GOAMD64", "v3")
+				cfg.GOAMD64 = "v3"
 			}
 		}
 		if len(beastOptions) > 0 {

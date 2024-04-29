@@ -4,6 +4,15 @@
 //         Copyright © 1994-1999 Lucent Technologies Inc. All rights reserved.
 //         Revisions Copyright © 2000-2007 Vita Nuova Holdings Limited (www.vitanuova.com).  All rights reserved.
 //         Portions Copyright 2009 The Go Authors. All rights reserved.
+// Copyright (c) 2024 ByteDance Ltd. and/or its affiliates.
+// SPDX-License-Identifier: MIT
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2024-04-29.
+//
+// Original file was released under the MIT License, with the full license text
+// available below.
+//
+// This modified file is released under the same license.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -65,17 +74,23 @@ tail:
 	JBE	move_9through16
 	CMPQ	BX, $32
 	JBE	move_17through32
+#ifdef GOAMD64_v3
+	MOVB	runtime·memmoveBits(SB), AX
+	CMPB	AX, $const_avxSupported
+	JEQ	avxUnaligned
+#endif
 	CMPQ	BX, $64
 	JBE	move_33through64
 	CMPQ	BX, $128
 	JBE	move_65through128
 	CMPQ	BX, $256
 	JBE	move_129through256
-
+#ifndef GOAMD64_v3
 	MOVB	runtime·memmoveBits(SB), AX
 	// We have AVX but we don't want to use REP MOVSx.
 	CMPB	AX, $const_avxSupported
 	JEQ	avxUnaligned
+#endif
 /*
  * check and set for backwards
  */
@@ -308,6 +323,16 @@ move_256through2048:
 	JMP	tail
 
 avxUnaligned:
+#ifdef GOAMD64_v3
+	CMPQ	BX, $64
+	JBE		move_33through64_avx
+	CMPQ	BX, $128
+	JBE		move_65through128_avx
+	CMPQ	BX, $256
+	JBE		move_129through256_avx
+	CMPQ	BX, $512
+	JBE 	move_257through512_avx
+#endif
 	// There are two implementations of move algorithm.
 	// The first one for non-overlapped memory regions. It uses forward copying.
 	// The second one for overlapped regions. It uses backward copying
@@ -545,3 +570,81 @@ gobble_big_mem_bwd_loop:
 	MOVOU	X11, 0x60(AX)
 	MOVOU	X12, 0x70(AX)
 	RET
+#ifdef GOAMD64_v3
+move_33through64_avx:
+	VMOVDQU (SI), Y0
+	VMOVDQU -32(SI)(BX*1), Y1
+	VMOVDQU Y0, (DI)
+	VMOVDQU Y1, -32(DI)(BX*1)
+	VZEROUPPER
+	RET
+
+move_65through128_avx:
+	VMOVDQU (SI), Y0
+	VMOVDQU 32(SI), Y1
+	VMOVDQU -64(SI)(BX*1), Y2
+	VMOVDQU -32(SI)(BX*1), Y3
+	VMOVDQU Y0, (DI)
+	VMOVDQU Y1, 32(DI)
+	VMOVDQU Y2, -64(DI)(BX*1)
+	VMOVDQU Y3, -32(DI)(BX*1)
+	VZEROUPPER
+	RET
+
+move_129through256_avx:
+	VMOVDQU (SI), Y0
+	VMOVDQU 32(SI), Y1
+	VMOVDQU 64(SI), Y2
+	VMOVDQU 96(SI), Y3
+	VMOVDQU -128(SI)(BX*1), Y4
+	VMOVDQU -96(SI)(BX*1), Y5
+	VMOVDQU -64(SI)(BX*1), Y6
+	VMOVDQU -32(SI)(BX*1), Y7
+	VMOVDQU Y0, (DI)
+	VMOVDQU Y1, 32(DI)
+	VMOVDQU Y2, 64(DI)
+	VMOVDQU Y3, 96(DI)
+	VMOVDQU Y4, -128(DI)(BX*1)
+	VMOVDQU Y5, -96(DI)(BX*1)
+	VMOVDQU Y6, -64(DI)(BX*1)
+	VMOVDQU Y7, -32(DI)(BX*1)
+	VZEROUPPER
+	RET
+
+move_257through512_avx:
+	VMOVDQU (SI), Y0
+	VMOVDQU 32(SI), Y1
+	VMOVDQU 64(SI), Y2
+	VMOVDQU 96(SI), Y3
+	VMOVDQU 128(SI), Y4
+	VMOVDQU 160(SI), Y5
+	VMOVDQU 192(SI), Y6
+	VMOVDQU 224(SI), Y7
+	VMOVDQU -256(SI)(BX*1), Y8
+	VMOVDQU -224(SI)(BX*1), Y9
+	VMOVDQU -192(SI)(BX*1), Y10
+	VMOVDQU -160(SI)(BX*1), Y11
+	VMOVDQU -128(SI)(BX*1), Y12
+	VMOVDQU -96(SI)(BX*1), Y13
+	VMOVDQU -64(SI)(BX*1), Y14
+	VMOVDQU -32(SI)(BX*1), Y15
+	VMOVDQU Y0, (DI)
+	VMOVDQU Y1, 32(DI)
+	VMOVDQU Y2, 64(DI)
+	VMOVDQU Y3, 96(DI)
+	VMOVDQU Y4, 128(DI)
+	VMOVDQU Y5, 160(DI)
+	VMOVDQU Y6, 192(DI)
+	VMOVDQU Y7, 224(DI)
+	VMOVDQU Y8, -256(DI)(BX*1)
+	VMOVDQU Y9, -224(DI)(BX*1)
+	VMOVDQU Y10, -192(DI)(BX*1)
+	VMOVDQU Y11, -160(DI)(BX*1)
+	VMOVDQU Y12, -128(DI)(BX*1)
+	VMOVDQU Y13, -96(DI)(BX*1)
+	VMOVDQU Y14, -64(DI)(BX*1)
+	VMOVDQU Y15, -32(DI)(BX*1)
+	XORPS	X15, X15
+	VZEROUPPER
+	RET
+#endif
