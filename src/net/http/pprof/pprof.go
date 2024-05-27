@@ -318,6 +318,26 @@ func (name handler) serveDeltaProfile(w http.ResponseWriter, r *http.Request, p 
 		serveError(w, http.StatusBadRequest, "seconds and debug params are incompatible")
 		return
 	}
+
+	// Set sample rate for block and mutex.
+	if ratestr := r.FormValue("rate"); ratestr != "" {
+		rate, err := strconv.ParseInt(ratestr, 10, 64)
+		if err != nil || rate < 0 {
+			serveError(w, http.StatusBadRequest, `invalid value for "rate" - must be greater than or equal to zero`)
+			return
+		}
+		if name == "block" {
+			runtime.SetBlockProfileRate(int(rate))
+			defer runtime.SetBlockProfileRate(0)
+		} else if name == "mutex" {
+			runtime.SetMutexProfileFraction(int(rate))
+			defer runtime.SetMutexProfileFraction(0)
+		} else {
+			serveError(w, http.StatusBadRequest, `"rate" parameter is not supported for this profile type`)
+			return
+		}
+	}
+
 	p0, err := collectProfile(p)
 	if err != nil {
 		serveError(w, http.StatusInternalServerError, "failed to collect profile")

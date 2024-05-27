@@ -195,3 +195,114 @@ func checkMsgJson(t *testing.T, cmt string, targetkv map[string]string, targeten
 		}
 	}
 }
+
+// Test rate parameter.
+
+func requestIndex(path string) ([]byte, error) {
+	req := httptest.NewRequest("GET", path, nil)
+	w := httptest.NewRecorder()
+	Index(w, req)
+	resp := w.Result()
+	return io.ReadAll(resp.Body)
+}
+
+func TestRateParameterInvalids(t *testing.T) {
+	// Request both the block profile and mutex profile first, if the sample rate is set back to 0
+	// as we expect after each request, the following requests to mutex or block can't get any response.
+	requestIndex("http://example.com/debug/pprof/mutex?seconds=2&rate=1")
+	requestIndex("http://example.com/debug/pprof/block?seconds=2&rate=1")
+
+	testCases := []struct {
+		path               string
+		handler            http.HandlerFunc
+		statusCode         int
+		contentType        string
+		contentDisposition string
+		resp               []byte
+	}{
+		{"/debug/pprof/mutex", Index, http.StatusOK, "application/octet-stream", `attachment; filename="mutex"`, nil},
+		{"/debug/pprof/mutex?seconds=1", Index, http.StatusOK, "application/octet-stream", `attachment; filename="mutex-delta"`, nil},
+		{"/debug/pprof/block", Index, http.StatusOK, "application/octet-stream", `attachment; filename="block"`, nil},
+		{"/debug/pprof/block?seconds=1", Index, http.StatusOK, "application/octet-stream", `attachment; filename="block-delta"`, nil},
+		{"/debug/pprof/mutex?seconds=1&rate=-1", Index, http.StatusBadRequest, "text/plain; charset=utf-8", "", []byte(`invalid value for "rate" - must be greater than or equal to zero` + "\n")},
+		{"/debug/pprof/heap?seconds=1&rate=1", Index, http.StatusBadRequest, "text/plain; charset=utf-8", "", []byte(`"rate" parameter is not supported for this profile type` + "\n")},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.path, func(t *testing.T) {
+			req := httptest.NewRequest("GET", "http://example.com"+tc.path, nil)
+			w := httptest.NewRecorder()
+			tc.handler(w, req)
+
+			resp := w.Result()
+			if got, want := resp.StatusCode, tc.statusCode; got != want {
+				t.Errorf("status code: got %d; want %d", got, want)
+			}
+
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				t.Errorf("when reading response body, expected non-nil err; got %v", err)
+			}
+			if got, want := resp.Header.Get("X-Content-Type-Options"), "nosniff"; got != want {
+				t.Errorf("X-Content-Type-Options: got %q; want %q", got, want)
+			}
+			if got, want := resp.Header.Get("Content-Type"), tc.contentType; got != want {
+				t.Errorf("Content-Type: got %q; want %q", got, want)
+			}
+			if got, want := resp.Header.Get("Content-Disposition"), tc.contentDisposition; got != want {
+				t.Errorf("Content-Disposition: got %q; want %q", got, want)
+			}
+
+			if resp.StatusCode == http.StatusOK {
+				return
+			}
+			if got, want := resp.Header.Get("X-Go-Pprof"), "1"; got != want {
+				t.Errorf("X-Go-Pprof: got %q; want %q", got, want)
+			}
+			if !bytes.Equal(body, tc.resp) {
+				t.Errorf("response: got %q; want %q", body, tc.resp)
+			}
+		})
+	}
+}
+
+func TestRateParameterValids(t *testing.T) {
+	testCases := []struct {
+		path               string
+		handler            http.HandlerFunc
+		statusCode         int
+		contentType        string
+		contentDisposition string
+	}{
+		{"/debug/pprof/mutex?seconds=1&rate=1", Index, http.StatusOK, "application/octet-stream", `attachment; filename="mutex-delta"`},
+		{"/debug/pprof/block?seconds=1&rate=1", Index, http.StatusOK, "application/octet-stream", `attachment; filename="block-delta"`},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.path, func(t *testing.T) {
+			req := httptest.NewRequest("GET", "http://example.com"+tc.path, nil)
+			w := httptest.NewRecorder()
+			tc.handler(w, req)
+
+			resp := w.Result()
+			if got, want := resp.StatusCode, tc.statusCode; got != want {
+				t.Errorf("status code: got %d; want %d", got, want)
+			}
+
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				t.Errorf("when reading response body, expected non-nil err; got %v", err)
+			}
+			if got, want := resp.Header.Get("X-Content-Type-Options"), "nosniff"; got != want {
+				t.Errorf("X-Content-Type-Options: got %q; want %q", got, want)
+			}
+			if got, want := resp.Header.Get("Content-Type"), tc.contentType; got != want {
+				t.Errorf("Content-Type: got %q; want %q", got, want)
+			}
+			if got, want := resp.Header.Get("Content-Disposition"), tc.contentDisposition; got != want {
+				t.Errorf("Content-Disposition: got %q; want %q", got, want)
+			}
+			if len(body) == 0 {
+				t.Errorf("response is nil")
+			}
+		})
+	}
+}
