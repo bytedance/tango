@@ -18,15 +18,17 @@ func TestBVersion(t *testing.T) {
 	}
 
 	const (
-		experimentSeparator = " X:"
-		experimentPattern   = `\w+(?:,\w+)*`
+		experimentPattern = `\w+(?:,\w+)*`
 	)
-	if prefix, experiments, found := strings.Cut(bver, experimentSeparator); found {
-		bver = prefix
-		if matched, err := regexp.MatchString(experimentPattern, experiments); err != nil {
-			t.Fatalf("matching experiment features: %v", err)
-		} else if !matched {
-			t.Fatalf("experiment features %q do not match %q", experiments, experimentPattern)
+	for _, separator := range []string{" X:", "-X:"} {
+		if prefix, experiments, found := strings.Cut(bver, separator); found {
+			bver = prefix
+			if matched, err := regexp.MatchString(experimentPattern, experiments); err != nil {
+				t.Fatalf("matching experiment features: %v", err)
+			} else if !matched {
+				t.Fatalf("experiment features %q do not match %q", experiments, experimentPattern)
+			}
+			break
 		}
 	}
 

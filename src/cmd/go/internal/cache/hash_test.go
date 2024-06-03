@@ -1,12 +1,17 @@
 // Copyright 2017 The Go Authors. All rights reserved.
+// Copyright (c) 2024 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2024-06-03.
 
 package cache
 
 import (
 	"fmt"
 	"os"
+	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -47,5 +52,11 @@ func TestHashFile(t *testing.T) {
 	want := "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
 	if sum != want {
 		t.Errorf("hash(hello world) = %v, want %v", sum, want)
+	}
+}
+
+func TestTangoInfo(t *testing.T) {
+	if !strings.HasPrefix(strings.TrimPrefix(string(hashSalt), stripExperiment(runtime.Version())), ".bm.") {
+		t.Errorf("hashSalt miss tango infomation, get %s", hashSalt)
 	}
 }

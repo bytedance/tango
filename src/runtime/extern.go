@@ -374,9 +374,31 @@ var buildVersion string
 var (
 	tangoVersion = sys.TangoVersion
 	optMode      = optmode
-	bVersion     = Version() + "." + tangoVersion
+	bVersion     = initbversion()
 	beastFlag    = ""
 )
+
+func initbversion() string {
+	base := Version()
+	for i := 0; i+2 < len(base); i++ {
+		if base[i] == '-' && base[i+1] == 'X' && base[i+2] == ':' {
+			prefix := base[:i]
+			suffix := base[i:]
+			return prefix + "." + tangoVersion + suffix
+		}
+	}
+	for i := 0; i < len(base); i++ {
+		if base[i] == ' ' {
+			// Experiment features enabled by default.
+			// e.g "go1.22.0 X:swisstable"
+
+			prefix := base[:i] // "go1.22.0"
+			suffix := base[i:] // " X:swisstable""
+			return prefix + "." + tangoVersion + suffix
+		}
+	}
+	return base + "." + tangoVersion
+}
 
 // BVersion returns the version string of Tango (Bytedance-modified Go)
 func BVersion() string {

@@ -14,30 +14,46 @@ import (
 	"testing"
 )
 
-func TestVersion(t *testing.T) {
+func getTangoFeature(t *testing.T) tangoFeatures {
 	instance := getTangoFeatures()
 	if feature, ok := instance.(tangoFeatures); !ok {
 		t.Fatal("tangoInstance not implement tangoFeatures interface")
+		return nil
 	} else {
-		version := feature.Version()
-		bVersion := feature.BVersion()
-		versionPattern := "go[123]\\.\\d+\\.?(rc\\d)?((\\d{1,2}\\.))*"
-		if matched, err := regexp.MatchString(versionPattern, version); err == nil {
-			if !matched {
-				t.Errorf("Version %s does not match pattern %s\n", version, versionPattern)
-			}
-		} else {
-			t.Errorf("Error matching %s to pattern %s", version, versionPattern)
-		}
+		return feature
+	}
+}
 
-		bVersionPattern := "(devel )*go[123]\\.\\d+(rc\\d)?\\.((\\d{1,2}\\.))*bm\\.\\d\\.\\d\\..*"
-		if matched, err := regexp.MatchString(bVersionPattern, bVersion); err == nil {
-			if !matched {
-				t.Errorf("BVersion %s does not match pattern %s\n", bVersion, bVersionPattern)
-			}
-		} else {
-			t.Errorf("Error matching %s to pattern %s", bVersion, bVersionPattern)
+// stripExperiment strips any GOEXPERIMENT configuration from the Go
+// version string.
+// Keep sync with src/cmd/go/internal/cache/hash.go
+func stripExperiment(version string) string {
+	if i := strings.Index(version, " X:"); i >= 0 {
+		return version[:i]
+	}
+	return version
+}
+
+func TestVersion(t *testing.T) {
+	tangoFeature := getTangoFeature(t)
+	version := stripExperiment(tangoFeature.Version()) // remove the experiment string, since it comes from the Go original mechanism
+	bVersion := stripExperiment(tangoFeature.BVersion())
+	versionPattern := "go[123]\\.\\d+\\.?(rc\\d)?((\\d{1,2}\\.))*"
+	if matched, err := regexp.MatchString(versionPattern, version); err == nil {
+		if !matched {
+			t.Errorf("Version %s does not match pattern %s\n", version, versionPattern)
 		}
+	} else {
+		t.Errorf("Error matching %s to pattern %s", version, versionPattern)
+	}
+
+	bVersionPattern := "(devel )*go[123]\\.\\d+(rc\\d)?\\.((\\d{1,2}\\.))*bm\\.\\d\\.\\d\\..*"
+	if matched, err := regexp.MatchString(bVersionPattern, bVersion); err == nil {
+		if !matched {
+			t.Errorf("BVersion %s does not match pattern %s\n", bVersion, bVersionPattern)
+		}
+	} else {
+		t.Errorf("Error matching %s to pattern %s", bVersion, bVersionPattern)
 	}
 }
 

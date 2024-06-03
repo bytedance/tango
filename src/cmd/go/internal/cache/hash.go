@@ -1,6 +1,9 @@
 // Copyright 2017 The Go Authors. All rights reserved.
+// Copyright (c) 2024 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2024-06-03.
 
 package cache
 
@@ -43,7 +46,12 @@ type Hash struct {
 // execution. This allows bootstrapping to converge faster: dist builds
 // go_bootstrap without any experiments, so by stripping experiments
 // go_bootstrap and the final go binary will use the same salt.
-var hashSalt = []byte(stripExperiment(runtime.Version()))
+//
+// Tango: add tango version information to hashSalt, avoid using wrong
+// cache when tango only updates bversion, add this information outside
+// the stripExperiment to avoid being stripped, and beast information
+// will be added in gcflags, no need to add it here.
+var hashSalt = []byte(stripExperiment(runtime.BVersion()))
 
 // stripExperiment strips any GOEXPERIMENT configuration from the Go
 // version string.
