@@ -67,7 +67,7 @@ func tangoNumSizes() int {
 
 // tangoNumCounters returns the number of counters of heap object allocation/free
 func tangoNumCounters() int {
-	return 8 + gc.NumSizeClasses*4
+	return tangoMemstatsCount + tangoNumSizes()*4
 }
 
 // Updates the memstats2 structure.
@@ -99,6 +99,22 @@ func updatememstats2(consStats *heapStatsDelta) {
 	}
 }
 
+// Offsets, kept in sync with tango/memstats.collectMemStats.
+const (
+	totalMallocs int = iota
+	totalFrees
+	largeNoScanAllocs
+	largeNoScanFrees
+	largeScanAllocs
+	largeScanFrees
+	tinyAllocs
+	tinyFrees
+	gabBufferAllocs
+	strBufferAllocs
+
+	tangoMemstatsCount
+)
+
 // tangoReadMemStats collects the statistics of heap object allocations and frees
 //
 // It's supposed to be used by package tango/memstats only, no public API
@@ -119,20 +135,22 @@ func tangoReadMemStats() (sizes []uint32, counts []uint64) {
 		readmemstats_m(&m)
 	})
 
-	counts[0] = m.Mallocs
-	counts[1] = m.Frees
-	counts[2] = memstats2.large_noscan_allocs
-	counts[3] = memstats2.large_noscan_frees
-	counts[4] = memstats2.large_allocs - memstats2.large_noscan_allocs
-	counts[5] = memstats2.large_frees - memstats2.large_noscan_frees
-	counts[6] = memstats2.tiny_allocs
-	counts[7] = memstats2.tiny_allocs
+	counts[totalMallocs] = m.Mallocs
+	counts[totalFrees] = m.Frees
+	counts[largeNoScanAllocs] = memstats2.large_noscan_allocs
+	counts[largeNoScanFrees] = memstats2.large_noscan_frees
+	counts[largeScanAllocs] = memstats2.large_allocs - memstats2.large_noscan_allocs
+	counts[largeScanFrees] = memstats2.large_frees - memstats2.large_noscan_frees
+	counts[tinyAllocs] = memstats2.tiny_allocs
+	counts[tinyFrees] = memstats2.tiny_allocs
+	counts[gabBufferAllocs] = uint64(gabBufferAllocStat)
+	counts[strBufferAllocs] = uint64(strBufferAllocStat)
 
 	for i := 0; i < numSizes; i++ {
 		sizes[i] = uint32(gc.SizeClassToSize[i])
 	}
 
-	nspos := 8
+	nspos := tangoMemstatsCount
 	spos := nspos + numSizes*2
 	for i := 0; i < numSizes; i++ {
 		off := i * 2

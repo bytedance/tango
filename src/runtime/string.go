@@ -1,6 +1,9 @@
 // Copyright 2014 The Go Authors. All rights reserved.
+// Copyright (c) 2024 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2024-06-18.
 
 package runtime
 
@@ -167,7 +170,11 @@ func slicebytetostring(buf *tmpBuf, ptr *byte, n int) string {
 	if buf != nil && n <= len(buf) {
 		p = unsafe.Pointer(buf)
 	} else {
-		p = mallocgc(uintptr(n), nil, false)
+		if isGabStrAllocEnabled() {
+			p = stralloc(uintptr(n), nil, false)
+		} else {
+			p = mallocgc(uintptr(n), nil, false)
+		}
 	}
 	memmove(p, unsafe.Pointer(ptr), uintptr(n))
 	return unsafe.String((*byte)(p), n)
@@ -322,14 +329,24 @@ func intstring(buf *[4]byte, v int64) (s string) {
 // The storage is not zeroed. Callers should use
 // b to set the string contents and then drop b.
 func rawstring(size int) (s string, b []byte) {
-	p := mallocgc(uintptr(size), nil, false)
+	var p unsafe.Pointer
+	if isGabStrAllocEnabled() {
+		p = stralloc(uintptr(size), nil, false)
+	} else {
+		p = mallocgc(uintptr(size), nil, false)
+	}
 	return unsafe.String((*byte)(p), size), unsafe.Slice((*byte)(p), size)
 }
 
 // rawbyteslice allocates a new byte slice. The byte slice is not zeroed.
 func rawbyteslice(size int) (b []byte) {
 	cap := roundupsize(uintptr(size), true)
-	p := mallocgc(cap, nil, false)
+	var p unsafe.Pointer
+	if isGabStrAllocEnabled() {
+		p = stralloc(cap, nil, false)
+	} else {
+		p = mallocgc(cap, nil, false)
+	}
 	if cap != uintptr(size) {
 		memclrNoHeapPointers(add(p, uintptr(size)), cap-uintptr(size))
 	}
@@ -344,7 +361,12 @@ func rawruneslice(size int) (b []rune) {
 		throw("out of memory")
 	}
 	mem := roundupsize(uintptr(size)*4, true)
-	p := mallocgc(mem, nil, false)
+	var p unsafe.Pointer
+	if isGabStrAllocEnabled() {
+		p = stralloc(mem, nil, false)
+	} else {
+		p = mallocgc(mem, nil, false)
+	}
 	if mem != uintptr(size)*4 {
 		memclrNoHeapPointers(add(p, uintptr(size)*4), mem-uintptr(size)*4)
 	}

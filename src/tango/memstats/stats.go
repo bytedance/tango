@@ -80,6 +80,9 @@ type memStat struct {
 
 	// distrubution of small objects, per size class
 	smalls []objStat
+
+	// total allocated bytes of gab buffers and str buffers
+	gabAllocs, strAllocs uint64
 }
 
 func sleep(r *http.Request, d time.Duration) {
@@ -99,6 +102,10 @@ const (
 	largeScanFrees
 	tinyAllocs
 	tinyFrees
+	gabBufferAllocs
+	strBufferAllocs
+
+	tangoMemstatsCount
 )
 
 // collectmemStats collecting memory statistics using an extended runtime API
@@ -134,8 +141,11 @@ func collectMemStats(r *http.Request, sec int64, sorted bool) *memStat {
 	// tiny objects
 	res.tiny.addStats(0, 0, counts[tinyAllocs], counts[tinyFrees])
 
+	// gab buffers and str buffers
+	res.gabAllocs, res.strAllocs = counts[gabBufferAllocs], counts[strBufferAllocs]
+
 	// per-class objects
-	bySizeNoScan := tinyFrees + 1
+	bySizeNoScan := tangoMemstatsCount
 	bySizeScan := bySizeNoScan + numSizes*2
 	for i := 1; i < numSizes; i++ {
 		off := i * 2

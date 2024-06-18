@@ -1097,6 +1097,10 @@ func mallocgc(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 	if gabEnabled && noscan && size <= gabMaxAllocSize {
 		size = alignUp(size, goarch.PtrSize)
 		if gp.ab.remaining() < size {
+			if shouldPauseGab() {
+				gabEnabled = false
+				goto slow
+			}
 			gp.ab.refill()
 		}
 		var x unsafe.Pointer
@@ -1108,6 +1112,7 @@ func mallocgc(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 		return x
 	}
 
+slow:
 	if sizeSpecializedMallocEnabled && heapBitsInSpan(size) {
 		if typ == nil || !typ.Pointers() {
 			return mallocNoScanTable[size](size, typ, needzero)
@@ -1119,6 +1124,38 @@ func mallocgc(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 		}
 	}
 
+	return mallocgc1(size, typ, needzero, false)
+}
+
+// stralloc allocates string bodies from a specialized per-goroutine buffer.
+func stralloc(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
+	if doubleCheckMalloc && gcphase == _GCmarktermination {
+		throw("stralloc called with gcphase == _GCmarktermination")
+	}
+	if size == 0 {
+		return unsafe.Pointer(&zerobase)
+	}
+
+	gp := getg()
+	if gabEnabled && size <= gabMaxAllocSize {
+		size = alignUp(size, goarch.PtrSize)
+		if gp.strAB.remaining() < size {
+			if shouldPauseGab() {
+				gabEnabled = false
+				goto slow
+			}
+			gp.strAB.refill(false)
+		}
+		var x unsafe.Pointer
+		if isEvacEnabled() {
+			startObj(gp.strAB.top, gp.strAB.span)
+		}
+		x = unsafe.Pointer(gp.strAB.top)
+		gp.strAB.top += size
+		return x
+	}
+
+slow:
 	return mallocgc1(size, typ, needzero, false)
 }
 

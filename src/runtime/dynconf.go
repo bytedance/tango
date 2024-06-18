@@ -40,6 +40,7 @@ var rtCfgMap = map[string]any{
 	"runtime.gabThreshold,ro":             &gabState.gabMemLimit,
 	"runtime.gabMemoryPercent,rw":         &gabMemoryPercent,
 	"runtime.gabEnabled,ro":               &gabEnabled,
+	"runtime.gabStrAlloc,ro":              &gabdebug.gabStrAlloc,
 	"runtime.gctrace,rw":                  &debug.gctrace,
 	"runtime.buildVersion,ro":             &buildVersion,
 	"runtime.tangoVersion,ro":             &tangoVersion,

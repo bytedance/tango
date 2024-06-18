@@ -289,11 +289,17 @@ func gabGCPrologue() {
 		if ab := uintptr(gp.ab.base); ab != 0 {
 			spanOf(ab).gabPinObj(ab)
 		}
+		if ab := uintptr(gp.strAB.base); ab != 0 {
+			spanOf(ab).gabPinObj(ab)
+		}
 	}
 	unlock(&allglock)
 
 	for mp := allm; mp != nil; mp = mp.alllink {
 		if ab := uintptr(mp.g0.ab.base); ab != 0 {
+			spanOf(ab).gabPinObj(ab)
+		}
+		if ab := uintptr(mp.g0.strAB.base); ab != 0 {
 			spanOf(ab).gabPinObj(ab)
 		}
 	}
@@ -902,8 +908,16 @@ func checkAllG() {
 	// Active GABs are not evacuated, since objects in it are recently
 	// allocated and are likely to be alive.
 	for mp := allm; mp != nil; mp = mp.alllink {
+		foundActiveGABs := false
 		if gb := uintptr(mp.g0.ab.base); gb != 0 {
 			spanOf(gb).gabPinObj(gb)
+			foundActiveGABs = true
+		}
+		if gb := uintptr(mp.g0.strAB.base); gb != 0 {
+			spanOf(gb).gabPinObj(gb)
+			foundActiveGABs = true
+		}
+		if foundActiveGABs {
 			gs++
 		}
 	}
@@ -927,6 +941,9 @@ func rescanStack(gp *g) {
 	// Active GABs are not evacuated, since objects in it
 	// are recently allocated and are likely to be alive.
 	if gb := uintptr(gp.ab.base); gb != 0 {
+		spanOf(gb).gabPinObj(gb)
+	}
+	if gb := uintptr(gp.strAB.base); gb != 0 {
 		spanOf(gb).gabPinObj(gb)
 	}
 

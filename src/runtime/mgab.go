@@ -8,6 +8,7 @@ import (
 	"internal/abi"
 	"internal/bytealg"
 	"internal/goarch"
+	"internal/runtime/atomic"
 	"internal/runtime/gc"
 	"internal/strconv"
 	"unsafe"
@@ -46,8 +47,10 @@ const (
 )
 
 var (
-	gabCapMax    uintptr = gabCapMaxDefault // default value of gab Max Capacity.
-	gabUsedBytes uintptr                    // total consumed bytes
+	gabCapMax          uintptr = gabCapMaxDefault // default value of gab Max Capacity.
+	gabUsedBytes       uintptr                    // total consumed bytes
+	strBufferAllocStat uintptr                    // total allocated bytes of str buffer
+	gabBufferAllocStat uintptr                    // total allocated bytes of gab buffer
 	// 'gabEnabled' control the runtime state of GAB feature,
 	// mallocgc() will check this flag to determine if should goto fastpath.
 	// on the other hand, 'runtime.debug.gab' represents user's intension
@@ -75,6 +78,8 @@ var gabdebug struct {
 	// 1: enabled.
 	// For testing only. Will be removed later.
 	gabPacer int32
+	// Whether enable GAB str allocation path.
+	gabStrAlloc int32
 }
 
 var gabvars = []dbgVar{
@@ -82,6 +87,7 @@ var gabvars = []dbgVar{
 	{name: "trace", value: &gabdebug.trace},
 	{name: "evacuation", value: &gabdebug.evacuation},
 	{name: "gabPacer", value: &gabdebug.gabPacer},
+	{name: "gabStrAlloc", value: &gabdebug.gabStrAlloc},
 }
 
 func gabinit() {
@@ -170,7 +176,11 @@ func (buf *gab) clear() {
 	buf.span = nil
 }
 
-func (buf *gab) refill() {
+func (buf *gab) refill(zero ...bool) {
+	needzero := true
+	if len(zero) != 0 {
+		needzero = zero[0]
+	}
 	ncap := buf.nextCapacity()
 	if isEvacEnabled() {
 		if buf.remaining() > 0 {
@@ -181,12 +191,12 @@ func (buf *gab) refill() {
 		// If a GAB is allocated before that and is not attached to a g,
 		// then it is missing to be pinned.
 		systemstack(func() {
-			base := mallocgc1(ncap, nil, true, true)
+			base := mallocgc1(ncap, nil, needzero, true)
 			buf.span = spanOf(uintptr(base))
 			buf.base = base
 		})
 	} else {
-		buf.base = mallocgc1(ncap, nil, true, true)
+		buf.base = mallocgc1(ncap, nil, needzero, true)
 	}
 	buf.top = uintptr(buf.base)
 	buf.end = buf.top + ncap
@@ -274,6 +284,16 @@ func gabStatus() string {
 		st = "off"
 	}
 	return st
+}
+
+func isGabStrAllocEnabled() bool {
+	return isGabEnabled() && gabdebug.gabStrAlloc > 0
+}
+
+func shouldPauseGab() bool {
+	return isGabStrAllocEnabled() &&
+		uint64(atomic.Loaduintptr(&gabUsedBytes)) >= gabState.gabMemLimit &&
+		gcController.heapGoal() >= uint64(gabUsePolicyThreshold)
 }
 
 // Notice the end of GC, safe place to perform global strategy adjustment.
