@@ -39,7 +39,7 @@ var rtCfgMap = map[string]any{
 	"runtime.beastFlag,ro":        &beastFlag,
 	"runtime.optMode,ro":          &optMode,
 	"runtime.maxHeapBytes,ro":     &maxHeap,
-	"runtime.largeAllocTrace,ro":  &debug.largealloctrace,
+	"runtime.largeAllocTrace,rw":  &debug.largealloctrace,
 	"runtime.memoryLimit,ro":      ptrMemoryLimit,
 }
 

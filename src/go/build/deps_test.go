@@ -680,13 +680,13 @@ var depsRules = `
 	< net/http/cgi
 	< net/http/fcgi;
 
-	# Features
-	RUNTIME, unsafe, sync, errors, fmt
-	< tango/features;
-
 	# DynConf
-	net/http, tango/features, runtime/debug, path, sync
+	net/http, runtime/debug, path, sync, unicode
 	< tango/dynconf;
+
+	# Features
+	RUNTIME, unsafe, sync, errors, fmt, tango/dynconf
+	< tango/features;
 
     # Goid
     unsafe

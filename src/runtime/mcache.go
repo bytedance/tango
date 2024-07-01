@@ -246,7 +246,7 @@ func (c *mcache) refill(spc spanClass) {
 
 // allocLarge allocates a span for a large object.
 func (c *mcache) allocLarge(size uintptr, noscan bool) *mspan {
-	if largeAllocTraceEnabled && size >= uintptr(debug.largealloctrace) {
+	if debug.largealloctrace > 0 && size >= uintptr(debug.largealloctrace) {
 		recordAllocLarge(size)
 	}
 

@@ -11,12 +11,17 @@
 package dynconf
 
 import (
+	"errors"
 	"fmt"
 	"internal/godebug"
 	"net/http"
+	"reflect"
 	"runtime"
 	"sort"
 	"strings"
+	"sync"
+	"unicode"
+	_ "unsafe"
 )
 
 type cmdHandler func([]byte) ([]byte, error)
@@ -72,6 +77,7 @@ func serveError(w http.ResponseWriter, status int, txt string) {
 	fmt.Fprintln(w, txt)
 }
 
+//go:linkname cmdSetConfig
 func cmdSetConfig(args []byte) (res []byte, err error) {
 	pairs := strings.Split(string(args), ",")
 	for _, pair := range pairs {
@@ -103,6 +109,7 @@ func cmdSetConfig(args []byte) (res []byte, err error) {
 	return res, err
 }
 
+//go:linkname cmdGetConfig
 func cmdGetConfig(args []byte) (res []byte, err error) {
 	lazyInit()
 	names := strings.Split(string(args), ",")
@@ -118,15 +125,109 @@ func cmdGetConfig(args []byte) (res []byte, err error) {
 	return res, err
 }
 
+var (
+	registerConf      map[string]map[string]*dyncfg
+	registerConfMutex sync.Mutex
+)
+
+const (
+	runtimeNameSpace          = "runtime"
+	tangoNameSpace            = "tango"
+	namespaceThreshold        = 10
+	confThresholdPerNamespace = 20
+)
+
+var (
+	errReservedNamespace  = errors.New("cannot register runtime and tango namespace")
+	errParameterFormat    = errors.New("namespace or key is not an identifier")
+	errNamespaceThreshold = fmt.Errorf("number of namespaces exceeds the limit %d", namespaceThreshold)
+	errConfThreshold      = fmt.Errorf("number of namespace configurations exceeds the limit %d", confThresholdPerNamespace)
+)
+
+// isValidParameter reports whether the parameter can be used to register dynconf.
+// It has similar checking rules as Identifier, but allows go keywords.
+func isValidParameter(name string) bool {
+	if name == "" {
+		return false
+	}
+	for i, c := range name {
+		if !unicode.IsLetter(c) && c != '_' && (i == 0 || !unicode.IsDigit(c)) {
+			return false
+		}
+	}
+	return true
+}
+
+//go:linkname registerDynconf
+func registerDynconf(namespace, key string, value any, writable bool) error {
+	if namespace == runtimeNameSpace || namespace == tangoNameSpace {
+		return errReservedNamespace
+	}
+	if !isValidParameter(namespace) || !isValidParameter(key) {
+		return errParameterFormat
+	}
+	registerConfMutex.Lock()
+	defer registerConfMutex.Unlock()
+	if registerConf == nil {
+		registerConf = make(map[string]map[string]*dyncfg, namespaceThreshold)
+	}
+	if registerConf[namespace] == nil {
+		if len(registerConf) >= namespaceThreshold {
+			return errNamespaceThreshold
+		}
+		registerConf[namespace] = make(map[string]*dyncfg, confThresholdPerNamespace)
+	}
+	if _, ok := registerConf[namespace][key]; !ok && len(registerConf[namespace]) >= confThresholdPerNamespace {
+		return errConfThreshold
+	}
+	registerConf[namespace][key] = &dyncfg{
+		name: namespace + "." + key,
+		rw:   writable,
+		v:    reflect.Indirect(reflect.ValueOf(value)),
+	}
+	return nil
+}
+
+func getAllRegisterDynconf() []*dyncfg {
+	var res []*dyncfg
+	registerConfMutex.Lock()
+	defer registerConfMutex.Unlock()
+	for _, confs := range registerConf {
+		for _, value := range confs {
+			res = append(res, value)
+		}
+	}
+	sort.Slice(res, func(i, j int) bool { return res[i].name < res[j].name })
+	return res
+}
+
+//go:linkname cmdListConfigs
 func cmdListConfigs(args []byte) ([]byte, error) {
 	lazyInit()
-	res := []string{}
+	res := make([]string, 0, len(allConfigs)+len(taskMap))
 	for _, cfg := range allConfigs {
 		res = append(res, cfg.String())
 	}
 	for t := range taskMap {
 		res = append(res, "task: "+t)
 	}
+
+	if len(args) > 0 {
+		argsStr := string(args)
+		if index := strings.Index(argsStr, "="); index != -1 {
+			key := argsStr[:index]
+			value := argsStr[index+1:]
+			if key == "extern" {
+				extern := getAllRegisterDynconf()
+				for _, v := range extern {
+					if value == "all" || strings.HasPrefix(v.name, value+".") {
+						res = append(res, v.String())
+					}
+				}
+			}
+		}
+	}
+
 	return []byte(strings.Join(res, "\n")), nil
 }
 

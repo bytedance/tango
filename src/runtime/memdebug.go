@@ -9,14 +9,11 @@ package runtime
 
 import "internal/abi"
 
-var largeAllocTraceEnabled = false
-
 func memdebuginit() {
 	if debug.largealloctrace > 0 {
 		if debug.largealloctrace <= maxSmallSize {
 			debug.largealloctrace = maxSmallSize + 1
 		}
-		largeAllocTraceEnabled = true
 	}
 }
 

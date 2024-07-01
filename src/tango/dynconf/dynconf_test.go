@@ -12,6 +12,7 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
+	"os"
 	"os/exec"
 	"path"
 	"reflect"
@@ -40,6 +41,20 @@ func TestPprofDynconf(t *testing.T) {
 	t.Run("TestSetGetEquals", testSetGetEquals)
 	t.Run("TestRemoteStableness", testRemoteStableness)
 	t.Run("TestMemoryLimit", testMemoryLimit)
+	t.Run("TestLargeAllocTrace", testLargeAllocTrace)
+}
+
+func TestPprofDynconfLocal(t *testing.T) {
+	var port int = 10000 + rand.Int()%1024
+	// wait for the http server to start
+	addr := fmt.Sprintf("127.0.0.1:%d", port)
+	go http.ListenAndServe(addr, nil)
+	httpurl = fmt.Sprintf("http://127.0.0.1:%d/debug/pprof/dynconf", port)
+	t.Logf("httpurl=%s", httpurl)
+	// wait for the http server to start
+	time.Sleep(3 * time.Second)
+	t.Run("TestRegister", testRegister)
+	t.Run("TestRegisterError", testRegisterError)
 }
 
 func TestPprofDynconfWithDefaultEnv(t *testing.T) {
@@ -54,7 +69,7 @@ func TestPprofDynconfWithDefaultEnv(t *testing.T) {
 		"config(ro): runtime.gcPercent=-1",
 		"config(ro): runtime.memoryLimit=4294967296",
 	}
-	listAndCheck(t, expectedStrings)
+	listAndCheck(t, expectedStrings, "")
 }
 
 // retrieve the default expected values of dynconf
@@ -129,16 +144,16 @@ func testList(t *testing.T) {
 		"config(ro): runtime.pgoSource=none",
 		"config(ro): runtime.gcPercent=100",
 		"config(ro): runtime.optMode=default",
+		"config(rw): runtime.largeAllocTrace=",
 		"config(ro): runtime.asyncpreemptoff=",
 		"config(ro): runtime.madvdontneed=",
 		"config(ro): runtime.harddecommit=",
 		"config(ro): runtime.maxHeapBytes=",
-		"config(ro): runtime.largeAllocTrace=",
 		"config(ro): runtime.gabThreshold=",
 		"config(ro): runtime.memoryLimit=",
 		"task: runtime.GC",
 	}
-	listAndCheck(t, expectedStrings)
+	listAndCheck(t, expectedStrings, "")
 }
 
 func testGetAndCheck(t *testing.T) {
@@ -306,8 +321,8 @@ func getInt64Value(t *testing.T, k string) int64 {
 	return iv
 }
 
-func listAndCheck(t *testing.T, expectedStrings []string) {
-	strres, err := postCmd("list", "")
+func listAndCheck(t *testing.T, expectedStrings []string, args string) {
+	strres, err := postCmd("list", args)
 	if err != nil {
 		t.Fatalf("Failed to postCmd 'list', error=%v\n", err)
 	}
@@ -325,6 +340,9 @@ func shouldContains(s string, keys []string, t *testing.T) {
 
 // Test the dynconf facilities from within current process
 func TestLocalGet(t *testing.T) {
+	// lazyInit will not be executed if no http request is ever sent.
+	// Call it manually during local testing to avoid inconsistent PGO results when other tests send requests.
+	lazyInit()
 	if len(allConfigs) <= 0 {
 		t.Fatal("Local dynconf Map is empty")
 	}
@@ -374,7 +392,7 @@ func testListPGO(t *testing.T) {
 		"config(ro): runtime.pgoSource=prof",
 		"task: runtime.GC",
 	}
-	listAndCheck(t, expectedStrings)
+	listAndCheck(t, expectedStrings, "")
 }
 
 // test change memory limit by debug.SetMemoryLimit.
@@ -394,5 +412,215 @@ func testMemoryLimit(t *testing.T) {
 	value := getInt64Value(t, "runtime.memoryLimit")
 	if value != newValue {
 		t.Fatalf("get: %s=%d, but expecting %d", key, value, newValue)
+	}
+}
+
+// only for test to clear register dynconf.
+func clearRegisterDynconf() {
+	registerConfMutex.Lock()
+	defer registerConfMutex.Unlock()
+	registerConf = nil
+}
+
+func testRegister(t *testing.T) {
+	defer clearRegisterDynconf()
+	err := registerDynconf("Test", "AAA", "true", false)
+	if err != nil {
+		t.Errorf("registerDynconf unexpected error %v", err)
+	}
+	expectedStrings := []string{"config(ro): Test.AAA=true"}
+	// after successful registration, adding the extern=all or extern=namespace parameter should display the config.
+	listAndCheck(t, expectedStrings, "extern=all")
+	listAndCheck(t, expectedStrings, "extern=Test")
+	err = registerDynconf("Test", "BBB", "false", false)
+	if err != nil {
+		t.Errorf("registerDynconf unexpected error %v", err)
+	}
+	listAndCheck(t, []string{"Test.AAA=true", "Test.BBB=false"}, "extern=Test")
+	// get should also be able to obtain the registered config.
+	cfg := getcfg("Test.AAA")
+	expect := "config(ro): Test.AAA=true"
+	if cfg.String() != expect {
+		t.Errorf("get config details failed, expected %s, got %s", expect, cfg.String())
+	}
+	// registered configs should also respect read-only and writable attributes.
+	err = cfg.setStringValue("true")
+	if err == nil {
+		t.Errorf("set readonly config unexpect success")
+	}
+}
+
+func testRegisterError(t *testing.T) {
+	defer clearRegisterDynconf()
+	// register with the reserved namespace.
+	err := registerDynconf(runtimeNameSpace, "AAA", 1, false)
+	if err != errReservedNamespace {
+		t.Errorf("expected error %v, got %v", errReservedNamespace, err)
+	}
+
+	err = registerDynconf(tangoNameSpace, "AAA", 1, false)
+	if err != errReservedNamespace {
+		t.Errorf("expected error %v, got %v", errReservedNamespace, err)
+	}
+	// register with incorrect namespace format.
+	err = registerDynconf("Test.AAA", "BBB", 1, false)
+	if err != errParameterFormat {
+		t.Errorf("expected error %v, got %v", errParameterFormat, err)
+	}
+	// register with incorrect key format.
+	err = registerDynconf("Test", "AAA.BBB", 1, false)
+	if err != errParameterFormat {
+		t.Errorf("expected error %v, got %v", errParameterFormat, err)
+	}
+	// all registrations above should fail and the list should be empty.
+	if dyns := getAllRegisterDynconf(); len(dyns) != 0 {
+		t.Errorf("unexpected register success")
+	}
+	// when the number of namespaces is less than namespaceThreshold, registration should success.
+	for i := 0; i < namespaceThreshold; i++ {
+		err = registerDynconf(fmt.Sprintf("Test%d", i), "AAA", 1, false)
+		if err != nil {
+			t.Errorf("unexpected error %v", err)
+		}
+	}
+	// when the number of namespaces exceeds namespaceThreshold, registration should fail.
+	err = registerDynconf(fmt.Sprintf("Test%d", namespaceThreshold), "AAA", 1, false)
+	if err != errNamespaceThreshold {
+		t.Errorf("expected error %v, got %v", errNamespaceThreshold, err)
+	}
+	// when the number of configs per namespace is less than confThresholdPerNamespace, registration should success.
+	// Note: for Test0 namespace, one has been successfully registered above,
+	// and the number checked here is confThresholdPerNamespace-1
+	for i := 0; i < confThresholdPerNamespace-1; i++ {
+		err = registerDynconf(fmt.Sprintf("Test%d", 0), fmt.Sprintf("AAA%d", i), 1, false)
+		if err != nil {
+			t.Errorf("unexpected error %v", err)
+		}
+	}
+	// when the number of configs per namespace exceeds confThresholdPerNamespace, registration should fail.
+	err = registerDynconf(fmt.Sprintf("Test%d", 0), fmt.Sprintf("AAA%d", confThresholdPerNamespace), 1, false)
+	if err != errConfThreshold {
+		t.Errorf("expected error %v, got %v", errConfThreshold, err)
+	}
+}
+
+var memdebugglobal interface{}
+
+func allocMemory(size int64) {
+	memdebugglobal = make([]byte, size)
+}
+
+func TestChangeLargeAllocTrace(t *testing.T) {
+	defer func() {
+		memdebugglobal = nil
+	}()
+	if os.Getenv("SUB_PROCESS") == "1" {
+		var size int64 = 10 * 1024 * 1024
+		fmt.Println("Alloc Record", size)
+		allocMemory(size)
+		oldSize := size
+		size = 2 * oldSize
+		res, err := cmdSetConfig([]byte(fmt.Sprintf("runtime.largeAllocTrace=%d", size)))
+		if err != nil || !strings.Contains(string(res), "Successful") {
+			t.Fatalf("set config failed %s", err)
+			return
+		}
+		fmt.Println("Alloc Not Record")
+		allocMemory(oldSize)
+		fmt.Println("Alloc Record", size)
+		allocMemory(size)
+		fmt.Println("Alloc Not Record")
+		allocMemory(size - 1)
+
+		res, err = cmdSetConfig([]byte(fmt.Sprintf("runtime.largeAllocTrace=%d", 0)))
+		if err != nil || !strings.Contains(string(res), "Successful") {
+			t.Fatalf("set config failed %s", err)
+			return
+		}
+		fmt.Println("Alloc Not Record")
+		allocMemory(size)
+		return
+	}
+	cmd := exec.Command(os.Args[0], "-test.run=^TestChangeLargeAllocTrace$")
+	cmd.Env = append(os.Environ(), "SUB_PROCESS=1", "GODEBUG=largealloctrace="+strconv.Itoa(10*1024*1024))
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Log(string(out))
+		t.Fatalf("Return error: %s\n", err)
+	}
+	output := string(out)
+	if success := checkLargeAllocTraceOutput(output); !success {
+		t.Fatal("Not record memory allocation information")
+	}
+}
+
+func checkLargeAllocTraceOutput(output string) bool {
+	lines := strings.Split(output, "\n")
+	shouldRecord := false
+	allocSize := ""
+	for _, line := range lines {
+		if strings.HasPrefix(line, "Alloc Record") {
+			if shouldRecord {
+				return false
+			}
+			shouldRecord = true
+			allocSize = strings.TrimSpace(strings.TrimPrefix(line, "Alloc Record"))
+		} else if strings.HasPrefix(line, "Alloc Not Record") {
+			if shouldRecord {
+				return false
+			}
+			shouldRecord = false
+			allocSize = ""
+		} else {
+			if strings.HasPrefix(line, "[Memory]") {
+				if !shouldRecord {
+					return false
+				}
+				if !strings.Contains(line, "tango/dynconf.allocMemory") || !strings.Contains(line, "bytes="+allocSize) {
+					return false
+				}
+				// check success
+				shouldRecord = false
+			} else {
+				if shouldRecord {
+					return false
+				}
+			}
+		}
+	}
+	return true
+}
+
+func testLargeAllocTrace(t *testing.T) {
+	key := "runtime.largeAllocTrace"
+	iv := getInt64Value(t, key)
+
+	// do set
+	var size int64 = 10 * 1024 * 1024
+	resp, err := http.PostForm(httpurl, url.Values{
+		"cmd":  []string{"set"},
+		"args": []string{fmt.Sprintf("%s=%d", key, size)},
+	})
+	if err != nil {
+		t.Fatalf("Failed to post cmd: 'set'")
+	}
+	res, err := ioutil.ReadAll(resp.Body)
+	strres := strings.TrimSpace(string(res))
+	if err != nil || strres != fmt.Sprintf("Successful: %s=%d", key, size) {
+		t.Fatalf("Failed to read resp body, err=%v, resp=%s", err, strres)
+	}
+
+	// restore original value at the end
+	defer func() {
+		http.PostForm(httpurl, url.Values{
+			"cmd":  []string{"set"},
+			"args": []string{fmt.Sprintf("%s=%d", key, iv)},
+		})
+		t.Logf("Config restored: %s=%d", key, iv)
+	}()
+
+	iv2 := getInt64Value(t, key)
+	if iv2 != size {
+		t.Fatalf("Expecting %d, but got %d\n", size, iv2)
 	}
 }

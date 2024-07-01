@@ -10,8 +10,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-
-	_ "tango/features" // to build a dependency
 )
 
 // all known configurations
@@ -24,6 +22,15 @@ func getcfg(name string) *dyncfg {
 	})
 	if found {
 		return allConfigs[idx]
+	}
+	extern := getAllRegisterDynconf()
+	if len(extern) > 0 {
+		idx, found := sort.Find(len(extern), func(i int) int {
+			return strings.Compare(name, extern[i].name)
+		})
+		if found {
+			return extern[idx]
+		}
 	}
 	return nil
 }

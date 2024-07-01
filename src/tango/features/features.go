@@ -14,6 +14,8 @@ import (
 	"fmt"
 	"runtime"
 	"sync"
+	_ "tango/dynconf"
+	_ "unsafe"
 )
 
 var featuresVersion map[string]string
@@ -38,6 +40,16 @@ const (
 	attrDetail = "detail"
 	// The heapLimit attribute is used to set and get the current heap limit value of the featureMaxheap.
 	attrHeapLimit = "heapLimit"
+
+	// The following attributes are used in dynconf.
+	// The register attribute return a function that can be used to register configuration items.
+	attrDynconfRegister = "register"
+	// The register attribute return a function that can be used to get configuration items.
+	attrDynconfCmdGet = "cmdGet"
+	// The register attribute return a function that can be used to set configuration items.
+	attrDynconfCmdSet = "cmdSet"
+	// The register attribute return a function that can be used to list configuration items.
+	attrDynconfCmdList = "cmdList"
 )
 
 var (
@@ -50,7 +62,7 @@ func initFeatures() {
 	featuresVersion[featureMaxheap] = "1.0"
 	featuresVersion[featureGab] = "1.0"
 	featuresVersion[featureBeastmode] = "1.1"
-	featuresVersion[featureDynconf] = "1.2"
+	featuresVersion[featureDynconf] = "1.3"
 	featuresVersion[featureMemstats] = "1.0"
 	featuresVersion[featureBversion] = "1.1"
 	featuresVersion[featureTangoinfo] = "1.1"
@@ -96,9 +108,7 @@ func (t *tangoInstance) AllFeatures() map[string]interface{} {
 				return isGabEnabled()
 			}),
 			featureBeastmode: newBeastmodeInstance(),
-			featureDynconf: newFeatureInstance(featureDynconf, func() bool {
-				return true
-			}),
+			featureDynconf:   newDynconfInstance(),
 			featureMemstats: newFeatureInstance(featureMemstats, func() bool {
 				return true
 			}),
@@ -211,6 +221,43 @@ func (f *maxHeapFeature) GetAttr(name string) interface{} {
 
 func newMaxHeapInstance() feature {
 	return &maxHeapFeature{newFeatureInstance(featureMaxheap, setMaxHeapEnabled)}
+}
+
+type dynconfFeature struct {
+	*featureInstance
+}
+
+//go:linkname registerDynconf tango/dynconf.registerDynconf
+func registerDynconf(namespace, key string, value any, writable bool) error
+
+//go:linkname cmdGetConfig tango/dynconf.cmdGetConfig
+func cmdGetConfig(args []byte) (res []byte, err error)
+
+//go:linkname cmdSetConfig tango/dynconf.cmdSetConfig
+func cmdSetConfig(args []byte) ([]byte, error)
+
+//go:linkname cmdListConfigs tango/dynconf.cmdListConfigs
+func cmdListConfigs(args []byte) ([]byte, error)
+
+func (f *dynconfFeature) GetAttr(name string) interface{} {
+	switch name {
+	case attrDynconfRegister:
+		return registerDynconf
+	case attrDynconfCmdGet:
+		return cmdGetConfig
+	case attrDynconfCmdSet:
+		return cmdSetConfig
+	case attrDynconfCmdList:
+		return cmdListConfigs
+	default:
+		return nil
+	}
+}
+
+func newDynconfInstance() feature {
+	return &dynconfFeature{newFeatureInstance(featureDynconf, func() bool {
+		return true
+	})}
 }
 
 var global interface{}
