@@ -603,8 +603,9 @@ type g struct {
 
 	// Note: since some third-party libraries rely on the goid offset to obtain groutine id,
 	// the newly added fields need to be placed behind the goid.
-	ab    gab // goroutine allocation buffer; offset known to cmd/compile/internal/gc/ssa.go
-	strAB gab // goroutine allocation buffer for string bodies
+	ab          gab // goroutine allocation buffer; offset known to cmd/compile/internal/gc/ssa.go
+	strAB       gab // goroutine allocation buffer for string bodies
+	strHeaderAB gab // goroutine allocation buffer for string headers
 }
 
 // Replace pid.Get() and pid.GetPid() with runtime.getGId() and runtime.getPId()

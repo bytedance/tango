@@ -925,7 +925,11 @@ func scanSpan(p objptr, gcw *gcWork) {
 	for _, p := range gcw.ptrBuf[:nptrs] {
 		if !tryDeferToSpanScan(p, gcw) {
 			if obj, span, objIndex := findObject(p, 0, 0); obj != 0 {
-				greyobject(obj, 0, 0, span, gcw, objIndex)
+				if span.isGab() && !span.spanclass.noscan() {
+					greyGabObject(obj, 0, 0, p, span, gcw, objIndex)
+				} else {
+					greyobject(obj, 0, 0, span, gcw, objIndex)
+				}
 				if isEvacEnabled() && span.doEvacuation() {
 					span.gabPinObj(obj)
 				}
@@ -1012,7 +1016,11 @@ func scanObjectSmall(spanBase, b, objSize uintptr, gcw *gcWork) {
 		}
 		if !tryDeferToSpanScan(p, gcw) {
 			if obj, span, objIndex := findObject(p, 0, 0); obj != 0 {
-				greyobject(obj, 0, 0, span, gcw, objIndex)
+				if span.isGab() && !span.spanclass.noscan() {
+					greyGabObject(obj, 0, 0, p, span, gcw, objIndex)
+				} else {
+					greyobject(obj, 0, 0, span, gcw, objIndex)
+				}
 				if isEvacEnabled() && span.doEvacuation() {
 					span.gabPinObj(obj)
 				}
@@ -1063,7 +1071,11 @@ func scanObjectsSmall(base, objSize uintptr, elems uint16, gcw *gcWork, scans *g
 		}
 		if !tryDeferToSpanScan(p, gcw) {
 			if obj, span, objIndex := findObject(p, 0, 0); obj != 0 {
-				greyobject(obj, 0, 0, span, gcw, objIndex)
+				if span.isGab() && !span.spanclass.noscan() {
+					greyGabObject(obj, 0, 0, p, span, gcw, objIndex)
+				} else {
+					greyobject(obj, 0, 0, span, gcw, objIndex)
+				}
 				if isEvacEnabled() && span.doEvacuation() {
 					span.gabPinObj(obj)
 				}
@@ -1285,7 +1297,11 @@ func scanObject(b uintptr, gcw *gcWork) {
 			if (isEvacEnabled() && !pinned) || !tryDeferToSpanScan(obj, gcw) {
 				src := obj
 				if obj, span, objIndex := findObject(obj, b, addr-b); obj != 0 {
-					greyobject(obj, b, addr-b, span, gcw, objIndex)
+					if span.isGab() && !span.spanclass.noscan() {
+						greyGabObject(obj, b, addr-b, src, span, gcw, objIndex)
+					} else {
+						greyobject(obj, b, addr-b, span, gcw, objIndex)
+					}
 					if isEvacEnabled() && span.doEvacuation() {
 						if pinned {
 							span.gabPinObj(obj)

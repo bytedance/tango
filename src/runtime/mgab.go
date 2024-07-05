@@ -44,13 +44,16 @@ const (
 	// See comments before newFrozenBits() for details.
 	// This size is guarded by the test case TestGabMinFrozenMapBucketSize().
 	minFrozenMapBucketSize uintptr = 136
+	gabStrHeaderObjSize            = 16
 )
 
 var (
-	gabCapMax          uintptr = gabCapMaxDefault // default value of gab Max Capacity.
-	gabUsedBytes       uintptr                    // total consumed bytes
-	strBufferAllocStat uintptr                    // total allocated bytes of str buffer
-	gabBufferAllocStat uintptr                    // total allocated bytes of gab buffer
+	gabCapMax             uintptr = gabCapMaxDefault // default value of gab Max Capacity.
+	gabScanCapMax         uintptr = gabCapMax << 2   // maximum capacity for scan GABs.
+	gabUsedBytes          uintptr                    // total consumed bytes
+	gabStrHeaderUsedBytes uintptr                    // total consumed bytes of string header buffers
+	strBufferAllocStat    uintptr                    // total allocated bytes of str buffer
+	gabBufferAllocStat    uintptr                    // total allocated bytes of gab buffer
 	// 'gabEnabled' control the runtime state of GAB feature,
 	// mallocgc() will check this flag to determine if should goto fastpath.
 	// on the other hand, 'runtime.debug.gab' represents user's intension
@@ -80,6 +83,10 @@ var gabdebug struct {
 	gabPacer int32
 	// Whether enable GAB str allocation path.
 	gabStrAlloc int32
+	// Whether enable GAB str header allocation path.
+	gabStrHeaderAlloc int32
+	// Whether enable GAB debug allocation statistics.
+	gabDebugStat int32
 }
 
 var gabvars = []dbgVar{
@@ -88,6 +95,8 @@ var gabvars = []dbgVar{
 	{name: "evacuation", value: &gabdebug.evacuation},
 	{name: "gabPacer", value: &gabdebug.gabPacer},
 	{name: "gabStrAlloc", value: &gabdebug.gabStrAlloc},
+	{name: "gabStrHeaderAlloc", value: &gabdebug.gabStrHeaderAlloc},
+	{name: "gabDebugStat", value: &gabdebug.gabDebugStat},
 }
 
 func gabinit() {
@@ -176,13 +185,17 @@ func (buf *gab) clear() {
 	buf.span = nil
 }
 
-func (buf *gab) refill(zero ...bool) {
-	needzero := true
-	if len(zero) != 0 {
-		needzero = zero[0]
-	}
+func (buf *gab) refill() {
+	buf.refillWithOptions(true, nil)
+}
+
+func (buf *gab) refillWithOptions(needzero bool, typ *_type) {
 	ncap := buf.nextCapacity()
-	if isEvacEnabled() {
+	noscan := typ == nil || !typ.Pointers()
+	if !noscan && ncap > gabScanCapMax {
+		ncap = gabScanCapMax
+	}
+	if isEvacEnabled() && noscan {
 		if buf.remaining() > 0 {
 			buf.fillRemaining()
 		}
@@ -191,12 +204,12 @@ func (buf *gab) refill(zero ...bool) {
 		// If a GAB is allocated before that and is not attached to a g,
 		// then it is missing to be pinned.
 		systemstack(func() {
-			base := mallocgc1(ncap, nil, needzero, true)
+			base := mallocgc1(ncap, typ, needzero, true)
 			buf.span = spanOf(uintptr(base))
 			buf.base = base
 		})
 	} else {
-		buf.base = mallocgc1(ncap, nil, needzero, true)
+		buf.base = mallocgc1(ncap, typ, needzero, true)
 	}
 	buf.top = uintptr(buf.base)
 	buf.end = buf.top + ncap
@@ -288,6 +301,14 @@ func gabStatus() string {
 
 func isGabStrAllocEnabled() bool {
 	return isGabEnabled() && gabdebug.gabStrAlloc > 0
+}
+
+func isGabStrHeaderAllocEnabled() bool {
+	return isGabEnabled() && gabdebug.gabStrHeaderAlloc > 0
+}
+
+func isGabDebugStatEnabled() bool {
+	return isGabEnabled() && gabdebug.gabDebugStat > 0
 }
 
 func shouldPauseGab() bool {

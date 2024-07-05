@@ -29,8 +29,13 @@ func (s *mspan) isGab() bool {
 }
 
 //go:nowritebarrierrec
+func (s *mspan) isNoScanGab() bool {
+	return s.spanclass >= numNonGabSpanClasses && s.spanclass.noscan()
+}
+
+//go:nowritebarrierrec
 func (s *mspan) doEvacuation() bool {
-	return gabState.isEvacuation && s.isGab()
+	return gabState.isEvacuation && s.isNoScanGab()
 }
 
 //go:nowritebarrierrec
@@ -65,7 +70,7 @@ func pinIfOnHeap(ptr uintptr) {
 	if s == nil {
 		return
 	}
-	if s.isGab() && !s.isFree(s.objIndex(ptr)) {
+	if s.isNoScanGab() && !s.isFree(s.objIndex(ptr)) {
 		s.gabPinObj(ptr)
 	}
 }
@@ -410,9 +415,9 @@ func mallocgc1WithoutSizeSpecializedMalloc(size uintptr, typ *_type, needzero bo
 				throw("objects with pointers must be zeroed")
 			}
 			if heapBitsInSpan(size) {
-				x, elemsize = mallocgcSmallScanNoHeader(size, typ)
+				x, elemsize = mallocgcSmallScanNoHeader(size, typ, isgab)
 			} else {
-				x, elemsize = mallocgcSmallScanHeader(size, typ)
+				x, elemsize = mallocgcSmallScanHeader(size, typ, isgab)
 			}
 		}
 	} else {

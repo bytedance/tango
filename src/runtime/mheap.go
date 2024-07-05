@@ -636,10 +636,14 @@ type spanClass uint8
 
 const (
 	// we arrange [0,2*_NumSizeClasses) to hold non-gab spans,
-	// while [2*_NumSizeClasses, 3*_NumSizeClasses) to hold gab spans,
+	// while the remaining compact range holds scan and noscan GAB spans.
 	// please note that the GAB spans slots are very sparse
 	numNonGabSpanClasses = gc.NumSizeClasses << 1
-	numSpanClasses       = numNonGabSpanClasses + gc.NumSizeClasses
+	minGabSizeClass      = 32
+	maxGabSizeClass      = 67
+	gabSizeClassOffset   = minGabSizeClass
+	numGabSpanClasses    = (maxGabSizeClass + 1 - gabSizeClassOffset) << 1
+	numSpanClasses       = numNonGabSpanClasses + numGabSpanClasses
 	tinySpanClass        = spanClass(tinySizeClass<<1 | 1)
 )
 
@@ -647,10 +651,8 @@ func makeSpanClass(sizeclass uint8, noscan bool, isgab bool) spanClass {
 	if debug.gab <= 0 || !isgab {
 		return spanClass(sizeclass<<1) | spanClass(bool2int(noscan))
 	} else {
-		if !noscan {
-			throw("gab span must be noscan for now")
-		}
-		return spanClass(numNonGabSpanClasses + sizeclass)
+		return numNonGabSpanClasses +
+			(spanClass((sizeclass-gabSizeClassOffset)<<1) | spanClass(bool2int(noscan)))
 	}
 }
 
@@ -659,13 +661,13 @@ func (sc spanClass) sizeclass() int8 {
 	if sc < numNonGabSpanClasses {
 		return int8(sc >> 1)
 	} else {
-		return int8(sc - numNonGabSpanClasses)
+		return int8((sc-numNonGabSpanClasses)>>1) + gabSizeClassOffset
 	}
 }
 
 //go:nosplit
 func (sc spanClass) noscan() bool {
-	return sc&1 != 0 || sc.gabSpanClass()
+	return sc&1 != 0
 }
 
 func (sc spanClass) gabSpanClass() bool {
@@ -1586,7 +1588,7 @@ func (h *mheap) initSpan(s *mspan, typ spanAllocType, spanclass spanClass, base,
 		s.allocCache = ^uint64(0) // all 1s indicating all free.
 		s.gcmarkBits = newMarkBits(uintptr(s.nelems))
 		s.allocBits = newAllocBits(uintptr(s.nelems))
-		if isEvacEnabled() && s.isGab() {
+		if isEvacEnabled() && s.isNoScanGab() {
 			s.gabPinBits = newAllocBits(uintptr(s.nelems))
 			s.newObjStartBits()
 		}

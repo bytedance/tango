@@ -63,7 +63,7 @@ func initFeatures() {
 	featuresVersion[featureBalancedgc] = "1.0"
 	featuresVersion[featureMaxheap] = "1.0"
 	featuresVersion[featureGCAdaptive] = "1.0"
-	featuresVersion[featureGab] = "1.1"
+	featuresVersion[featureGab] = "2.0"
 	featuresVersion[featureBeastmode] = "1.3"
 	featuresVersion[featureAdaptsched] = "1.0"
 	featuresVersion[featureDynconf] = "1.3"

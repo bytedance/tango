@@ -30,9 +30,9 @@ func htmlWrite(w http.ResponseWriter, r *http.Request, sec int64, res *memStat) 
 
 	fmt.Fprintf(&b, "<tr>  GAB Allocator: size limit=%dBytes, status=%s</tr><br>",
 		gabMaxAllocSize(), gabStatus())
-	fmt.Fprintf(&b, "<tr>  GAB Allocation Buffer Allocated Stat: %d</tr><br>",
+	fmt.Fprintf(&b, "<tr>  GAB Allocation Buffer Allocated Stat: %d B</tr><br>",
 		res.gabAllocs)
-	fmt.Fprintf(&b, "<tr>  GAB Str Allocation Buffer Allocated Stat: %d</tr><br>",
+	fmt.Fprintf(&b, "<tr>  GAB Str Allocation Buffer Allocated Stat: %d B</tr><br>",
 		res.strAllocs)
 	b.WriteString(tblFooter)
 

@@ -232,7 +232,11 @@ func scanObject(b uintptr, gcw *gcWork) {
 			if !tryDeferToSpanScan(obj, gcw) {
 				src := obj
 				if obj, span, objIndex := findObject(obj, b, addr-b); obj != 0 {
-					greyobject(obj, b, addr-b, span, gcw, objIndex)
+					if span.isGab() && !span.spanclass.noscan() {
+						greyGabObject(obj, b, addr-b, src, span, gcw, objIndex)
+					} else {
+						greyobject(obj, b, addr-b, span, gcw, objIndex)
+					}
 					if isEvacEnabled() && span.doEvacuation() {
 						if pinned {
 							span.gabPinObj(obj)

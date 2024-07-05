@@ -250,6 +250,30 @@ func wbBufFlush1(pp *p) {
 		if span != nil && isEvacEnabled() && span.doEvacuation() {
 			span.gabPinObj(obj)
 		}
+
+		// Mark the str body from gab str header
+		if span != nil && span.isGab() && !span.spanclass.noscan() {
+			baseAfterMallocHeader := span.base() + span.elemsize*objIndex + mallocHeaderSize
+			bodyPtrAddr := baseAfterMallocHeader + (ptr-baseAfterMallocHeader)/gabStrHeaderObjSize*gabStrHeaderObjSize
+			bodyPtr := *(*uintptr)(unsafe.Pointer(bodyPtrAddr))
+			if bodyPtr != 0 {
+				// check and mark the bodyPtr, should be consistent with greyGabObject
+				if bodySpan := spanOfHeap(bodyPtr); bodySpan != nil && bodySpan.spanclass.noscan() {
+					bodyIndex := bodySpan.objIndex(bodyPtr)
+					bodyObj := bodySpan.base() + bodyIndex*bodySpan.elemsize
+					if !bodySpan.isFreeOrNewlyAllocated(bodyIndex) {
+						greyobject(bodyObj, 0, 0, bodySpan, gcw, bodyIndex)
+						if isEvacEnabled() && bodySpan.doEvacuation() {
+							if !bodySpan.isPinnedGab(bodyObj) {
+								getg().m.p.ptr().refsIn.enqueue(bodyPtrAddr)
+								updateMarkedGABObjects(bodySpan, bodyPtr, bodyObj)
+							}
+						}
+					}
+				}
+			}
+		}
+
 		// TODO: Consider making two passes where the first
 		// just prefetches the mark bits.
 		mbits := span.markBitsForIndex(objIndex)
@@ -264,7 +288,8 @@ func wbBufFlush1(pp *p) {
 			atomic.Or8(&arena.pageMarks[pageIdx], pageMask)
 		}
 
-		if span.spanclass.noscan() {
+		// Skip greying noscan objects and gab scan objects
+		if span.spanclass.noscan() || span.isGab() {
 			gcw.bytesMarked += uint64(span.elemsize)
 			if isGabEnabled() && span.isGab() {
 				gcw.gabMarked += uint64(span.elemsize)

@@ -1,6 +1,9 @@
 // Copyright 2023 The Go Authors. All rights reserved.
+// Copyright (c) 2024 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2024-07-05.
 
 package runtime_test
 
@@ -15,6 +18,10 @@ type obj struct {
 	x int64
 	y int64
 	z int64
+}
+
+type objNotInGab struct {
+	x [1025]byte
 }
 
 type objWith[T any] struct {
@@ -69,7 +76,9 @@ func TestPinnerSimple(t *testing.T) {
 
 func TestPinnerPinKeepsAliveAndReleases(t *testing.T) {
 	var pinner runtime.Pinner
-	p := new(obj)
+	// Alloc p in Gab will delay the memory release after Unpin is called,
+	// and block the finalizer test.
+	p := new(objNotInGab)
 	done := make(chan struct{})
 	runtime.SetFinalizer(p, func(any) {
 		done <- struct{}{}

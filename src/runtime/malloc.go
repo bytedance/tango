@@ -1144,7 +1144,7 @@ func stralloc(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 				gabEnabled = false
 				goto slow
 			}
-			gp.strAB.refill(false)
+			gp.strAB.refillWithOptions(false, nil)
 		}
 		var x unsafe.Pointer
 		if isEvacEnabled() {
@@ -1152,6 +1152,31 @@ func stralloc(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 		}
 		x = unsafe.Pointer(gp.strAB.top)
 		gp.strAB.top += size
+		return x
+	}
+
+slow:
+	return mallocgc1(size, typ, needzero, false)
+}
+
+// strHeaderAlloc allocates string headers from a scan GAB.
+func strHeaderAlloc(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
+	if doubleCheckMalloc && gcphase == _GCmarktermination {
+		throw("strHeaderAlloc called with gcphase == _GCmarktermination")
+	}
+
+	gp := getg()
+	if gabEnabled {
+		size = alignUp(size, goarch.PtrSize)
+		if gp.strHeaderAB.remaining() < size {
+			if shouldPauseGab() {
+				gabEnabled = false
+				goto slow
+			}
+			gp.strHeaderAB.refillWithOptions(true, typ)
+		}
+		x := unsafe.Pointer(gp.strHeaderAB.top)
+		gp.strHeaderAB.top += size
 		return x
 	}
 
@@ -1199,7 +1224,7 @@ func mallocgc1(size uintptr, typ *_type, needzero bool, isgab bool) unsafe.Point
 				if !needzero {
 					throw("objects with pointers must be zeroed")
 				}
-				x, elemsize = mallocgcSmallScanHeader(size, typ)
+				x, elemsize = mallocgcSmallScanHeader(size, typ, isgab)
 			}
 		} else {
 			x, elemsize = mallocgcLarge(size, typ, needzero)
@@ -1221,13 +1246,25 @@ func mallocgc1(size uintptr, typ *_type, needzero bool, isgab bool) unsafe.Point
 					throw("objects with pointers must be zeroed")
 				}
 				if heapBitsInSpan(size) {
-					x, elemsize = mallocgcSmallScanNoHeader(size, typ)
+					x, elemsize = mallocgcSmallScanNoHeader(size, typ, isgab)
 				} else {
-					x, elemsize = mallocgcSmallScanHeader(size, typ)
+					x, elemsize = mallocgcSmallScanHeader(size, typ, isgab)
 				}
 			}
 		} else {
 			x, elemsize = mallocgcLarge(size, typ, needzero)
+		}
+	}
+
+	if isgab {
+		atomic.Xadduintptr(&gabUsedBytes, elemsize)
+		if isGabDebugStatEnabled() {
+			atomic.Xadduintptr(&gabStrHeaderUsedBytes, elemsize)
+			if needzero {
+				atomic.Xadduintptr(&gabBufferAllocStat, elemsize)
+			} else {
+				atomic.Xadduintptr(&strBufferAllocStat, elemsize)
+			}
 		}
 	}
 
@@ -1470,9 +1507,6 @@ func mallocgcSmallNoscan(size uintptr, typ *_type, needzero, isgab bool) (unsafe
 	if v == 0 {
 		v, span, checkGCTrigger = c.nextFree(spc)
 	}
-	if isgab {
-		atomic.Xadduintptr(&gabUsedBytes, size)
-	}
 	if isgab != spc.gabSpanClass() {
 		throw("Incorrect span class!")
 	}
@@ -1588,7 +1622,7 @@ func mallocgcSmallNoscanReuse(c *mcache, span *mspan, spc spanClass, size uintpt
 	return x
 }
 
-func mallocgcSmallScanNoHeader(size uintptr, typ *_type) (unsafe.Pointer, uintptr) {
+func mallocgcSmallScanNoHeader(size uintptr, typ *_type, isgab bool) (unsafe.Pointer, uintptr) {
 	// Set mp.mallocing to keep from being preempted by GC.
 	mp := acquirem()
 	if doubleCheckMalloc {
@@ -1610,7 +1644,7 @@ func mallocgcSmallScanNoHeader(size uintptr, typ *_type) (unsafe.Pointer, uintpt
 	checkGCTrigger := false
 	c := getMCache(mp)
 	sizeclass := gc.SizeToSizeClass8[divRoundUp(size, gc.SmallSizeDiv)]
-	spc := makeSpanClass(sizeclass, false, false)
+	spc := makeSpanClass(sizeclass, false, isgab)
 	span := c.alloc[spc]
 	v := nextFreeFast(span)
 	if v == 0 {
@@ -1679,7 +1713,7 @@ func mallocgcSmallScanNoHeader(size uintptr, typ *_type) (unsafe.Pointer, uintpt
 	return x, size
 }
 
-func mallocgcSmallScanHeader(size uintptr, typ *_type) (unsafe.Pointer, uintptr) {
+func mallocgcSmallScanHeader(size uintptr, typ *_type, isgab bool) (unsafe.Pointer, uintptr) {
 	// Set mp.mallocing to keep from being preempted by GC.
 	mp := acquirem()
 	if doubleCheckMalloc {
@@ -1708,7 +1742,7 @@ func mallocgcSmallScanHeader(size uintptr, typ *_type) (unsafe.Pointer, uintptr)
 		sizeclass = gc.SizeToSizeClass128[divRoundUp(size-gc.SmallSizeMax, gc.LargeSizeDiv)]
 	}
 	size = uintptr(gc.SizeClassToSize[sizeclass])
-	spc := makeSpanClass(sizeclass, false, false)
+	spc := makeSpanClass(sizeclass, false, isgab)
 	span := c.alloc[spc]
 	v := nextFreeFast(span)
 	if v == 0 {

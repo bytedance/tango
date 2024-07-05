@@ -30,14 +30,14 @@ func GetGABObjectSize(addr uintptr) (uintptr, bool) {
 func isActiveGAB(start uintptr) bool {
 	isActive := false
 	for _, gp := range allgs {
-		if gp != nil && (uintptr(gp.ab.base) == start || uintptr(gp.strAB.base) == start) {
+		if gp != nil && (uintptr(gp.ab.base) == start || uintptr(gp.strAB.base) == start || uintptr(gp.strHeaderAB.base) == start) {
 			isActive = true
 			break
 		}
 	}
 	if !isActive {
 		for mp := allm; mp != nil; mp = mp.alllink {
-			if mp.g0 != nil && (uintptr(mp.g0.ab.base) == start || uintptr(mp.g0.strAB.base) == start) {
+			if mp.g0 != nil && (uintptr(mp.g0.ab.base) == start || uintptr(mp.g0.strAB.base) == start || uintptr(mp.g0.strHeaderAB.base) == start) {
 				isActive = true
 				break
 			}
@@ -81,7 +81,7 @@ func VerifyGABs() bool {
 	stw := stopTheWorld(stwVerifyGABs)
 	makeGABParsable()
 	for _, s := range mheap_.allspans {
-		if !s.isGab() || s.allocCount == 0 {
+		if !s.isNoScanGab() || s.allocCount == 0 {
 			continue
 		}
 		base := s.base()

@@ -170,8 +170,21 @@ func slicebytetostring(buf *tmpBuf, ptr *byte, n int) string {
 	if buf != nil && n <= len(buf) {
 		p = unsafe.Pointer(buf)
 	} else {
-		if isGabStrAllocEnabled() {
-			p = stralloc(uintptr(n), nil, false)
+		// Manually inline the fastpath to alloc str body like gabInline does.
+		// Notice that for objs which have zero size, they should not be alloc by the
+		// fastpath, those objs should be alloc with the zero base.
+		if isGabStrAllocEnabled() && n > 0 && n <= gabMaxAllocSize {
+			gp := getg()
+			gp.strAB.top = alignUp(gp.strAB.top, goarch.PtrSize)
+			if gp.strAB.remaining() >= uintptr(n) {
+				if isEvacEnabled() {
+					startObj(gp.strAB.top, gp.strAB.span)
+				}
+				p = unsafe.Pointer(gp.strAB.top)
+				gp.strAB.top += uintptr(n)
+			} else {
+				p = stralloc(uintptr(n), nil, false)
+			}
 		} else {
 			p = mallocgc(uintptr(n), nil, false)
 		}
@@ -330,8 +343,21 @@ func intstring(buf *[4]byte, v int64) (s string) {
 // b to set the string contents and then drop b.
 func rawstring(size int) (s string, b []byte) {
 	var p unsafe.Pointer
-	if isGabStrAllocEnabled() {
-		p = stralloc(uintptr(size), nil, false)
+	// Manually inline the fastpath to alloc str body like gabInline does.
+	// Notice that for objs which have zero size, they should not be alloc by the
+	// fastpath, those objs should be alloc with the zero base.
+	if isGabStrAllocEnabled() && size > 0 && size <= gabMaxAllocSize {
+		gp := getg()
+		gp.strAB.top = alignUp(gp.strAB.top, goarch.PtrSize)
+		if gp.strAB.remaining() >= uintptr(size) {
+			if isEvacEnabled() {
+				startObj(gp.strAB.top, gp.strAB.span)
+			}
+			p = unsafe.Pointer(gp.strAB.top)
+			gp.strAB.top += uintptr(size)
+		} else {
+			p = stralloc(uintptr(size), nil, false)
+		}
 	} else {
 		p = mallocgc(uintptr(size), nil, false)
 	}
@@ -342,8 +368,21 @@ func rawstring(size int) (s string, b []byte) {
 func rawbyteslice(size int) (b []byte) {
 	cap := roundupsize(uintptr(size), true)
 	var p unsafe.Pointer
-	if isGabStrAllocEnabled() {
-		p = stralloc(cap, nil, false)
+	// Manually inline the fastpath to alloc str body like gabInline does.
+	// Notice that for objs which have zero size, they should not be alloc by the
+	// fastpath, those objs should be alloc with the zero base.
+	if isGabStrAllocEnabled() && cap > 0 && cap <= gabMaxAllocSize {
+		gp := getg()
+		gp.strAB.top = alignUp(gp.strAB.top, goarch.PtrSize)
+		if gp.strAB.remaining() >= cap {
+			if isEvacEnabled() {
+				startObj(gp.strAB.top, gp.strAB.span)
+			}
+			p = unsafe.Pointer(gp.strAB.top)
+			gp.strAB.top += cap
+		} else {
+			p = stralloc(cap, nil, false)
+		}
 	} else {
 		p = mallocgc(cap, nil, false)
 	}
@@ -362,8 +401,21 @@ func rawruneslice(size int) (b []rune) {
 	}
 	mem := roundupsize(uintptr(size)*4, true)
 	var p unsafe.Pointer
-	if isGabStrAllocEnabled() {
-		p = stralloc(mem, nil, false)
+	// Manually inline the fastpath to alloc str body like gabInline does.
+	// Notice that for objs which have zero size, they should not be alloc by the
+	// fastpath, those objs should be alloc with the zero base.
+	if isGabStrAllocEnabled() && mem > 0 && mem <= gabMaxAllocSize {
+		gp := getg()
+		gp.strAB.top = alignUp(gp.strAB.top, goarch.PtrSize)
+		if gp.strAB.remaining() >= mem {
+			if isEvacEnabled() {
+				startObj(gp.strAB.top, gp.strAB.span)
+			}
+			p = unsafe.Pointer(gp.strAB.top)
+			gp.strAB.top += mem
+		} else {
+			p = stralloc(mem, nil, false)
+		}
 	} else {
 		p = mallocgc(mem, nil, false)
 	}

@@ -428,7 +428,19 @@ func convTstring(val string) (x unsafe.Pointer) {
 	if val == "" {
 		x = unsafe.Pointer(&zeroVal[0])
 	} else {
-		x = mallocgc(unsafe.Sizeof(val), stringType, true)
+		// Manually inline the fastpath to alloc str header like gabInline does.
+		if isGabStrHeaderAllocEnabled() {
+			gp := getg()
+			if gp.strHeaderAB.remaining() >= unsafe.Sizeof(val) {
+				x = unsafe.Pointer(gp.strHeaderAB.top)
+				gp.strHeaderAB.top += unsafe.Sizeof(val)
+			} else {
+				x = strHeaderAlloc(unsafe.Sizeof(val), stringType, true)
+			}
+		} else {
+			x = mallocgc(unsafe.Sizeof(val), stringType, true)
+		}
+
 		*(*string)(x) = val
 	}
 	return

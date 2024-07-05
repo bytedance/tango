@@ -7,6 +7,7 @@ package runtime_test
 import (
 	"fmt"
 	"internal/goarch"
+	"internal/race"
 	"internal/testenv"
 	"io/ioutil"
 	"os"
@@ -47,9 +48,64 @@ func getGABEnvs() [][]string {
 	return envs
 }
 
+func getGABAllocStrEnvs() [][]string {
+	var envs [][]string
+	if isEvacSupported() {
+		envs = [][]string{
+			{
+				"GODEBUG=gab=1",
+				"GOGABOPT=gabStrAlloc=1",
+			},
+			{
+				"GODEBUG=gab=2",
+				"GOGABOPT=gabStrAlloc=1",
+			},
+			{
+				"GODEBUG=gab=2",
+				"GOGABOPT=evacuation=1,gabStrAlloc=1",
+			},
+		}
+	} else {
+		envs = [][]string{
+			{
+				"GODEBUG=gab=1",
+				"GOGABOPT=gabStrAlloc=1",
+			},
+		}
+	}
+	return envs
+}
+
+func getGABAllocStrHeaderEnvs() [][]string {
+	var envs [][]string
+	if isEvacSupported() {
+		envs = [][]string{
+			{
+				"GODEBUG=gab=1",
+				"GOGABOPT=gabStrAlloc=1,gabStrHeaderAlloc=1",
+			},
+			{
+				"GODEBUG=gab=2",
+				"GOGABOPT=gabStrAlloc=1,gabStrHeaderAlloc=1",
+			},
+			{
+				"GODEBUG=gab=2",
+				"GOGABOPT=evacuation=1,gabStrAlloc=1,gabStrHeaderAlloc=1",
+			},
+		}
+	} else {
+		envs = [][]string{
+			{
+				"GODEBUG=gab=1",
+				"GOGABOPT=gabStrAlloc=1,gabStrHeaderAlloc=1",
+			},
+		}
+	}
+	return envs
+}
+
 func isEvacSupported() bool {
-	// TODO balanced GC supports arm64
-	return runtime.GOARCH == "amd64" && (runtime.GOOS == "linux" || runtime.GOOS == "darwin")
+	return (runtime.GOARCH == "amd64" || runtime.GOARCH == "arm64") && (runtime.GOOS == "linux" || runtime.GOOS == "darwin")
 }
 
 func TestGabAllocBasic(t *testing.T) {
@@ -62,9 +118,88 @@ func TestGabAllocBasic(t *testing.T) {
 	}
 }
 
+func TestGabAllocStr(t *testing.T) {
+	for _, env := range getGABAllocStrEnvs() {
+		output := runTestProg(t, "testproggab", "AllocStr", env...)
+		want := "OK\n"
+		if output != want {
+			t.Errorf("expected %q got %v", want, output)
+		}
+	}
+}
+
+func TestGabAllocStrHeader(t *testing.T) {
+	for _, env := range getGABAllocStrHeaderEnvs() {
+		output := runTestProg(t, "testproggab", "AllocStrHeader", env...)
+		want := "OK\n"
+		if output != want {
+			t.Errorf("expected %q got %v", want, output)
+		}
+	}
+}
+
 func TestGabObjFinalizer(t *testing.T) {
 	for _, env := range getGABEnvs() {
 		output := runTestProg(t, "testproggab", "ObjFinalizer", env...)
+		want := "OK\n"
+		if output != want {
+			t.Errorf("expected %q got %v", want, output)
+		}
+	}
+}
+
+func TestGabReuseBuffer(t *testing.T) {
+	for _, env := range getGABAllocStrHeaderEnvs() {
+		output := runTestProg(t, "testproggab", "ReuseBuffer", env...)
+		want := "OK\n"
+		if output != want {
+			t.Errorf("expected %q got %v", want, output)
+		}
+	}
+}
+
+func TestGabAllocZeroSizeString(t *testing.T) {
+	for _, env := range getGABAllocStrHeaderEnvs() {
+		output := runTestProg(t, "testproggab", "AllocZeroSizeString", env...)
+		want := "OK\n"
+		if output != want {
+			t.Errorf("expected %q got %v", want, output)
+		}
+	}
+}
+
+func TestGabMarkStrBody(t *testing.T) {
+	for _, env := range getGABAllocStrHeaderEnvs() {
+		output := runTestProg(t, "testproggab", "MarkStrBody", env...)
+		want := "OK\n"
+		if output != want {
+			t.Errorf("expected %q got %v", want, output)
+		}
+	}
+}
+
+func TestGabMarkStrBodyWithAllocHeader(t *testing.T) {
+	for _, env := range getGABAllocStrHeaderEnvs() {
+		output := runTestProg(t, "testproggab", "MarkStrBodyWithAllocHeader", env...)
+		want := "OK\n"
+		if output != want {
+			t.Errorf("expected %q got %v", want, output)
+		}
+	}
+}
+
+func TestGabMarkStrBodyWriteBarrier(t *testing.T) {
+	output := runTestProg(t, "testproggab", "MarkStrBodyWriteBarrier",
+		"GODEBUG=gab=1", "GOGABOPT=gabStrHeaderAlloc=1")
+	want := "OK\n"
+	if output != want {
+		t.Errorf("expected %q got %v", want, output)
+	}
+}
+
+func TestGabMarkStrBodyConservative(t *testing.T) {
+	for _, env := range getGABAllocStrHeaderEnvs() {
+		output := runTestProg(t, "testproggab", "MarkStrBodyConservative", env...)
 		want := "OK\n"
 		if output != want {
 			t.Errorf("expected %q got %v", want, output)
@@ -207,11 +342,14 @@ func BenchmarkSmallGarbage(b *testing.B) {
 }
 
 func TestGabMaxCap(t *testing.T) {
+	if race.Enabled {
+		t.Skip("-race")
+	}
 	gabToCap := map[int]int{
-		-1: 0,
-		0:  0,
-		1:  16384,
-		//2:     16384, TODO balanced GC supports arm64
+		-1:    0,
+		0:     0,
+		1:     16384,
+		2:     16384,
 		1023:  16384,
 		1024:  1024,
 		1025:  1024,
@@ -304,9 +442,12 @@ func TestGabPolicyMemPercentLimit(t *testing.T) {
 			"GOGABOPT=evacuation=1",
 		},
 	}
+	want := "OK\n"
 	for _, env := range envs {
 		output := runTestProg(t, "testproggab", "MemoryPercentLimit", env...)
-		t.Logf("%s", output)
+		if !strings.HasSuffix(output, want) {
+			t.Errorf("%s", output)
+		}
 	}
 }
 
@@ -328,14 +469,49 @@ func TestGabHardMemoryLimit(t *testing.T) {
 			"GOGABOPT=evacuation=1",
 		},
 	}
-
+	want := "OK\n"
 	for _, env := range envs {
 		output := runTestProg(t, "testproggab", "GabHardMemPctLimit", env...)
-		t.Logf("%s", output)
+		if !strings.HasSuffix(output, want) {
+			t.Errorf("%s", output)
+		}
+	}
+}
+
+// testing for GAB threshold check when refilling GAB buffer
+func TestGabPausedThreshold(t *testing.T) {
+	maxHeap := 1 << 30
+	envs := [][]string{
+		{
+			fmt.Sprintf("MY_MEM_LIMIT=%d", maxHeap),
+			"GODEBUG=gab=1,gcHeapPercent=50",
+			"GOGABOPT=gabStrAlloc=1",
+		},
+		{
+			fmt.Sprintf("MY_MEM_LIMIT=%d", maxHeap),
+			"GODEBUG=gab=2,gcHeapPercent=50",
+			"GOGABOPT=gabStrAlloc=1",
+		},
+		{
+			fmt.Sprintf("MY_MEM_LIMIT=%d", maxHeap),
+			"GODEBUG=gab=2,gcHeapPercent=50",
+			"GOGABOPT=evacuation=1,gabStrAlloc=1",
+		},
+	}
+
+	want := "OK\n"
+	for _, env := range envs {
+		output := runTestProg(t, "testproggab", "GabPausedThreshold", env...)
+		if !strings.HasSuffix(output, want) {
+			t.Errorf("%s", output)
+		}
 	}
 }
 
 func TestGabDebugOpt(t *testing.T) {
+	if race.Enabled {
+		t.Skip("-race")
+	}
 	//valid percent values
 	pctToTest := []int64{1, 10, 20, 50, 90, 99}
 	for _, pct := range pctToTest {

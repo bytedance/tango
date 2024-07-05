@@ -699,6 +699,9 @@ func (sl *sweepLocked) sweep(preserve bool) bool {
 		if nfreed > 0 {
 			bytesFreed := uintptr(nfreed) * size
 			atomic.Xadduintptr(&gabUsedBytes, -bytesFreed)
+			if isGabDebugStatEnabled() && !s.spanclass.noscan() {
+				atomic.Xadduintptr(&gabStrHeaderUsedBytes, -bytesFreed)
+			}
 		}
 	}
 
@@ -715,7 +718,7 @@ func (sl *sweepLocked) sweep(preserve bool) bool {
 	// Those balanced GC off-heap memory still needs to be released
 	// when GAB allocator is used.
 	if isGabEnabled() && s.state.get() == mSpanInUse {
-		if s.isGab() {
+		if s.isNoScanGab() {
 			s.gabPinBits = nil
 			if isEvacEnabled() {
 				s.clrFreeObjStartBits()

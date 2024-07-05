@@ -1503,7 +1503,11 @@ func scanblock(b0, n0 uintptr, ptrmask *uint8, gcw *gcWork, stk *stackScanState)
 					} else {
 						if !tryDeferToSpanScan(p, gcw) {
 							if obj, span, objIndex := findObject(p, b, i); obj != 0 {
-								greyobject(obj, b, i, span, gcw, objIndex)
+								if span.isGab() && !span.spanclass.noscan() {
+									greyGabObject(obj, b, i, p, span, gcw, objIndex)
+								} else {
+									greyobject(obj, b, i, span, gcw, objIndex)
+								}
 								if isEvacEnabled() && span.doEvacuation() {
 									span.gabPinObj(obj)
 								}
@@ -1624,7 +1628,11 @@ func scanConservative(b, n uintptr, ptrmask *uint8, gcw *gcWork, state *stackSca
 		// val points to an allocated object. Mark it.
 		obj := span.base() + idx*span.elemsize
 		if !tryDeferToSpanScan(obj, gcw) {
-			greyobject(obj, b, i, span, gcw, idx)
+			if span.isGab() && !span.spanclass.noscan() {
+				greyGabObject(obj, b, i, val, span, gcw, idx)
+			} else {
+				greyobject(obj, b, i, span, gcw, idx)
+			}
 			if isEvacEnabled() && span.doEvacuation() {
 				span.gabPinObj(obj)
 			}
@@ -1641,7 +1649,11 @@ func shade(b uintptr) {
 	gcw := &getg().m.p.ptr().gcw
 	if !tryDeferToSpanScan(b, gcw) {
 		if obj, span, objIndex := findObject(b, 0, 0); obj != 0 {
-			greyobject(obj, 0, 0, span, gcw, objIndex)
+			if span.isGab() && !span.spanclass.noscan() {
+				greyGabObject(obj, 0, 0, b, span, gcw, objIndex)
+			} else {
+				greyobject(obj, 0, 0, span, gcw, objIndex)
+			}
 			if span != nil && isEvacEnabled() && span.doEvacuation() {
 				span.gabPinObj(obj)
 			}
@@ -1711,6 +1723,56 @@ func greyobject(obj, base, off uintptr, span *mspan, gcw *gcWork, objIndex uintp
 	// Queue the obj for scanning.
 	if !gcw.putObjFast(obj) {
 		gcw.putObj(obj)
+	}
+}
+
+// greyGabObject marks a string body referenced by a string header in a scan GAB.
+func greyGabObject(obj, base, off, src uintptr, span *mspan, gcw *gcWork, objIndex uintptr) {
+	if obj&(goarch.PtrSize-1) != 0 {
+		throw("greyGabObject: obj not pointer-aligned")
+	}
+	mbits := span.markBitsForIndex(objIndex)
+
+	if useCheckmark {
+		if setCheckmark(obj, base, off, mbits) {
+			return
+		}
+	} else {
+		baseAfterMallocHeader := span.base() + span.elemsize*objIndex + mallocHeaderSize
+		bodyPtrAddr := baseAfterMallocHeader +
+			(src-baseAfterMallocHeader)/gabStrHeaderObjSize*gabStrHeaderObjSize
+		bodyPtr := *(*uintptr)(unsafe.Pointer(bodyPtrAddr))
+		if bodyPtr != 0 {
+			// The reference to a string header may come from scanConservative,
+			// and pointing to a string header whose body has been freed.
+			// So before marking the string body, we should check the bodyPtr
+			// like scanConservative does.
+			if bodySpan := spanOfHeap(bodyPtr); bodySpan != nil && bodySpan.spanclass.noscan() {
+				bodyIndex := bodySpan.objIndex(bodyPtr)
+				bodyObj := bodySpan.base() + bodyIndex*bodySpan.elemsize
+				if !bodySpan.isFreeOrNewlyAllocated(bodyIndex) {
+					greyobject(bodyObj, base, src-base, bodySpan, gcw, bodyIndex)
+					if isEvacEnabled() && bodySpan.doEvacuation() {
+						if !bodySpan.isPinnedGab(bodyObj) {
+							getg().m.p.ptr().refsIn.enqueue(bodyPtrAddr)
+							updateMarkedGABObjects(bodySpan, bodyPtr, bodyObj)
+						}
+					}
+				}
+			}
+		}
+		if mbits.isMarked() {
+			return
+		}
+		mbits.setMarked()
+		arena, pageIdx, pageMask := pageIndexOf(span.base())
+		if arena.pageMarks[pageIdx]&pageMask == 0 {
+			atomic.Or8(&arena.pageMarks[pageIdx], pageMask)
+		}
+	}
+	gcw.bytesMarked += uint64(span.elemsize)
+	if isGabEnabled() {
+		gcw.gabMarked += uint64(span.elemsize)
 	}
 }
 

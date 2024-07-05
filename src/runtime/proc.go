@@ -4535,8 +4535,11 @@ func gdestroy(gp *g) {
 	gp.bubble = nil
 	gp.fipsOnlyBypass = false
 	gp.secret = 0
-	gp.ab.retire()
-	gp.strAB.retire()
+	if !isGabStrHeaderAllocEnabled() {
+		gp.ab.retire()
+		gp.strAB.retire()
+		gp.strHeaderAB.clear()
+	}
 
 	if gcBlackenEnabled != 0 && gp.gcAssistBytes > 0 {
 		// Flush assist credit to the global pool. This gives
@@ -5396,8 +5399,11 @@ func newproc1(fn *funcval, callergp *g, callerpc uintptr, parked bool, waitreaso
 	newg.ancestors = saveAncestors(callergp)
 	newg.startpc = fn.fn
 	newg.runningCleanups.Store(false)
-	newg.ab.clear()
-	newg.strAB.clear()
+	if !isGabStrHeaderAllocEnabled() {
+		newg.ab.clear()
+		newg.strAB.clear()
+		newg.strHeaderAB.clear()
+	}
 	if isSystemGoroutine(newg, false) {
 		sched.ngsys.Add(1)
 	} else {

@@ -18,6 +18,7 @@ var (
 	gabEnabled       *bool
 	gabUsedBytes     *uintptr
 	gabMemoryPercent *int32
+	gabThreshold     *uint64
 )
 
 //go:linkname getGabCap runtime.gabGetCap
@@ -37,6 +38,12 @@ func isGabPinned(p uintptr) bool
 
 //go:linkname dumpGABObject runtime.dbgDumpGABObject
 func dumpGABObject(label string, p uintptr) bool
+
+//go:linkname makeGabStrHeaderForWBTest runtime.dbgMakeGabStrHeaderForWBTest
+func makeGabStrHeaderForWBTest() (bodyPtr, headerPtr uintptr)
+
+//go:linkname gabStrHeaderBodyAddrNeedsMallocHeader runtime.dbgGabStrHeaderBodyAddrNeedsMallocHeader
+func gabStrHeaderBodyAddrNeedsMallocHeader(bodyPtr, headerPtr uintptr) bool
 
 func register(name string, f func()) {
 	if cmds[name] != nil {
@@ -65,6 +72,8 @@ func init() {
 			gab = value.(*int32)
 		} else if strings.HasPrefix(key, "runtime.gabEnabled,") {
 			gabEnabled = value.(*bool)
+		} else if strings.HasPrefix(key, "runtime.gabThreshold,") {
+			gabThreshold = value.(*uint64)
 		}
 	}
 }

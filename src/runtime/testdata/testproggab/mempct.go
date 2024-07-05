@@ -17,9 +17,11 @@ func init() {
 	register("MemoryPercentLimit", testMemPctLimit)
 	register("EchoMemoryPercent", echoGabMemoryPercent)
 	register("GabHardMemPctLimit", testGabHardMemPctLimit)
+	register("GabPausedThreshold", testGabPausedThreshold)
 }
 
 func testMemPctLimit() {
+	runtime.GC()
 	if !*gabEnabled {
 		panic("gabEnabled should have been turned on")
 	}
@@ -71,6 +73,7 @@ func testMemPctLimit() {
 	}
 	fmt.Println("gab turned on adaptively")
 	ballast[0] = 1
+	fmt.Println("OK")
 }
 
 func echoGabMemoryPercent() {
@@ -133,4 +136,52 @@ func testGabHardMemPctLimit() {
 		panic("gabEnabled should have been turned on by adaptive policy")
 	}
 	ballast[0] = 1
+	fmt.Println("OK")
+}
+
+func testGabPausedThreshold() {
+	// GAB should not pause before the heap size >= gabUsePolicyThreshold
+	// to make gab decision to take effects
+	ballast := make([]byte, 1<<25)
+	runtime.GC()
+
+	allocGrain := uintptr(128)
+	const workerNum = 5
+
+	refs := make([]map[unsafe.Pointer]struct{}, workerNum)
+	threshold := uintptr(*gabThreshold)
+
+	// make GAB memory exceeds the 10% of gabThreshold.
+	var gabAllocLimit = threshold * 11 / 10 / workerNum
+	var wg sync.WaitGroup
+	for i := 0; i < workerNum; i++ {
+		refs[i] = make(map[unsafe.Pointer]struct{})
+		wg.Add(1)
+		// allocation worker
+		go func(workerID int) {
+			defer wg.Done()
+			var workerAllocBytes uintptr
+			for workerAllocBytes < gabAllocLimit {
+				buf := make([]byte, allocGrain)
+				ptr := unsafe.Pointer(&buf)
+				refs[workerID][ptr] = struct{}{}
+				workerAllocBytes += allocGrain
+			}
+		}(i)
+	}
+	wg.Wait()
+	// GAB should have been turned off.
+	if *gabEnabled {
+		panic("gabEnabled should have been turned off by gabThreshold check")
+	}
+
+	refs = make([]map[unsafe.Pointer]struct{}, workerNum)
+	runtime.GC()
+	runtime.GC()
+	// GAB memory is released. GAB should have been turned on.
+	if !*gabEnabled {
+		panic("gabEnabled should have been turned on by adaptive policy")
+	}
+	ballast[0] = 1
+	fmt.Println("OK")
 }

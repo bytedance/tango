@@ -7,6 +7,7 @@ package runtime_test
 import (
 	"fmt"
 	"internal/abi"
+	"internal/race"
 	"internal/testenv"
 	"log"
 	"maps"
@@ -46,6 +47,9 @@ func TestGabGCALot(t *testing.T) {
 }
 
 func TestGabMemSim(t *testing.T) {
+	if race.Enabled {
+		t.Skip("-race")
+	}
 	var envs = [][]string{
 		{
 			"GODEBUG=gab=1,gctrace=1",
@@ -217,6 +221,9 @@ func TestGabFindBlockFast(t *testing.T) {
 	if !isEvacSupported() {
 		t.Skip("Skip balanced GC test on platforms other than linux/amd64 and darwin/amd64")
 	}
+	if race.Enabled {
+		t.Skip("-race")
+	}
 	maxHeap := 4 << 30
 	var envs = [][]string{
 		{
@@ -240,6 +247,9 @@ func TestGabFindBlockFast(t *testing.T) {
 func TestGabMarkStacks(t *testing.T) {
 	if !isEvacSupported() {
 		t.Skip("Skip balanced GC test on platforms other than linux/amd64 and darwin/amd64")
+	}
+	if race.Enabled {
+		t.Skip("-race")
 	}
 	var envs = [][]string{
 		{
@@ -460,6 +470,9 @@ func TestGabBalancedGC2GAB(t *testing.T) {
 func TestGabPacer(t *testing.T) {
 	if *flagQuick {
 		t.Skip("-quick")
+	}
+	if race.Enabled {
+		t.Skip("-race")
 	}
 	if !isEvacSupported() {
 		t.Skip("Skip balanced GC test on platforms other than linux/amd64 and darwin/amd64")
