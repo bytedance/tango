@@ -1,0 +1,63 @@
+# Test PGO optimizations/bug-fixes in Tango
+
+# this test rebuild runtime with different flags, skip in short mode
+[short] skip
+
+# generate cpu.prof
+go run test_recursive.go
+
+# build with PGO's default flow, checking diagnostics of the current package is sufficient
+go build -pgo ./cpu.prof -gcflags='-d=pgodebug=1' test_recursive.go
+stderr 'check allows inlining for call reflect.Value.Len'
+# to warn if upstream branch supports recursive inlining, someday
+! stderr 'check allows inlining for call reflect.Value.lenNonSlice'
+
+# build with the resursive enhancement flow
+go build -pgo ./cpu.prof -gcflags='-d=pgodebug=1,pgorecursive=1' test_recursive.go
+stderr 'check allows inlining for call reflect.Value.Len'
+stderr 'check allows inlining for call reflect.Value.lenNonSlice'
+
+-- prof --
+-- test_recursive.go --
+package main
+
+import (
+  "log"
+  "os"
+  "runtime/pprof"
+  "reflect"
+  "time"
+)
+
+func main() {
+  f, err := os.Create("cpu.prof")
+  if err != nil {
+    log.Fatal("fail to create CPU profile: ", err)
+  }
+  defer f.Close()
+
+  if err := pprof.StartCPUProfile(f); err != nil {
+    log.Fatal("fail to start CPU profile: ", err)
+  }
+  defer pprof.StopCPUProfile()
+
+  t := time.Now()
+  // approximately 1 second
+  benchStringLen(1000000*300)
+  d := time.Now().Sub(t)
+  log.Printf("total length: %d, cost: %v\n", total, d)
+}
+
+var v reflect.Value
+var s string
+var total int
+
+//go:noinline
+func benchStringLen(n int) {
+  s = "hello pgo"
+  v = reflect.ValueOf(s)
+
+  for i := 0; i < n; i++ {
+    total += v.Len()
+  }
+}

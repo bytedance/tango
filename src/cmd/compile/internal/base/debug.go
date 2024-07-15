@@ -82,6 +82,7 @@ type DebugFlags struct {
 	PGOInlineCDFThreshold string `help:"cumulative threshold percentage for determining call sites as hot candidates for inlining" concurrent:"ok"`
 	PGOInlineBudget       int    `help:"inline budget for hot functions" concurrent:"ok"`
 	PGODevirtualize       int    `help:"enable profile-guided devirtualization; 0 to disable, 1 to enable interface devirtualization, 2 to enable function devirtualization" concurrent:"ok"`
+	PGORecursive          int    `help:"enable recursive profile-guided inlining"`
 	PGOStackSize          int    `help:"enable profile-guided stack size adjustment"`
 	RangeFuncCheck        int    `help:"insert code to check behavior of range iterator functions" concurrent:"ok"`
 	VariableMakeHash      string `help:"hash value for debugging stack allocation of variable-sized make results" concurrent:"ok"`

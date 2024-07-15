@@ -1,6 +1,9 @@
 // Copyright 2023 The Go Authors. All rights reserved.
+// Copyright (c) 2024 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2024-07-15.
 
 // Package interleaved implements the interleaved devirtualization and
 // inlining pass.
@@ -61,7 +64,7 @@ func DevirtualizeAndInlinePackage(pkg *ir.Package, profile *pgoir.Profile) {
 			fmt.Printf("%v: function %v considered 'big'; reducing max cost of inlinees\n", ir.Line(fn), fn)
 		}
 
-		s := &inlClosureState{bigCaller: bigCaller, profile: profile, fn: fn, callSites: make(map[*ir.ParenExpr]bool), useCounts: calleeUseCounts}
+		s := &inlClosureState{bigCaller: bigCaller, profile: profile, fn: fn, callSites: make(map[*ir.ParenExpr]bool), useCounts: calleeUseCounts, recursiveCallers: make(map[*ir.ParenExpr]*ir.Func)}
 		s.parenthesize()
 		inlState[fn] = s
 
@@ -114,6 +117,7 @@ func DevirtualizeAndInlinePackage(pkg *ir.Package, profile *pgoir.Profile) {
 							if origCall, inlinedCall := s.edit(&state, i); inlinedCall != nil {
 								// Update AST and recursively mark nodes.
 								paren.X = inlinedCall
+								s.markCaller = inline.RecursiveMarkCallerMap[inlinedCall]
 								ir.EditChildren(inlinedCall, s.mark) // mark may append to parens
 								state.InlinedCall(s.fn, origCall, inlinedCall)
 								done = false
@@ -173,7 +177,7 @@ func DevirtualizeAndInlineFunc(fn *ir.Func, profile *pgoir.Profile) {
 			fmt.Printf("%v: function %v considered 'big'; reducing max cost of inlinees\n", ir.Line(fn), fn)
 		}
 
-		s := &inlClosureState{bigCaller: bigCaller, profile: profile, fn: fn, callSites: make(map[*ir.ParenExpr]bool), useCounts: make(map[*ir.Func]int)}
+		s := &inlClosureState{bigCaller: bigCaller, profile: profile, fn: fn, callSites: make(map[*ir.ParenExpr]bool), useCounts: make(map[*ir.Func]int), recursiveCallers: make(map[*ir.ParenExpr]*ir.Func)}
 		s.parenthesize()
 		s.fixpoint()
 		s.unparenthesize()
@@ -186,13 +190,15 @@ type callSite struct {
 }
 
 type inlClosureState struct {
-	fn        *ir.Func
-	profile   *pgoir.Profile
-	callSites map[*ir.ParenExpr]bool // callSites[p] == "p appears in parens" (do not append again)
-	resolved  []*ir.Func             // for each call in parens, the resolved target of the call
-	useCounts map[*ir.Func]int       // shared among all InlClosureStates
-	parens    []*ir.ParenExpr
-	bigCaller bool
+	fn               *ir.Func
+	profile          *pgoir.Profile
+	callSites        map[*ir.ParenExpr]bool // callSites[p] == "p appears in parens" (do not append again)
+	resolved         []*ir.Func             // for each call in parens, the resolved target of the call
+	useCounts        map[*ir.Func]int       // shared among all InlClosureStates
+	parens           []*ir.ParenExpr
+	bigCaller        bool
+	markCaller       *ir.Func                   // the recursive caller to record in recursiveCallers map when marking a sub call in body
+	recursiveCallers map[*ir.ParenExpr]*ir.Func // mapping a call site to its recursive caller
 }
 
 // resolve attempts to resolve a call to a potentially inlineable callee
@@ -235,6 +241,11 @@ func (s *inlClosureState) edit(state *devirtualize.State, i int) (*ir.CallExpr, 
 	callee, count := s.resolve(state, i)
 	if count <= 0 {
 		return nil, nil
+	}
+
+	recursiveCaller := s.recursiveCallers[s.parens[i]]
+	if recursiveCaller != nil && inline.PGORecursiveEnabled(recursiveCaller) {
+		inline.RecursiveCallSiteCallerMap[call] = recursiveCaller
 	}
 	if inlCall := inline.TryInlineCall(s.fn, call, s.bigCaller, s.profile, count == 1 && callee.ClosureParent != nil); inlCall != nil {
 		return call, inlCall
@@ -283,6 +294,7 @@ func (s *inlClosureState) mark(n ir.Node) ir.Node {
 		}
 
 		s.parens = append(s.parens, p)
+		s.recursiveCallers[p] = s.markCaller
 		n = p
 	} else if p != nil {
 		n = p // didn't change anything, restore n
@@ -336,6 +348,7 @@ func (s *inlClosureState) fixpoint() bool {
 				if origCall, inlinedCall := s.edit(&state, i); inlinedCall != nil {
 					// Update AST and recursively mark nodes.
 					paren.X = inlinedCall
+					s.markCaller = inline.RecursiveMarkCallerMap[inlinedCall]
 					ir.EditChildren(inlinedCall, s.mark) // mark may append to parens
 					state.InlinedCall(s.fn, origCall, inlinedCall)
 					done = false

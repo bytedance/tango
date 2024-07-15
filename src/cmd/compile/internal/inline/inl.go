@@ -90,6 +90,18 @@ var (
 	inlineClosureCalledOnceCost       = 10 * inlineMaxBudget // if a closure is just called once, inline it.
 )
 
+// RecursiveMarkCallerMap record the caller func of the CallExpr in a parent CallExpr's body
+// In another word, it maps the CallExpr to the callee func, and the callee func will be
+// the caller func of the CallExpr in its body.
+var RecursiveMarkCallerMap = make(map[ir.Node]*ir.Func)
+
+// RecursiveCallSiteCallerMap record the caller func of a CallExpr.
+var RecursiveCallSiteCallerMap = make(map[*ir.CallExpr]*ir.Func)
+
+func PGORecursiveEnabled(fn *ir.Func) bool {
+	return base.Debug.PGORecursive > 0 && types.RuntimeSymName(fn.Sym()) == ""
+}
+
 func IsPgoHotFunc(fn *ir.Func, profile *pgoir.Profile) bool {
 	if profile == nil {
 		return false
@@ -1001,8 +1013,13 @@ func inlineCostOK(n *ir.CallExpr, caller, callee *ir.Func, bigCaller, closureCal
 		}
 	}
 
-	lineOffset := pgoir.NodeLineOffset(n, caller)
-	csi := pgoir.CallSiteInfo{LineOffset: lineOffset, Caller: caller}
+	pfCaller := RecursiveCallSiteCallerMap[n]
+	if pfCaller == nil {
+		pfCaller = caller
+	}
+
+	lineOffset := pgoir.NodeLineOffset(n, pfCaller)
+	csi := pgoir.CallSiteInfo{LineOffset: lineOffset, Caller: pfCaller}
 	_, hot := candHotEdgeMap[csi]
 
 	if metric <= maxCost {
@@ -1250,6 +1267,8 @@ func mkinlcall(callerfn *ir.Func, n *ir.CallExpr, fn *ir.Func, bigCaller, closur
 	if inlheur.Enabled() {
 		inlheur.UpdateCallsiteTable(callerfn, n, res)
 	}
+
+	RecursiveMarkCallerMap[res] = fn
 
 	return res
 }
