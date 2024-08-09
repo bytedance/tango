@@ -77,6 +77,10 @@ func actionList(root *Action) []*Action {
 func (b *Builder) Do(ctx context.Context, root *Action) {
 	ctx, span := trace.StartSpan(ctx, "exec.Builder.Do ("+root.Mode+" "+root.Target+")")
 	defer span.Done()
+	defer func() {
+		b.ctHitCacheRate(ctx, span)
+		b.ctRecordCompilerInfo(ctx, span)
+	}()
 
 	if !b.IsCmdList {
 		// If we're doing real work, take time at the end to trim the cache.
@@ -749,6 +753,14 @@ func (b *Builder) build(ctx context.Context, a *Action) (err error) {
 	need &^= needCovMetaFile // handled by cover action
 	need &^= needCgoHdr      // handled by run cgo action // TODO: accumulate "negative" need bits from actions
 
+	a.traceCtx = ctx
+	defer func() {
+		if need == 0 {
+			b.ctRecordCacheByID(a, a.actionID, trace.CTHitPkgCache)
+		} else {
+			b.ctRecordCacheByID(a, a.actionID, trace.CTMissPkgCache)
+		}
+	}()
 	if need == 0 {
 		return
 	}
@@ -936,7 +948,11 @@ func (b *Builder) build(ctx context.Context, a *Action) (err error) {
 	// Compile Go.
 	objpkg := objdir + "_pkg_.a"
 	ofile, out, err := BuildToolchain.gc(b, a, objpkg, icfg.Bytes(), embedcfg, symabis, len(sfiles) > 0, pgoProfile, gofiles)
+	gcErr := err
 	if err := sh.reportCmd("", "", out, err); err != nil {
+		if gcErr != nil {
+			b.ctRecordCompilerError(ctx, a.traceSpan, gcErr.Error(), err.Error())
+		}
 		return err
 	}
 	if ofile != objpkg {
@@ -1088,6 +1104,7 @@ func (b *Builder) cacheObjdirFile(a *Action, c cache.Cache, name string) error {
 	}
 	defer f.Close()
 	_, _, err = c.Put(cache.Subkey(a.actionID, name), f)
+	b.ctRecordCacheByID(a, cache.Subkey(a.actionID, name), trace.CTMissOtherCache)
 	return err
 }
 
@@ -1096,6 +1113,7 @@ func (b *Builder) findCachedObjdirFile(a *Action, c cache.Cache, name string) (s
 	if err != nil {
 		return "", fmt.Errorf("loading cached file %s: %w", name, err)
 	}
+	b.ctRecordCacheByID(a, cache.Subkey(a.actionID, name), trace.CTHitOtherCache)
 	return file, nil
 }
 
@@ -1136,6 +1154,7 @@ func (b *Builder) cacheSrcFiles(a *Action, srcfiles []string) {
 		}
 	}
 	cache.PutBytes(c, cache.Subkey(a.actionID, "srcfiles"), buf.Bytes())
+	b.ctRecordCacheByID(a, cache.Subkey(a.actionID, "srcfiles"), trace.CTMissOtherCache)
 }
 
 func (b *Builder) loadCachedVet(a *Action, vetDeps []*Action) error {
@@ -1144,6 +1163,7 @@ func (b *Builder) loadCachedVet(a *Action, vetDeps []*Action) error {
 	if err != nil {
 		return fmt.Errorf("reading srcfiles list: %w", err)
 	}
+	b.ctRecordCacheByID(a, cache.Subkey(a.actionID, "srcfiles"), trace.CTHitOtherCache)
 	var srcfiles []string
 	for name := range strings.SplitSeq(string(list), "\n") {
 		if name == "" { // end of list
@@ -1168,6 +1188,7 @@ func (b *Builder) loadCachedCompiledGoFiles(a *Action) error {
 	if err != nil {
 		return fmt.Errorf("reading srcfiles list: %w", err)
 	}
+	b.ctRecordCacheByID(a, cache.Subkey(a.actionID, "srcfiles"), trace.CTHitOtherCache)
 	var gofiles []string
 	for name := range strings.SplitSeq(string(list), "\n") {
 		if name == "" { // end of list
@@ -1399,6 +1420,18 @@ func (b *Builder) vet(ctx context.Context, a *Action) error {
 		stdoutKey     = cache.Subkey(id, "stdout")  // for .stdout file
 		fixArchiveKey = cache.Subkey(id, "fix.zip") // for .fix.zip file
 	)
+
+	a.traceCtx = ctx
+	defer func() {
+		// When the vet cache is hit, a.built is the cache file,
+		// and the cache file has the suffix "-d". When the cache is not hit,
+		// a.built is vcfg.VetxOutput, and the suffix of vcfg.VetxOutput is "out".
+		if strings.HasSuffix(a.built, "-d") {
+			b.ctRecordCacheByID(a, id, trace.CTHitVetCache)
+		} else {
+			b.ctRecordCacheByID(a, id, trace.CTMissVetCache)
+		}
+	}()
 
 	// Check the cache; -a forces a rebuild.
 	if !cfg.BuildA {

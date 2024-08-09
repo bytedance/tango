@@ -342,6 +342,7 @@ func invoke(cmd *base.Command, args []string) {
 		}()
 	}
 
+	trace.CTCreateAndSetDebugTrace(cmd)
 	ctx := maybeStartTrace(context.Background())
 	ctx, span := trace.StartSpan(ctx, fmt.Sprint("Running ", cmd.Name(), " command"))
 	cmd.Run(ctx, cmd, args)
@@ -359,6 +360,7 @@ func mainUsage() {
 
 func maybeStartTrace(pctx context.Context) context.Context {
 	if cfg.DebugTrace == "" {
+		trace.CTSetDebugTrace()
 		return pctx
 	}
 

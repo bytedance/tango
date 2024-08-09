@@ -1,6 +1,9 @@
 // Copyright 2011 The Go Authors. All rights reserved.
+// Copyright (c) 2024 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2024-08-09.
 
 // Action graph creation (planning).
 
@@ -22,6 +25,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"cmd/go/internal/base"
@@ -64,6 +68,8 @@ type Builder struct {
 	toolIDCache    par.Cache[string, string] // tool name -> tool ID
 	gccToolIDCache map[string]string         // tool name -> tool ID
 	buildIDCache   map[string]string         // file name -> build ID
+	ctCacheHit     atomic.Int64
+	ctCacheMiss    atomic.Int64
 }
 
 // NOTE: Much of Action would not need to be exported if not for test.
@@ -126,6 +132,7 @@ type Action struct {
 	json         *actionJSON       // action graph information
 	nonGoOverlay map[string]string // map from non-.go source files to copied files in objdir. Nil if no overlay is used.
 	traceSpan    *trace.Span
+	traceCtx     context.Context
 }
 
 // BuildActionID returns the action ID section of a's build ID.

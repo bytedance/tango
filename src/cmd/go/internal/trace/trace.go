@@ -1,6 +1,9 @@
 // Copyright 2020 The Go Authors. All rights reserved.
+// Copyright (c) 2024 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2024-08-09.
 
 package trace
 
@@ -121,8 +124,9 @@ func (s *Span) Done() {
 type tracer struct {
 	file chan traceFile // 1-buffered
 
-	nextTID    atomic.Uint64
-	nextFlowID atomic.Uint64
+	nextTID     atomic.Uint64
+	nextFlowID  atomic.Uint64
+	nextCacheID uint64
 }
 
 func (t *tracer) writeEvent(ev *format.Event) error {
@@ -154,6 +158,13 @@ func (t *tracer) Close() error {
 	defer func() { t.file <- f }()
 
 	_, firstErr := f.f.WriteString("]")
+	// maybeStartTrace will add (*tracer).Close when exiting. If an error occurs in (*tracer).Close,
+	// base.Fatal will be called, and the program continues to exit and call (*tracer).Close,
+	// thus entering a dead loop. We don't want this consequence of this feature,
+	// so it's okay to silently ignore the error directly.
+	if err := ctSortFile(f); err != nil {
+		return nil
+	}
 	if err := f.f.Close(); firstErr == nil {
 		firstErr = err
 	}
