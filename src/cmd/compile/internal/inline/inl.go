@@ -415,6 +415,14 @@ func InlineImpossible(fn *ir.Func) string {
 		return reason
 	}
 
+	if base.Flag.Cfg.BeastOpt.FmtRewrite != 0 {
+		sym := fn.Sym()
+		if (sym.Pkg.Path == "fmt" || sym.Pkg == types.LocalPkg && base.Ctxt.Pkgpath == "fmt") && sym.Name == "Sprintf" {
+			reason = "fmt.Sprintf can expand in later pass"
+			return reason
+		}
+	}
+
 	return ""
 }
 

@@ -255,10 +255,18 @@ var runtimeDecls = [...]struct {
 	{"asanregisterglobals", funcTag, 136},
 	{"KeepAlive", funcTag, 11},
 	{"gabInliningEnabled", varTag, 6},
+	{"fmt_bool", funcTag, 166},
+	{"fmt_itoa", funcTag, 169},
+	{"fmt_uitoa", funcTag, 170},
+	{"fmt_hex", funcTag, 169},
+	{"fmt_uhex", funcTag, 170},
+	{"fmt_stringcopy", funcTag, 171},
+	{"fmt_stringer", funcTag, 172},
+	{"fmt_error", funcTag, 172},
 }
 
 func runtimeTypes() []*types.Type {
-	var typs [166]*types.Type
+	var typs [173]*types.Type
 	typs[0] = types.ByteType
 	typs[1] = types.NewPtr(typs[0])
 	typs[2] = types.Types[types.TANY]
@@ -425,6 +433,13 @@ func runtimeTypes() []*types.Type {
 	typs[163] = newSig(params(typs[30], typs[30], typs[15]), nil)
 	typs[164] = types.NewArray(typs[0], 16)
 	typs[165] = newSig(params(typs[7], typs[67], typs[164], typs[30], typs[13], typs[71], typs[71]), params(typs[67]))
+	typs[166] = newSig(params(typs[6]), params(typs[30]))
+	typs[167] = types.NewArray(typs[0], 24)
+	typs[168] = types.NewPtr(typs[167])
+	typs[169] = newSig(params(typs[168], typs[22]), params(typs[30]))
+	typs[170] = newSig(params(typs[168], typs[24]), params(typs[30]))
+	typs[171] = newSig(params(typs[30]), params(typs[30]))
+	typs[172] = newSig(params(typs[2]), params(typs[30]))
 	return typs[:]
 }
 

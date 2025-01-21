@@ -75,6 +75,10 @@ type I int
 
 func (i I) String() string { return Sprintf("<%d>", int(i)) }
 
+type E int
+
+func (e E) Error() string { return Sprintf("errno(%d)", int(e)) }
+
 type B struct {
 	I I
 	j int
@@ -726,6 +730,16 @@ var fmtTests = []struct {
 	{"%d", I(23), `23`},
 	// Stringer applies to the extracted value.
 	{"%s", reflect.ValueOf(I(23)), `<23>`},
+
+	// error
+	{"%v", E(23), `errno(23)`},
+	{"%s", E(23), `errno(23)`},
+	{"%q", E(23), `"errno(23)"`},
+	{"%x", E(23), `6572726e6f28323329`},
+	{"%#x", E(23), `0x6572726e6f28323329`},
+	{"%# x", E(23), `0x65 0x72 0x72 0x6e 0x6f 0x28 0x32 0x33 0x29`},
+	{"%d", E(23), `23`},
+	{"%s", reflect.ValueOf(E(23)), `errno(23)`},
 
 	// go syntax
 	{"%#v", A{1, 2, "a", []int{1, 2}}, `fmt_test.A{i:1, j:0x2, s:"a", x:[]int{1, 2}}`},

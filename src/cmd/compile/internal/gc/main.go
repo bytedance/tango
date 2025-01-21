@@ -1,6 +1,9 @@
 // Copyright 2009 The Go Authors. All rights reserved.
+// Copyright (c) 2025 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2025-01-21.
 
 package gc
 
@@ -13,6 +16,7 @@ import (
 	"cmd/compile/internal/deadlocals"
 	"cmd/compile/internal/dwarfgen"
 	"cmd/compile/internal/escape"
+	"cmd/compile/internal/fmtrewrite"
 	"cmd/compile/internal/inline"
 	"cmd/compile/internal/inline/interleaved"
 	"cmd/compile/internal/ir"
@@ -252,9 +256,11 @@ func Main(archInit func(*ssagen.ArchInfo)) {
 
 	noder.MakeWrappers(typecheck.Target) // must happen after inlining
 
+	fmtrewrite.Init()
 	// Get variable capture right in for loops.
 	var transformed []loopvar.VarAndLoop
 	for _, fn := range typecheck.Target.Funcs {
+		fmtrewrite.RewriteSprintf(fn)
 		transformed = append(transformed, loopvar.ForCapture(fn)...)
 	}
 	ir.CurFunc = nil

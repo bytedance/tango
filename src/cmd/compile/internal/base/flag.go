@@ -157,6 +157,7 @@ type CmdFlags struct {
 			Verbose       int
 			MakeSliceCopy int
 			AmdVersion    int
+			FmtRewrite    int
 		}
 	}
 }
@@ -170,6 +171,7 @@ func parseBeastOption(beastStr string) {
 		"amdver":        &Flag.Cfg.BeastOpt.AmdVersion,
 		"verbose":       &Flag.Cfg.BeastOpt.Verbose,
 		"makeslicecopy": &Flag.Cfg.BeastOpt.MakeSliceCopy,
+		"fmtrewrite":    &Flag.Cfg.BeastOpt.FmtRewrite,
 	}
 	for oname, val := range flag_beast.ParseBeastArguments(beastStr) {
 		if opt, ok := beastVars[oname]; ok {

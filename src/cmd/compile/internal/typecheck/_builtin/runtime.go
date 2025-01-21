@@ -316,3 +316,13 @@ func KeepAlive(interface{})
 
 // gab
 var gabInliningEnabled bool
+
+// sprintf
+func fmt_bool(bool) string
+func fmt_itoa(*[24]byte, int64) string
+func fmt_uitoa(*[24]byte, uint64) string
+func fmt_hex(*[24]byte, int64) string
+func fmt_uhex(*[24]byte, uint64) string
+func fmt_stringcopy(string) string
+func fmt_stringer(any) string
+func fmt_error(any) string
