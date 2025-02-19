@@ -1,6 +1,9 @@
 // Copyright 2020 The Go Authors. All rights reserved.
+// Copyright (c) 2025 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2025-02-19.
 
 package metrics
 
@@ -224,6 +227,13 @@ var allDesc = []Description{
 			"to approximate finalizer queue length. Useful for detecting slow finalizers holding up the queue.",
 		Kind:       KindUint64,
 		Cumulative: true,
+	},
+	{
+		Name: "/gc/gcadaptive/throughput:percent",
+		Description: "GC throughput is defined as the proportion of time spent executing " +
+			"user code relative to the total time, including user execution time, GC time, " +
+			"and memory scavenging time.",
+		Kind: KindFloat64,
 	},
 	{
 		Name: "/gc/gogc:percent",

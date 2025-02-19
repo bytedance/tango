@@ -1,6 +1,9 @@
 // Copyright 2020 The Go Authors. All rights reserved.
+// Copyright (c) 2025 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2025-02-19.
 
 // Note: run 'go generate' (which will run 'go test -generate') to update the "Supported metrics" list.
 //go:generate go test -run=Docs -generate
@@ -172,6 +175,11 @@ Below is the full list of supported metrics, ordered lexicographically.
 		Subtract from /gc/finalizers/executed:finalizers to approximate
 		finalizer queue length. Useful for detecting slow finalizers
 		holding up the queue.
+
+	/gc/gcadaptive/throughput:percent
+		GC throughput is defined as the proportion of time spent
+		executing user code relative to the total time, including user
+		execution time, GC time, and memory scavenging time.
 
 	/gc/gogc:percent
 		Heap size target percentage configured by the user, otherwise

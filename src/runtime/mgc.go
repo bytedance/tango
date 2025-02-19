@@ -189,7 +189,10 @@ func gcinit() {
 	// Initialize GC pacer state.
 	// Use the environment variable GOGC for the initial gcPercent value.
 	// Use the environment variable GOMEMLIMIT for the initial memoryLimit value.
-	gcController.init(readGOGC(), readGOMEMLIMIT())
+	goGC, goMemLimit := readGOGC(), readGOMEMLIMIT()
+	gcController.init(goGC, goMemLimit)
+	// Initialize GC adaptive controller state.
+	gcAdaptiveController.init(goGC, readGOGCUPPERLIMIT(), readGOGCTHPRATIO(), goMemLimit)
 
 	// Set up the cleanup block ptr mask.
 	for i := range cleanupBlockPtrMask {
@@ -1438,9 +1441,11 @@ func gcMarkTermination(stw worldStop) {
 	// Record heapInUse for scavenger.
 	memstats.lastHeapInUse = gcController.heapInUse.load()
 
-	// Update GC trigger and pacing, as well as downstream consumers
-	// of this pacing information, for the next cycle.
-	systemstack(gcControllerCommit)
+	if !gcAdaptiveController.gcAdaptiveEnabled {
+		// Update GC trigger and pacing, as well as downstream consumers
+		// of this pacing information, for the next cycle.
+		systemstack(gcControllerCommit)
+	}
 
 	// Update timing memstats
 	now := nanotime()
@@ -1468,6 +1473,19 @@ func gcMarkTermination(stw worldStop) {
 	// Compute overall GC CPU utilization.
 	// Omit idle marking time from the overall utilization here since it's "free".
 	memstats.gc_cpu_fraction = float64(work.cpuStats.GCTotalTime-work.cpuStats.GCIdleTime) / float64(work.cpuStats.TotalTime)
+	// Update overall GC Throughput.
+	cpuStatusExtend.computeGCThroughput()
+
+	// Adjustment of gc percent in adaptGCThroughput must be called before gcControllerCommit.
+	if gcAdaptiveController.gcAdaptiveEnabled {
+		gcAdaptiveController.adaptGCThroughput()
+		// Update GC trigger and pacing, as well as downstream consumers
+		// of this pacing information, for the next cycle.
+		systemstack(gcControllerCommit)
+	}
+
+	// Update adaptive gc throughput control enable flag.
+	gcAdaptiveSwitch()
 
 	// Reset assist time and background time stats.
 	//
@@ -1606,7 +1624,6 @@ func gcMarkTermination(stw worldStop) {
 	// we're trying to print.
 	if debug.gctrace > 0 {
 		util := int(memstats.gc_cpu_fraction * 100)
-
 		var sbuf [24]byte
 		printlock()
 		print("gc ", memstats.numgc,
@@ -1616,6 +1633,9 @@ func gcMarkTermination(stw worldStop) {
 			print(" (checking for goroutine leaks)")
 		}
 		print(": ")
+		if debug.gcadaptivetrace == 1 {
+			print(int(cpuStatusExtend.gcThroughput.Load()), "%: ")
+		}
 		prev := work.tSweepTerm
 		for i, ns := range []int64{work.tMark, work.tMarkTerm, work.tEnd} {
 			if i != 0 {

@@ -2227,3 +2227,103 @@ func gcReadPolicyLocked() (gogc int, maxHeapOut int64, goal uint64) {
 func GetGIdInternal() int64 {
 	return getGId()
 }
+
+const (
+	// Allowable error margin for GC throughput, within -0.75% ~ +0.75%
+	GCThroughputTolerance = 0.0075
+	// Minimum step size for GO GC adjustment (5%)
+	MinGOGCAdjustmentStep = 0.10
+	// Maximum step size for GO GC adjustment (45%)
+	MaxGOGCAdjustmentStep = 0.40
+	// Base value for GC throughput delta calculation
+	GCThroughputDeltaBase = 30.0
+)
+
+func ComputeGCThroughput(userTime, totalTime int64) float64 {
+	return computeGCThroughput(userTime, totalTime)
+}
+
+func ComputeAdjustmentStep(delta float64, base float64) float64 {
+	return calculateAdjustmentStep(delta, base)
+}
+
+// adaptive gc test.
+func BoundGCPercent(gcPercent int32) int32 {
+	return gcAdaptiveController.boundGCPercent(gcPercent)
+}
+
+func CheckGCAdaptiveIsEnabled() bool {
+	return gcAdaptiveController.gcAdaptiveEnabled
+}
+
+func CheckGCIsStable() bool {
+	return gcAdaptiveController.gcStable
+}
+
+func InitialGCPercent() int32 {
+	return gcAdaptiveController.initialGCPercent
+}
+
+func InitialMemoryLimit() int64 {
+	return gcAdaptiveController.initialMemoryLimit
+}
+
+func GCAdaptiveGOGCUpperLimit() int32 {
+	return gcAdaptiveController.gcGOGCUpperLimit
+}
+
+func GCAdaptiveGOGCLowerLimit() int32 {
+	return gcAdaptiveController.gcGOGCLowerLimit
+}
+
+func GCThroughputGoal() float64 {
+	return gcAdaptiveController.gcThroughputGoal
+}
+
+func LatestGCThroughputGoal() float64 {
+	return gcAdaptiveController.latestGcThroughputGoal
+}
+
+func GCThroughputUpperGoal() float64 {
+	return gcAdaptiveController.upperBoundGoal
+}
+
+func GCThroughputLowerGoal() float64 {
+	return gcAdaptiveController.lowerBoundGoal
+}
+
+func GCThroughputRatio() float64 {
+	return gcAdaptiveController.gcThroughputRatio
+}
+
+func GCThroughputEMA() float64 {
+	return gcAdaptiveController.gcThroughputEMA
+}
+
+func GetGCPercent() int32 {
+	return gcController.gcPercent.Load()
+}
+
+func GetGCNum() uint32 {
+	return memstats.numgc
+}
+
+func GCAdaptiveDefaultGCPercent() int32 {
+	return defaultGCPercent
+}
+
+func SetGCAdaptiveEnabled(flag int32) {
+	setGCAdaptive(flag == 1)
+}
+
+func SetGCThroughputGoal(goal float64) {
+	setGCThroughputGoal(goal)
+}
+
+func GetGCThroughputRatio() float64 {
+	return cpuStatusExtend.gcThroughput.Load()
+}
+
+func ReadGOGCUPPERLIMIT() int32 {
+	return readGOGCUPPERLIMIT()
+}

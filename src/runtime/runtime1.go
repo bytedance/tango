@@ -371,6 +371,9 @@ var debug struct {
 	// tracebacklabels controls the inclusion of goroutine labels in the
 	// goroutine status header line.
 	tracebacklabels atomic.Int32
+
+	gcadaptive      int32
+	gcadaptivetrace int32
 }
 
 var dbgvars = []*dbgVar{
@@ -411,6 +414,8 @@ var dbgvars = []*dbgVar{
 	{name: "gab", value: &debug.gab},
 	{name: "gcHeapPercent", value: &debug.gcHeapPercent},
 	{name: "largealloctrace", value: &debug.largealloctrace},
+	{name: "gcadaptive", value: &debug.gcadaptive},
+	{name: "gcadaptivetrace", value: &debug.gcadaptivetrace},
 }
 
 func parseRuntimeDebugVars(godebug string) {

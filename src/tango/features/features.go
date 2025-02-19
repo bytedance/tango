@@ -23,6 +23,7 @@ var featuresVersion map[string]string
 const (
 	featureBalancedgc = "balancedgc"
 	featureMaxheap    = "maxheap"
+	featureGCAdaptive = "gcadaptive"
 	featureGab        = "gab"
 	featureBeastmode  = "beastmode"
 	featureDynconf    = "pprof/dynconf"
@@ -60,6 +61,7 @@ func initFeatures() {
 	featuresVersion = make(map[string]string, featureCount)
 	featuresVersion[featureBalancedgc] = "1.0"
 	featuresVersion[featureMaxheap] = "1.0"
+	featuresVersion[featureGCAdaptive] = "1.0"
 	featuresVersion[featureGab] = "1.0"
 	featuresVersion[featureBeastmode] = "1.1"
 	featuresVersion[featureDynconf] = "1.3"
@@ -104,6 +106,9 @@ func (t *tangoInstance) AllFeatures() map[string]interface{} {
 				return isBalanceGcEnabled()
 			}),
 			featureMaxheap: newMaxHeapInstance(),
+			featureGCAdaptive: newFeatureInstance(featureGCAdaptive, func() bool {
+				return isGCAdaptiveEnabled()
+			}),
 			featureGab: newFeatureInstance(featureGab, func() bool {
 				return isGabEnabled()
 			}),

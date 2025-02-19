@@ -9,6 +9,7 @@ import "unsafe"
 // This variable ignores the atomic inherency of atomic.Int32
 var ptrGCPercent *int32 = (*int32)(unsafe.Pointer(&gcController.gcPercent))
 var ptrMemoryLimit *int64 = (*int64)(unsafe.Pointer(&gcController.memoryLimit))
+var ptrGcThrptGoal *float64 = (*float64)(unsafe.Pointer(&gcAdaptiveController.latestGcThroughputGoal))
 
 var pgoSource string
 
@@ -23,24 +24,27 @@ func setPGOSource(value string) {
 }
 
 var rtCfgMap = map[string]any{
-	"runtime.gab,ro":              &debug.gab,
-	"runtime.gabUsedBytes,ro":     &gabUsedBytes,
-	"runtime.gabThreshold,ro":     &gabState.gabMemLimit,
-	"runtime.gabMemoryPercent,rw": &gabMemoryPercent,
-	"runtime.gabEnabled,ro":       &gabEnabled,
-	"runtime.gctrace,rw":          &debug.gctrace,
-	"runtime.buildVersion,ro":     &buildVersion,
-	"runtime.tangoVersion,ro":     &tangoVersion,
-	"runtime.pgoSource,ro":        &pgoSource,
-	"runtime.gcPercent,ro":        ptrGCPercent,
-	"runtime.asyncpreemptoff,ro":  &debug.asyncpreemptoff,
-	"runtime.madvdontneed,ro":     &debug.madvdontneed,
-	"runtime.harddecommit,ro":     &debug.harddecommit,
-	"runtime.beastFlag,ro":        &beastFlag,
-	"runtime.optMode,ro":          &optMode,
-	"runtime.maxHeapBytes,ro":     &maxHeap,
-	"runtime.largeAllocTrace,rw":  &debug.largealloctrace,
-	"runtime.memoryLimit,ro":      ptrMemoryLimit,
+	"runtime.gab,ro":                 &debug.gab,
+	"runtime.gabUsedBytes,ro":        &gabUsedBytes,
+	"runtime.gabThreshold,ro":        &gabState.gabMemLimit,
+	"runtime.gabMemoryPercent,rw":    &gabMemoryPercent,
+	"runtime.gabEnabled,ro":          &gabEnabled,
+	"runtime.gctrace,rw":             &debug.gctrace,
+	"runtime.buildVersion,ro":        &buildVersion,
+	"runtime.tangoVersion,ro":        &tangoVersion,
+	"runtime.optMode,ro":             &optMode,
+	"runtime.pgoSource,ro":           &pgoSource,
+	"runtime.gcPercent,ro":           ptrGCPercent,
+	"runtime.maxHeapBytes,ro":        &maxHeap,
+	"runtime.largeAllocTrace,rw":     &debug.largealloctrace,
+	"runtime.asyncpreemptoff,ro":     &debug.asyncpreemptoff,
+	"runtime.madvdontneed,ro":        &debug.madvdontneed,
+	"runtime.harddecommit,ro":        &debug.harddecommit,
+	"runtime.memoryLimit,ro":         ptrMemoryLimit,
+	"runtime.beastFlag,ro":           &beastFlag,
+	"runtime.gcadaptivetrace,rw":     &debug.gcadaptivetrace,
+	"runtime.gcadaptive,rw":          &debug.gcadaptive,
+	"runtime.gcadaptiveThrptGoal,rw": ptrGcThrptGoal,
 }
 
 //go:linkname rtCfgListAll

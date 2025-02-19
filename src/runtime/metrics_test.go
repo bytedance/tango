@@ -1,6 +1,9 @@
 // Copyright 2020 The Go Authors. All rights reserved.
+// Copyright (c) 2025 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2025-02-19.
 
 package runtime_test
 
@@ -57,6 +60,8 @@ func TestReadMetrics(t *testing.T) {
 	var mstats runtime.MemStats
 	_, samples := prepareAllMetricsSamples()
 	runtime.ReadMetricsSlow(&mstats, unsafe.Pointer(&samples[0]), len(samples), cap(samples))
+	// Read GC Throughput for check.
+	gcThroughput := runtime.GetGCThroughputRatio()
 
 	checkUint64 := func(t *testing.T, m string, got, want uint64) {
 		t.Helper()
@@ -175,6 +180,10 @@ func TestReadMetrics(t *testing.T) {
 			checkUint64(t, name, samples[i].Value.Uint64(), mstats.NextGC)
 		case "/gc/gogc:percent":
 			checkUint64(t, name, samples[i].Value.Uint64(), uint64(gcPercent))
+		case "/gc/gcadaptive/throughput:percent":
+			if metricGCThroughput := samples[i].Value.Float64(); !withinEpsilon(metricGCThroughput, gcThroughput, 0.02) {
+				t.Errorf("gc throughput not within 2%% by metric reading: %f vs. %f", metricGCThroughput, gcThroughput)
+			}
 		case "/gc/cycles/automatic:gc-cycles":
 			checkUint64(t, name, samples[i].Value.Uint64(), uint64(mstats.NumGC-mstats.NumForcedGC))
 		case "/gc/cycles/forced:gc-cycles":

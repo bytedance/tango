@@ -1007,7 +1007,10 @@ func (c *gcControllerState) heapGoalInternal() (goal, minTrigger uint64) {
 	goal = c.gcPercentHeapGoal.Load()
 
 	// Check if the memory-limit-based goal is smaller, and if so, pick that.
-	if newGoal := c.memoryLimitHeapGoal(); newGoal < goal || setMaxHeapEnabled() {
+	if newGoal := c.memoryLimitHeapGoal(); newGoal < goal || (setMaxHeapEnabled() && !gcAdaptiveController.gcAdaptiveEnabled) {
+		// If max heap and adaptive gc throughput control are both enabled, we still
+		// use gc percent to determine the goal. Max heap is a soft memory limit to
+		// avoid OOM.
 		goal = newGoal
 	} else {
 		// We're not limited by the memory limit goal, so perform a series of
@@ -1370,6 +1373,12 @@ func (c *gcControllerState) setGCPercent(in int32) int32 {
 
 //go:linkname setGCPercent runtime/debug.setGCPercent
 func setGCPercent(in int32) (out int32) {
+	// if gc adaptive is enabled, we should avoid gc percent setting
+	// by some third party library, such as gctuner.
+	if isGCAdaptiveEnabled() {
+		out = gcController.gcPercent.Load()
+		return
+	}
 	// Run on the system stack since we grab the heap lock.
 	systemstack(func() {
 		lock(&mheap_.lock)

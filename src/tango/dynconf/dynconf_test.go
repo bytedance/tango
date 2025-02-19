@@ -71,6 +71,23 @@ func TestPprofDynconfWithDefaultEnv(t *testing.T) {
 	listAndCheck(t, expectedStrings, "")
 }
 
+func TestPprofDynconfWithGCAdaptiveEnv(t *testing.T) {
+	clear := buildAndRunDynconfServer(t, nil, []string{
+		"GODEBUG=gctrace=1,gcadaptive=1,gcadaptivetrace=1",
+		"GOGC=off",
+		"GOMEMLIMIT=4294967296",
+	})
+	defer clear()
+	expectedStrings := []string{
+		"config(rw): runtime.gctrace=1",
+		"config(rw): runtime.gcadaptive=1",
+		"config(rw): runtime.gcadaptivetrace=1",
+		"config(ro): runtime.gcPercent=100",
+		"config(ro): runtime.memoryLimit=4294967296",
+	}
+	listAndCheck(t, expectedStrings, "")
+}
+
 // retrieve the default expected values of dynconf
 func getExpectedCfgs(local bool) map[string]any {
 	expectedCfgs := map[string]any{
@@ -89,6 +106,8 @@ func getExpectedCfgs(local bool) map[string]any {
 		"runtime.optMode":          "default",
 		"runtime.pgoSource":        "none",
 		"runtime.memoryLimit":      int64(math.MaxInt64),
+		"runtime.gcadaptive":       int32(0),
+		"runtime.gcadaptivetrace":  int32(0),
 	}
 
 	if local {
@@ -138,6 +157,8 @@ func testList(t *testing.T) {
 		"config(rw): runtime.gabMemoryPercent=20",
 		"config(ro): runtime.gabEnabled=false",
 		"config(rw): runtime.gctrace=0",
+		"config(rw): runtime.gcadaptive=0",
+		"config(rw): runtime.gcadaptivetrace=0",
 		"config(ro): runtime.buildVersion=",
 		"config(ro): runtime.tangoVersion=bm.1.",
 		"config(ro): runtime.pgoSource=none",
@@ -233,6 +254,27 @@ func testIntOverflow(t *testing.T) {
 			"Request failed",
 			"Failed: int overflow, skip setting runtime.gctrace=17523466567680",
 		}, t)
+
+	// 17523466567680=0xFF000000000 which overflows int32
+	s, e = postCmd("set", "runtime.gcadaptivetrace=17523466567680")
+	if e != nil {
+		t.Fatalf("Failed to postCmd set, error=%v\n", e)
+	}
+	shouldContains(s,
+		[]string{
+			"Request failed",
+			"Failed: int overflow, skip setting runtime.gcadaptivetrace=17523466567680",
+		}, t)
+
+	s, e = postCmd("set", "runtime.gcadaptive=17523466567680")
+	if e != nil {
+		t.Fatalf("Failed to postCmd set, error=%v\n", e)
+	}
+	shouldContains(s,
+		[]string{
+			"Request failed",
+			"Failed: int overflow, skip setting runtime.gcadaptive=17523466567680",
+		}, t)
 }
 
 func testSetGetEquals(t *testing.T) {
@@ -247,6 +289,45 @@ func testSetGetEquals(t *testing.T) {
 	ig := getInt64Value(t, key)
 	if ig != iv {
 		t.Fatalf("get: %s=%d, but expecting %d", key, ig, iv)
+	}
+
+	key = "runtime.gcadaptivetrace"
+	iv = int64(rand.Int() % 128)
+	s, e = postCmd("set", fmt.Sprintf("%s=%d", key, iv))
+	if e != nil {
+		t.Fatalf("Failed to postCmd set, error=%v\n", e)
+	}
+	shouldContains(s, []string{fmt.Sprintf("Successful: %s=%d", key, iv)}, t)
+
+	ig = getInt64Value(t, key)
+	if ig != iv {
+		t.Fatalf("get: %s=%d, but expecting %d", key, ig, iv)
+	}
+
+	key = "runtime.gcadaptive"
+	iv = int64(rand.Int() % 128)
+	s, e = postCmd("set", fmt.Sprintf("%s=%d", key, iv))
+	if e != nil {
+		t.Fatalf("Failed to postCmd set, error=%v\n", e)
+	}
+	shouldContains(s, []string{fmt.Sprintf("Successful: %s=%d", key, iv)}, t)
+
+	ig = getInt64Value(t, key)
+	if ig != iv {
+		t.Fatalf("get: %s=%d, but expecting %d", key, ig, iv)
+	}
+
+	key = "runtime.gcadaptiveThrptGoal"
+	fiv := float64(rand.Int()%128) / 10.0
+	s, e = postCmd("set", fmt.Sprintf("%s=%s", key, strconv.FormatFloat(fiv, 'g', -1, 64)))
+	if e != nil {
+		t.Fatalf("Failed to postCmd set, error=%v\n", e)
+	}
+	shouldContains(s, []string{fmt.Sprintf("Successful: %s=%v", key, fiv)}, t)
+
+	fig := getFloat64Value(t, key)
+	if fig != fiv {
+		t.Fatalf("get: %s=%v, but expecting %v", key, fig, fiv)
 	}
 }
 
@@ -314,6 +395,19 @@ func getInt64Value(t *testing.T, k string) int64 {
 	}
 	s = strings.TrimSpace(strings.Split(s, "=")[1])
 	iv, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		t.Fatalf("Failed to parse: %s", s)
+	}
+	return iv
+}
+
+func getFloat64Value(t *testing.T, k string) float64 {
+	s, err := postCmd("get", k)
+	if err != nil {
+		t.Fatalf("Failed to postCmd get, error=%v\n", err)
+	}
+	s = strings.TrimSpace(strings.Split(s, "=")[1])
+	iv, err := strconv.ParseFloat(s, 64)
 	if err != nil {
 		t.Fatalf("Failed to parse: %s", s)
 	}

@@ -328,6 +328,12 @@ func initMetrics() {
 				out.scalar = gcController.heapMarked
 			},
 		},
+		"/gc/gcadaptive/throughput:percent": {
+			compute: func(in *statAggregate, out *metricValue) {
+				out.kind = metricKindFloat64
+				out.scalar = float64bits(cpuStatusExtend.gcThroughput.Load())
+			},
+		},
 		"/gc/heap/objects:objects": {
 			deps: makeStatDepSet(heapStatsDep),
 			compute: func(in *statAggregate, out *metricValue) {

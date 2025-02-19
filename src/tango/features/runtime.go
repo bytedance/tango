@@ -12,6 +12,9 @@ func setMaxHeapEnabled() bool
 //go:linkname gcSetMaxHeap runtime.gcSetMaxHeap
 func gcSetMaxHeap(bytes int64) int64
 
+//go:linkname isGCAdaptiveEnabled runtime.isGCAdaptiveEnabled
+func isGCAdaptiveEnabled() bool
+
 //go:linkname isBalanceGcEnabled runtime.isEvacEnabled
 func isBalanceGcEnabled() bool
 
