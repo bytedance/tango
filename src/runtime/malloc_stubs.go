@@ -85,15 +85,22 @@ func mallocStub(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 	// as content changes of byte slice.
 	//
 	// gabMaxAllocSize should always be aligned to goarch.PtrSize
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = elemsize_
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	// It's possible for any malloc to trigger sweeping, which may in

@@ -4,7 +4,7 @@
 
 package runtime
 
-import "internal/runtime/strconv"
+import "internal/strconv"
 
 const (
 	// GAB evacuation reasons
@@ -53,7 +53,7 @@ var gabState gabAllocState
 func (gs *gabAllocState) init() {
 	// Get pod memory limit.
 	if mem := gogetenv("MY_MEM_LIMIT"); mem != "" {
-		if memLimit, ok := strconv.Atoi(mem); ok && memLimit > 0 {
+		if memLimit, err := strconv.Atoi(mem); (err == nil) && memLimit > 0 {
 			gs.gabMemHardLimit = uint64(memLimit) * gabDefaultPodMemoryPercent / 100
 		}
 	}

@@ -42,7 +42,7 @@ const (
 	// The minimal size of map bucket that can have frozenBits.
 	// See comments before newFrozenBits() for details.
 	// This size is guarded by the test case TestGabMinFrozenMapBucketSize().
-	minFrozenMapBucketSize uintptr = 80
+	minFrozenMapBucketSize uintptr = 136
 )
 
 var (

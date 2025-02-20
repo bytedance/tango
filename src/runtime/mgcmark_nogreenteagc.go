@@ -1,6 +1,9 @@
 // Copyright 2025 The Go Authors. All rights reserved.
+// Copyright (c) 2025 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2025-02-20.
 
 //go:build !goexperiment.greenteagc
 
@@ -191,6 +194,11 @@ func scanObject(b uintptr, gcw *gcWork) {
 		tp = s.typePointersOfUnchecked(b)
 	}
 
+	var pinned bool
+	if isEvacEnabled() && gabState.isEvacuation && !s.isGab() {
+		pinned = s.shouldBePinned(b)
+	}
+
 	var scanSize uintptr
 	for {
 		var addr uintptr
@@ -222,8 +230,17 @@ func scanObject(b uintptr, gcw *gcWork) {
 			// just allocated and hence will be marked by
 			// allocation itself.
 			if !tryDeferToSpanScan(obj, gcw) {
+				src := obj
 				if obj, span, objIndex := findObject(obj, b, addr-b); obj != 0 {
 					greyobject(obj, b, addr-b, span, gcw, objIndex)
+					if isEvacEnabled() && span.doEvacuation() {
+						if pinned {
+							span.gabPinObj(obj)
+						} else if !span.isPinnedGab(obj) {
+							getg().m.p.ptr().refsIn.enqueue(addr)
+							updateMarkedGABObjects(span, src, obj)
+						}
+					}
 				}
 			}
 		}

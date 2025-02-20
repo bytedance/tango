@@ -1239,7 +1239,7 @@ func scanObject(b uintptr, gcw *gcWork) {
 	}
 
 	var pinned bool
-	if isEvacEnabled() && isEvacuation && !s.isGab() {
+	if isEvacEnabled() && gabState.isEvacuation && !s.isGab() {
 		pinned = s.shouldBePinned(b)
 	}
 
@@ -1280,14 +1280,9 @@ func scanObject(b uintptr, gcw *gcWork) {
 					if isEvacEnabled() && span.doEvacuation() {
 						if pinned {
 							span.gabPinObj(obj)
-						} else if !span.isPinnedGab(obj) && src != obj {
-							// src is a pointer that points to a GAB-allocated object.
-							// obj is the base address for the heap object containing src,
-							// so that it is the beginning of the GAB.
-							// src == obj, i.e., src is the base address of a GAB,
-							// which means g is scanned now and addr is &g.ab.base
+						} else if !span.isPinnedGab(obj) {
 							getg().m.p.ptr().refsIn.enqueue(addr)
-							updateMarkedGABObjects(src, obj)
+							updateMarkedGABObjects(span, src, obj)
 						}
 					}
 				}

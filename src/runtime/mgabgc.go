@@ -39,6 +39,11 @@ func isEvacEnabled() bool {
 	return debug.gab == 2
 }
 
+//go:linkname mapsIsEvacEnabled internal/runtime/maps.isEvacEnabled
+func mapsIsEvacEnabled() bool {
+	return isEvacEnabled()
+}
+
 //go:nowritebarrierrec
 func (s *mspan) gabPinBitsForIndex(objIndex uintptr) markBits {
 	bytep, mask := s.gabPinBits.bitp(objIndex)
@@ -461,6 +466,11 @@ func newBucketArray(typ *_type, n int) unsafe.Pointer {
 	return mallocgc2(mem, typ, true)
 }
 
+//go:linkname mapsNewGroupArray internal/runtime/maps.newGroupArray
+func mapsNewGroupArray(typ *_type, n int) unsafe.Pointer {
+	return newBucketArray(typ, n)
+}
+
 // Find if the object being copied contains any mspecials.
 // If true, relocate special blocks to the dest span and fix their offsets.
 //
@@ -503,7 +513,7 @@ func relocateSpecials(src uintptr, dest uintptr, size uintptr) {
 
 	// Find positions for special blocks in the dest mspan
 	destOffset := func(offset uintptr, s *mspan, d *mspan, ori uintptr, dest uintptr) uintptr {
-		blockOffset := offset - ori - s.base()
+		blockOffset := offset - (ori - s.base())
 		return dest - d.base() + blockOffset
 	}
 
@@ -604,6 +614,11 @@ func pinMapBucket(t *abi.MapType, bucket unsafe.Pointer) {
 	if t.Key.PtrBytes != 0 {
 		frozenBitsForAddr(uintptr(bucket)).setMarked()
 	}
+}
+
+//go:linkname mapsPinSwissMapGroups internal/runtime/maps.pinSwissMapGroups
+func mapsPinSwissMapGroups(t *abi.MapType, bucket unsafe.Pointer) {
+	pinMapBucket(t, bucket)
 }
 
 func frozenBitsForAddr(p uintptr) markBits {
@@ -975,8 +990,8 @@ func scanStackFrame(frame *stkframe, state *stackScanState) {
 				// object hasn't been allocated in the frame yet.
 				continue
 			}
-			ptrBytes, gcData := obj.gcdata()
-			scanFrameBlock(ptr, ptrBytes, gcData)
+			ptrBytes, gcdata := obj.gcdata()
+			scanFrameBlock(ptr, ptrBytes, gcdata)
 		}
 	}
 }
@@ -1002,3 +1017,8 @@ func scanFrameBlock(b, n uintptr, ptrmask *uint8) {
 		pinIfOnHeap(ptr)
 	}
 }
+
+// Function getSwissMapGroupPtrs pushed from internal/runtime/maps.
+//
+//go:linkname getSwissMapGroupPtrs
+func getSwissMapGroupPtrs(m unsafe.Pointer) []unsafe.Pointer

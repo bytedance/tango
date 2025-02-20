@@ -167,19 +167,32 @@ func GetGabSysMemUsage() uint64 {
 	return memstats.gab_sys.load()
 }
 
-func CheckMapFrozenBit[M ~map[K]V, K comparable, V any](m M) bool {
-	p := (**hmap)(unsafe.Pointer(&m))
-	bucket := uintptr((*(*p)).buckets)
-	if bucket == 0 {
-		return false
-	}
-	s := spanOf(bucket)
-	if s.frozenBits == nil {
-		return false
-	}
-	return frozenBitsForAddr(bucket).isMarked()
-}
-
 func GetGabMaxAllocSize() int {
 	return gabMaxAllocSize
+}
+
+func CheckSwissMapFrozenBit[M ~map[K]V, K comparable, V any](m M) bool {
+	groupPtrs := getSwissMapGroupPtrs((unsafe.Pointer(&m)))
+	allGroupsMarked := false
+	for _, groupPtr := range groupPtrs {
+		if groupPtr == nil {
+			continue
+		}
+		s := spanOf(uintptr(groupPtr))
+		if s.frozenBits == nil {
+			continue
+		}
+
+		if !frozenBitsForAddr(uintptr(groupPtr)).isMarked() {
+			allGroupsMarked = false
+			break
+		}
+		allGroupsMarked = true
+	}
+
+	return allGroupsMarked
+}
+
+func GetSwissMapGroupPtrs(m unsafe.Pointer) []unsafe.Pointer {
+	return getSwissMapGroupPtrs(m)
 }

@@ -1,6 +1,9 @@
 // Copyright 2024 The Go Authors. All rights reserved.
+// Copyright (c) 2025 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2025-02-20.
 
 package maps
 
@@ -369,3 +372,12 @@ outer:
 
 	return slotElem
 }
+
+//go:linkname isEvacEnabled
+func isEvacEnabled() bool
+
+//go:linkname newGroupArray
+func newGroupArray(typ *abi.Type, n int) unsafe.Pointer
+
+//go:linkname pinSwissMapGroups
+func pinSwissMapGroups(typ *abi.MapType, data unsafe.Pointer)

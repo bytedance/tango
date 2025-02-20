@@ -18,15 +18,23 @@ func mallocgcSmallScanNoHeaderSC1(size uintptr, typ *_type, needzero bool) unsaf
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 8
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -194,15 +202,23 @@ func mallocgcSmallScanNoHeaderSC2(size uintptr, typ *_type, needzero bool) unsaf
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 16
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -370,15 +386,23 @@ func mallocgcSmallScanNoHeaderSC3(size uintptr, typ *_type, needzero bool) unsaf
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 24
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -546,15 +570,23 @@ func mallocgcSmallScanNoHeaderSC4(size uintptr, typ *_type, needzero bool) unsaf
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 32
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -722,15 +754,23 @@ func mallocgcSmallScanNoHeaderSC5(size uintptr, typ *_type, needzero bool) unsaf
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 48
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -898,15 +938,23 @@ func mallocgcSmallScanNoHeaderSC6(size uintptr, typ *_type, needzero bool) unsaf
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 64
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -1074,15 +1122,23 @@ func mallocgcSmallScanNoHeaderSC7(size uintptr, typ *_type, needzero bool) unsaf
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 80
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -1250,15 +1306,23 @@ func mallocgcSmallScanNoHeaderSC8(size uintptr, typ *_type, needzero bool) unsaf
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 96
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -1426,15 +1490,23 @@ func mallocgcSmallScanNoHeaderSC9(size uintptr, typ *_type, needzero bool) unsaf
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 112
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -1602,15 +1674,23 @@ func mallocgcSmallScanNoHeaderSC10(size uintptr, typ *_type, needzero bool) unsa
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 128
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -1778,15 +1858,23 @@ func mallocgcSmallScanNoHeaderSC11(size uintptr, typ *_type, needzero bool) unsa
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 144
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -1954,15 +2042,23 @@ func mallocgcSmallScanNoHeaderSC12(size uintptr, typ *_type, needzero bool) unsa
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 160
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -2130,15 +2226,23 @@ func mallocgcSmallScanNoHeaderSC13(size uintptr, typ *_type, needzero bool) unsa
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 176
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -2306,15 +2410,23 @@ func mallocgcSmallScanNoHeaderSC14(size uintptr, typ *_type, needzero bool) unsa
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 192
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -2482,15 +2594,23 @@ func mallocgcSmallScanNoHeaderSC15(size uintptr, typ *_type, needzero bool) unsa
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 208
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -2658,15 +2778,23 @@ func mallocgcSmallScanNoHeaderSC16(size uintptr, typ *_type, needzero bool) unsa
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 224
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -2834,15 +2962,23 @@ func mallocgcSmallScanNoHeaderSC17(size uintptr, typ *_type, needzero bool) unsa
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 240
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -3010,15 +3146,23 @@ func mallocgcSmallScanNoHeaderSC18(size uintptr, typ *_type, needzero bool) unsa
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 256
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -3186,15 +3330,23 @@ func mallocgcSmallScanNoHeaderSC19(size uintptr, typ *_type, needzero bool) unsa
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 288
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -3362,15 +3514,23 @@ func mallocgcSmallScanNoHeaderSC20(size uintptr, typ *_type, needzero bool) unsa
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 320
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -3538,15 +3698,23 @@ func mallocgcSmallScanNoHeaderSC21(size uintptr, typ *_type, needzero bool) unsa
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 352
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -3714,15 +3882,23 @@ func mallocgcSmallScanNoHeaderSC22(size uintptr, typ *_type, needzero bool) unsa
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 384
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -3890,15 +4066,23 @@ func mallocgcSmallScanNoHeaderSC23(size uintptr, typ *_type, needzero bool) unsa
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 416
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -4066,15 +4250,23 @@ func mallocgcSmallScanNoHeaderSC24(size uintptr, typ *_type, needzero bool) unsa
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 448
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -4242,15 +4434,23 @@ func mallocgcSmallScanNoHeaderSC25(size uintptr, typ *_type, needzero bool) unsa
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 480
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -4418,15 +4618,23 @@ func mallocgcSmallScanNoHeaderSC26(size uintptr, typ *_type, needzero bool) unsa
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 512
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -4599,15 +4807,23 @@ func mallocgcTinySize1(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 16
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -4766,15 +4982,23 @@ func mallocgcTinySize2(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 16
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -4933,15 +5157,23 @@ func mallocgcTinySize3(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 16
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -5100,15 +5332,23 @@ func mallocgcTinySize4(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 16
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -5267,15 +5507,23 @@ func mallocgcTinySize5(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 16
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -5434,15 +5682,23 @@ func mallocgcTinySize6(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 16
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -5601,15 +5857,23 @@ func mallocgcTinySize7(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 16
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -5768,15 +6032,23 @@ func mallocgcTinySize8(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 16
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -5935,15 +6207,23 @@ func mallocgcTinySize9(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 16
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -6102,15 +6382,23 @@ func mallocgcTinySize10(size uintptr, typ *_type, needzero bool) unsafe.Pointer 
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 16
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -6269,15 +6557,23 @@ func mallocgcTinySize11(size uintptr, typ *_type, needzero bool) unsafe.Pointer 
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 16
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -6436,15 +6732,23 @@ func mallocgcTinySize12(size uintptr, typ *_type, needzero bool) unsafe.Pointer 
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 16
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -6603,15 +6907,23 @@ func mallocgcTinySize13(size uintptr, typ *_type, needzero bool) unsafe.Pointer 
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 16
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -6770,15 +7082,23 @@ func mallocgcTinySize14(size uintptr, typ *_type, needzero bool) unsafe.Pointer 
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 16
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -6937,15 +7257,23 @@ func mallocgcTinySize15(size uintptr, typ *_type, needzero bool) unsafe.Pointer 
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 16
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -7099,15 +7427,23 @@ func mallocgcSmallNoScanSC2(size uintptr, typ *_type, needzero bool) unsafe.Poin
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 16
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -7246,15 +7582,23 @@ func mallocgcSmallNoScanSC3(size uintptr, typ *_type, needzero bool) unsafe.Poin
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 24
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -7393,15 +7737,23 @@ func mallocgcSmallNoScanSC4(size uintptr, typ *_type, needzero bool) unsafe.Poin
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 32
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -7540,15 +7892,23 @@ func mallocgcSmallNoScanSC5(size uintptr, typ *_type, needzero bool) unsafe.Poin
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 48
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -7687,15 +8047,23 @@ func mallocgcSmallNoScanSC6(size uintptr, typ *_type, needzero bool) unsafe.Poin
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 64
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -7834,15 +8202,23 @@ func mallocgcSmallNoScanSC7(size uintptr, typ *_type, needzero bool) unsafe.Poin
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 80
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -7981,15 +8357,23 @@ func mallocgcSmallNoScanSC8(size uintptr, typ *_type, needzero bool) unsafe.Poin
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 96
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -8128,15 +8512,23 @@ func mallocgcSmallNoScanSC9(size uintptr, typ *_type, needzero bool) unsafe.Poin
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 112
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -8275,15 +8667,23 @@ func mallocgcSmallNoScanSC10(size uintptr, typ *_type, needzero bool) unsafe.Poi
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 128
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -8422,15 +8822,23 @@ func mallocgcSmallNoScanSC11(size uintptr, typ *_type, needzero bool) unsafe.Poi
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 144
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -8569,15 +8977,23 @@ func mallocgcSmallNoScanSC12(size uintptr, typ *_type, needzero bool) unsafe.Poi
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 160
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -8716,15 +9132,23 @@ func mallocgcSmallNoScanSC13(size uintptr, typ *_type, needzero bool) unsafe.Poi
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 176
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -8863,15 +9287,23 @@ func mallocgcSmallNoScanSC14(size uintptr, typ *_type, needzero bool) unsafe.Poi
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 192
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -9010,15 +9442,23 @@ func mallocgcSmallNoScanSC15(size uintptr, typ *_type, needzero bool) unsafe.Poi
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 208
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -9157,15 +9597,23 @@ func mallocgcSmallNoScanSC16(size uintptr, typ *_type, needzero bool) unsafe.Poi
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 224
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -9304,15 +9752,23 @@ func mallocgcSmallNoScanSC17(size uintptr, typ *_type, needzero bool) unsafe.Poi
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 240
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -9451,15 +9907,23 @@ func mallocgcSmallNoScanSC18(size uintptr, typ *_type, needzero bool) unsafe.Poi
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 256
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -9598,15 +10062,23 @@ func mallocgcSmallNoScanSC19(size uintptr, typ *_type, needzero bool) unsafe.Poi
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 288
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -9745,15 +10217,23 @@ func mallocgcSmallNoScanSC20(size uintptr, typ *_type, needzero bool) unsafe.Poi
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 320
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -9892,15 +10372,23 @@ func mallocgcSmallNoScanSC21(size uintptr, typ *_type, needzero bool) unsafe.Poi
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 352
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -10039,15 +10527,23 @@ func mallocgcSmallNoScanSC22(size uintptr, typ *_type, needzero bool) unsafe.Poi
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 384
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -10186,15 +10682,23 @@ func mallocgcSmallNoScanSC23(size uintptr, typ *_type, needzero bool) unsafe.Poi
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 416
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -10333,15 +10837,23 @@ func mallocgcSmallNoScanSC24(size uintptr, typ *_type, needzero bool) unsafe.Poi
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 448
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -10480,15 +10992,23 @@ func mallocgcSmallNoScanSC25(size uintptr, typ *_type, needzero bool) unsafe.Poi
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 480
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()
@@ -10627,15 +11147,23 @@ func mallocgcSmallNoScanSC26(size uintptr, typ *_type, needzero bool) unsafe.Poi
 		}
 	}
 
-	if debug.gab != 0 && (typ == nil || !typ.Pointers()) && size <= gabMaxAllocSize {
-		gp := getg()
-		size := alignUp(size, goarch.PtrSize)
-		if gp.ab.remaining() < size {
-			gp.ab.refill()
+	const objSize = 512
+
+	if objSize <= gabMaxAllocSize {
+		if gabEnabled && (typ == nil || !typ.Pointers()) {
+			gp := getg()
+			size = alignUp(size, goarch.PtrSize)
+			if gp.ab.remaining() < size {
+				gp.ab.refill()
+			}
+			var x unsafe.Pointer
+			if isEvacEnabled() {
+				startObj(gp.ab.top, gp.ab.span)
+			}
+			x = unsafe.Pointer(gp.ab.top)
+			gp.ab.top += size
+			return x
 		}
-		x := unsafe.Pointer(gp.ab.top)
-		gp.ab.top += size
-		return x
 	}
 
 	lockRankMayQueueFinalizer()

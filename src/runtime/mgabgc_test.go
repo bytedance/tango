@@ -148,6 +148,9 @@ func TestGabStackRescanning(t *testing.T) {
 		t.Skip("-quick")
 	}
 	testenv.MustHaveGoBuild(t)
+	if !isEvacSupported() {
+		t.Skip("Skip balanced GC test on platforms other than linux/amd64 and darwin/amd64")
+	}
 	const FREQ = 5
 
 	// Use separate GOPATH and GOCACHE to prevent this case from
@@ -518,18 +521,17 @@ func TestGabThreshold(t *testing.T) {
 	}
 
 	gabMaxAllocSize := runtime.GetGabMaxAllocSize()
-	maxKeySize := abi.SwissMapMaxKeyBytes
-	if gabMaxAllocSize != maxKeySize {
-		t.Fatal("The threshold of GAB objects should be the same as the threshold of indirect map key")
+	if gabMaxAllocSize != abi.MapMaxKeyBytes {
+		t.Fatal("The threshold of GAB objects should be the same as the threshold of indirect map key in swiss map")
 	}
 }
 
 type IndirectKey struct {
-	arr [abi.SwissMapMaxKeyBytes + 1]int
+	arr [abi.MapMaxKeyBytes + 1]int
 }
 
 type IndirectValue struct {
-	arr [abi.SwissMapMaxElemBytes + 1]int
+	arr [abi.MapMaxElemBytes + 1]int
 }
 
 func makeIndirectKeyNonFrozenMap() map[IndirectKey]int {
@@ -576,7 +578,7 @@ func TestGabMapClone(t *testing.T) {
 	m0 := makeIndirectKeyNonFrozenMap()
 	indirectKey := IndirectKey{}
 	m0[indirectKey] = 0
-	if runtime.CheckMapFrozenBit(m0) {
+	if runtime.CheckSwissMapFrozenBit(m0) {
 		t.Fatal("The map bucket is expected not to be frozen.")
 	}
 
@@ -584,11 +586,11 @@ func TestGabMapClone(t *testing.T) {
 	m1 := makeIndirectElemFrozenMap()
 	arr := IndirectValue{}
 	m1[&idx] = arr
-	if !runtime.CheckMapFrozenBit(m1) {
+	if !runtime.CheckSwissMapFrozenBit(m1) {
 		t.Fatal("The map bucket is expected to be frozen.")
 	}
 	clonedMap1 := maps.Clone(m1)
-	if !runtime.CheckMapFrozenBit(clonedMap1) {
+	if !runtime.CheckSwissMapFrozenBit(clonedMap1) {
 		t.Fatal("The cloned map bucket is expected to be frozen.")
 	}
 
@@ -596,11 +598,11 @@ func TestGabMapClone(t *testing.T) {
 	m2 := makeFrozenMap()
 	arr = IndirectValue{}
 	m2[&idx] = &arr
-	if !runtime.CheckMapFrozenBit(m2) {
+	if !runtime.CheckSwissMapFrozenBit(m2) {
 		t.Fatal("The map bucket is expected to be frozen.")
 	}
 	clonedMap2 := maps.Clone(m2)
-	if !runtime.CheckMapFrozenBit(clonedMap2) {
+	if !runtime.CheckSwissMapFrozenBit(clonedMap2) {
 		t.Fatal("The cloned map bucket is expected to be frozen.")
 	}
 
@@ -608,23 +610,23 @@ func TestGabMapClone(t *testing.T) {
 	// are expected NOT to be frozen. It is a non-frozen map
 	// because its key is an integer.
 	m3 := makeNonFrozenMap()
-	if runtime.CheckMapFrozenBit(m3) {
+	if runtime.CheckSwissMapFrozenBit(m3) {
 		t.Fatal("The map bucket is expected not to be frozen.")
 	}
 	// Test a map without any map buckets.
 	clonedMap3 := maps.Clone(m3)
-	if runtime.CheckMapFrozenBit(clonedMap3) {
+	if runtime.CheckSwissMapFrozenBit(clonedMap3) {
 		t.Fatal("Cloning an empty map should be safe.")
 	}
 
 	// 3. Same as the previous case. Initialize the non-frozen map.
 	arr = IndirectValue{}
 	m3[idx] = &arr
-	if runtime.CheckMapFrozenBit(m3) {
+	if runtime.CheckSwissMapFrozenBit(m3) {
 		t.Fatal("The map bucket is expected not to be pinned.")
 	}
 	clonedMap3 = maps.Clone(m3)
-	if runtime.CheckMapFrozenBit(clonedMap3) {
+	if runtime.CheckSwissMapFrozenBit(clonedMap3) {
 		t.Fatal("The cloned map bucket is expected not to be pinned.")
 	}
 }

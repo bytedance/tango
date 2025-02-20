@@ -1,6 +1,9 @@
 // Copyright 2024 The Go Authors. All rights reserved.
+// Copyright (c) 2025 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2025-02-20.
 
 package maps
 
@@ -316,6 +319,16 @@ type groupsReference struct {
 //
 // Length must be a power of two.
 func newGroups(typ *abi.MapType, length uint64) groupsReference {
+	if isEvacEnabled() {
+		ref := groupsReference{
+			// TODO: make the length type the same throughout.
+			data:       newGroupArray(typ.Group, int(length)),
+			lengthMask: length - 1,
+		}
+		pinSwissMapGroups(typ, ref.data)
+		return ref
+	}
+
 	return groupsReference{
 		// TODO: make the length type the same throughout.
 		data:       newarray(typ.Group, int(length)),

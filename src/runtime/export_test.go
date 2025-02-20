@@ -2159,6 +2159,7 @@ var (
 	Class_to_allocnpages = gc.SizeClassToNPages
 	Size_to_class8       = gc.SizeToSizeClass8
 	Size_to_class128     = gc.SizeToSizeClass128
+	NumSizeClasses       = gc.NumSizeClasses
 
 	SmallObjStartBitsAllocSize = smallObjStartBitsAllocSize
 	LargeObjStartBitsAllocSize = largeObjStartBitsAllocSize
@@ -2166,9 +2167,6 @@ var (
 	GABCapInitial              = gabCapInitial
 	GABFrozenBitsAllocSize     = frozenBitsAllocSize()
 )
-
-// The offset of hmap.buckets
-var MapBucketsOffset = unsafe.Offsetof(hmap{}.buckets)
 
 func SizeClass(p uintptr) int8 {
 	s := spanOf(p)

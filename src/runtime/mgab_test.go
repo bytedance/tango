@@ -527,110 +527,21 @@ func TestGabObjStartBits(t *testing.T) {
 	}
 }
 
-// Check whether the size class of minFrozenMapBucketSize equals to
-// the size of actual map bucket.
-func TestGabMinFrozenMapBucketSize(t *testing.T) {
-	if !isEvacSupported() {
-		t.Skip("Skip balanced GC test on platforms other than linux/amd64 and darwin/amd64")
-	}
-
-	m := allocFrozenMap()
-	bucketPtr := map2BucketPtr(unsafe.Pointer(m))
-	sc := size2SizeClass(runtime.MinFrozenMapBucketSize)
-	groundTruth := runtime.SizeClass(bucketPtr)
-	if sc != groundTruth {
-		t.Fatalf("Minimal map bucket with frozenBits size %d, sizeclass %d, expected %d",
-			runtime.MinFrozenMapBucketSize, sc, groundTruth)
-	}
-}
-
-// Allocate maps with pointer pointing to GAB-allocated object.
-// Then verify whether the map bucket is frozen.
-func TestGabFrozenBits(t *testing.T) {
-	if !isEvacSupported() {
-		t.Skip("Skip balanced GC test on platforms other than linux/amd64 and darwin/amd64")
-	}
-
-	if !testGabInChildProcEnv(t, "GabVerifyFrozenBits", "GODEBUG=gab=2", "GOGABOPT=evacuation=1") {
-		return
-	}
-	const length = 10000
-	var ptrs [length]unsafe.Pointer
-	for i := 0; i < length; i++ {
-		ptrs[i] = unsafe.Pointer(allocFrozenMap())
-	}
-
-	go func() {
-		for {
-			runtime.GC()
-			time.Sleep(time.Millisecond)
-		}
-	}()
-
-	for i := 0; i < length; i++ {
-		bucketPtr := map2BucketPtr(ptrs[i])
-		if !runtime.IsFrozenObj(bucketPtr) {
-			t.Fatalf("Object %x is expected to be frozen", unsafe.Pointer(bucketPtr))
-		}
-	}
-}
-
-// Verify the size of frozenBits.
-// Allocate a minimal size of map that can have frozenBits.
-// From the size of that map bucket, verify each mspan.
-// frozenBits should be less than 16 bytes.
-func TestGabFrozenBitsSize(t *testing.T) {
-	if !isEvacSupported() {
-		t.Skip("Skip balanced GC test on platforms other than linux/amd64 and darwin/amd64")
-	}
-	verifyFrozenBitsSize(t)
-}
-
-func verifyFrozenBitsSize(t *testing.T) {
-	// Allocate a map. Normal map variable is a pointer
-	// refers to an instance of hmap.
-	// ptr is a pointer to map, so it refers to a pointer of hmap.
-	ptr := unsafe.Pointer(allocFrozenMap())
-	buckets := map2BucketPtr(ptr)
-	minSizeClass := runtime.SizeClass(buckets)
-	minFrozenMapBktSizeClass := size2SizeClass(runtime.MinFrozenMapBucketSize)
-	if minSizeClass < minFrozenMapBktSizeClass {
-		t.Fatalf("Map bucket size class %d, expected %d", minSizeClass, minFrozenMapBktSizeClass)
-	}
-	for i := int(minSizeClass); i < len(runtime.Class_to_size); i++ {
-		elemSize := int(runtime.Class_to_size[i])
-		page := int(runtime.Class_to_allocnpages[i])
-		mspanSize := page << runtime.PageShift
-		// One bit for one object in mspan.
-		nelems := mspanSize / elemSize
-		// Round up to 8 bytes.
-		bytesNeeded := ((nelems + 63) / 64) * 8
-
-		if bytesNeeded > int(runtime.GABFrozenBitsAllocSize) {
-			t.Fatalf("frozenBits overflows. mspan size %d B, element size %d B, frozenBits size %d B, actual size %d",
-				mspanSize, elemSize, bytesNeeded, runtime.GABFrozenBitsAllocSize)
-		}
-	}
-}
-
-// ptr points to a map, map2BucketPtr returns the pointer pointing to the map buckets.
-//
-//go:nocheckptr
-func map2BucketPtr(ptr unsafe.Pointer) uintptr {
-	// mapHeader points to an hmap instance
-	mapHeader := *(*uintptr)(unsafe.Pointer(ptr))
-	// bucketsPtr points to hmap.buckets, which is a pointer
-	bucketsPtr := mapHeader + runtime.MapBucketsOffset
-	// de-reference bucketsPtr, now we have a pointer to the actual map buckets
-	buckets := *((*uintptr)(unsafe.Pointer(bucketsPtr)))
-	return buckets
-}
-
 //go:noinline
 func allocFrozenMap() *map[*GABObject]struct{} {
 	m := map[*GABObject]struct{}{}
 	obj := &GABObject{}
 	m[obj] = struct{}{}
+	return &m
+}
+
+//go:noinline
+func allocBigFrozenMap() *map[*GABObject]struct{} {
+	m := make(map[*GABObject]struct{}, 1000)
+	for i := range 1000 {
+		obj := &GABObject{i}
+		m[obj] = struct{}{}
+	}
 	return &m
 }
 
@@ -774,4 +685,138 @@ func verifyGabMemory(t *testing.T) {
 	}
 	fmt.Printf("GAB uses %d B, marked %d B, live %d B\n", used, marked, live)
 	*runtime.GabEnabled = true
+}
+
+// Check whether the size class of minFrozenMapBucketSize equals to
+// the size of actual map bucket.
+func TestGabMinFrozenMapBucketSize(t *testing.T) {
+	if !isEvacSupported() {
+		t.Skip("Skip balanced GC test on platforms other than linux/amd64 and darwin/amd64")
+	}
+
+	m := allocFrozenMap()
+	groupPtrs := runtime.GetSwissMapGroupPtrs(unsafe.Pointer(m))
+
+	if len(groupPtrs) != 1 {
+		t.Fatalf("Minimal map bucket has %d groups, expected 1", len(groupPtrs))
+	}
+
+	sc := size2SizeClass(runtime.MinFrozenMapBucketSize)
+	groundTruth := runtime.SizeClass(uintptr(groupPtrs[0]))
+	if sc != groundTruth {
+		t.Fatalf("Minimal map bucket with frozenBits size %d, sizeclass %d, expected %d",
+			runtime.MinFrozenMapBucketSize, sc, groundTruth)
+	}
+}
+
+// Allocate maps with pointer pointing to GAB-allocated object.
+// Then verify whether the map bucket is frozen.
+// Test the small map in swissmap.
+func TestGabFrozenBits(t *testing.T) {
+	if !isEvacSupported() {
+		t.Skip("Skip balanced GC test on platforms other than linux/amd64 and darwin/amd64")
+	}
+
+	if !testGabInChildProcEnv(t, "GabVerifyFrozenBits", "GODEBUG=gab=2", "GOGABOPT=evacuation=1") {
+		return
+	}
+	const length = 10000
+	var ptrs [length]unsafe.Pointer
+	for i := 0; i < length; i++ {
+		ptrs[i] = unsafe.Pointer(allocFrozenMap())
+	}
+
+	go func() {
+		for {
+			runtime.GC()
+			time.Sleep(time.Millisecond)
+		}
+	}()
+
+	for i := 0; i < length; i++ {
+		bucketPtr := map2GroupPtr(ptrs[i])
+		if !runtime.IsFrozenObj(uintptr(bucketPtr)) {
+			t.Fatalf("Object %x is expected to be frozen", bucketPtr)
+		}
+	}
+}
+
+// Allocate maps with pointer pointing to GAB-allocated object.
+// Then verify whether the map bucket is frozen.
+// Test the non small map in swissmap.
+func TestGabFrozenBitsForBigMap(t *testing.T) {
+	if !isEvacSupported() {
+		t.Skip("Skip balanced GC test on platforms other than linux/amd64 and darwin/amd64")
+	}
+
+	if !testGabInChildProcEnv(t, "TestGabFrozenBitsForBigMap", "GODEBUG=gab=2", "GOGABOPT=evacuation=1") {
+		return
+	}
+	const length = 10000
+	var ptrs [length]unsafe.Pointer
+	for i := 0; i < length; i++ {
+		ptrs[i] = unsafe.Pointer(allocBigFrozenMap())
+	}
+
+	go func() {
+		for {
+			runtime.GC()
+			time.Sleep(time.Millisecond)
+		}
+	}()
+
+	for i := 0; i < length; i++ {
+		bucketPtrs := runtime.GetSwissMapGroupPtrs(ptrs[i])
+		for _, ptr := range bucketPtrs {
+			if ptr == nil {
+				continue
+			}
+			if !runtime.IsFrozenObj(uintptr(ptr)) {
+				t.Fatalf("Object %x is expected to be frozen", ptr)
+			}
+		}
+
+	}
+}
+
+// Verify the size of frozenBits.
+// Allocate a minimal size of map that can have frozenBits.
+// From the size of that map bucket, verify each mspan.
+// frozenBits should be less than 16 bytes.
+func TestGabFrozenBitsSize(t *testing.T) {
+	if !isEvacSupported() {
+		t.Skip("Skip balanced GC test on platforms other than linux/amd64 and darwin/amd64")
+	}
+	verifyFrozenBitsSize(t)
+}
+
+func verifyFrozenBitsSize(t *testing.T) {
+	// Allocate a map. Normal map variable is a pointer
+	// refers to an instance of hmap.
+	// ptr is a pointer to map, so it refers to a pointer of hmap.
+	ptr := unsafe.Pointer(allocFrozenMap())
+	buckets := map2GroupPtr(ptr)
+	minSizeClass := runtime.SizeClass(uintptr(buckets))
+	minFrozenMapBktSizeClass := size2SizeClass(runtime.MinFrozenMapBucketSize)
+	if minSizeClass < minFrozenMapBktSizeClass {
+		t.Fatalf("Map bucket size class %d, expected %d", minSizeClass, minFrozenMapBktSizeClass)
+	}
+	for i := int(minSizeClass); i < runtime.NumSizeClasses; i++ {
+		elemSize := int(runtime.Class_to_size[i])
+		page := int(runtime.Class_to_allocnpages[i])
+		mspanSize := page << runtime.PageShift
+		// One bit for one object in mspan.
+		nelems := mspanSize / elemSize
+		// Round up to 8 bytes.
+		bytesNeeded := ((nelems + 63) / 64) * 8
+
+		if bytesNeeded > int(runtime.GABFrozenBitsAllocSize) {
+			t.Fatalf("frozenBits overflows. mspan size %d B, element size %d B, frozenBits size %d B, actual size %d",
+				mspanSize, elemSize, bytesNeeded, runtime.GABFrozenBitsAllocSize)
+		}
+	}
+}
+
+func map2GroupPtr(ptr unsafe.Pointer) unsafe.Pointer {
+	return runtime.GetSwissMapGroupPtrs(ptr)[0]
 }
