@@ -1,12 +1,16 @@
 // Copyright 2009 The Go Authors. All rights reserved.
+// Copyright (c) 2025 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2025-03-12.
 
 package fmt_test
 
 import (
 	"bytes"
 	. "fmt"
+	"internal/asan"
 	"internal/race"
 	"io"
 	"math"
@@ -1520,6 +1524,10 @@ var mallocTest = []struct {
 var _ bytes.Buffer
 
 func TestCountMallocs(t *testing.T) {
+	if asan.Enabled {
+		t.Skip("skipping allocations test with sanitizers")
+	}
+
 	switch {
 	case testing.Short():
 		t.Skip("skipping malloc count in short mode")

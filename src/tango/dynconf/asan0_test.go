@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -44,6 +45,50 @@ func TestSetLargeAllocTrace(t *testing.T) {
 	}
 	cmd := exec.Command(os.Args[0], "-test.run=^TestSetLargeAllocTrace$")
 	cmd.Env = append(os.Environ(), "SUB_PROCESS=1")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Log(string(out))
+		t.Fatalf("Return error: %s\n", err)
+	}
+	output := string(out)
+	if success := checkLargeAllocTraceOutput(output); !success {
+		t.Fatal("Not record memory allocation information")
+	}
+}
+
+func TestChangeLargeAllocTrace(t *testing.T) {
+	defer func() {
+		memdebugglobal = nil
+	}()
+	if os.Getenv("SUB_PROCESS") == "1" {
+		var size int64 = 10 * 1024 * 1024
+		fmt.Println("Alloc Record", size)
+		allocMemory(size)
+		oldSize := size
+		size = 2 * oldSize
+		res, err := cmdSetConfig([]byte(fmt.Sprintf("runtime.largeAllocTrace=%d", size)))
+		if err != nil || !strings.Contains(string(res), "Successful") {
+			t.Fatalf("set config failed %s", err)
+			return
+		}
+		fmt.Println("Alloc Not Record")
+		allocMemory(oldSize)
+		fmt.Println("Alloc Record", size)
+		allocMemory(size)
+		fmt.Println("Alloc Not Record")
+		allocMemory(size - 1)
+
+		res, err = cmdSetConfig([]byte(fmt.Sprintf("runtime.largeAllocTrace=%d", 0)))
+		if err != nil || !strings.Contains(string(res), "Successful") {
+			t.Fatalf("set config failed %s", err)
+			return
+		}
+		fmt.Println("Alloc Not Record")
+		allocMemory(size)
+		return
+	}
+	cmd := exec.Command(os.Args[0], "-test.run=^TestChangeLargeAllocTrace$")
+	cmd.Env = append(os.Environ(), "SUB_PROCESS=1", "GODEBUG=largealloctrace="+strconv.Itoa(10*1024*1024))
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Log(string(out))
