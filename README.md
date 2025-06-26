@@ -16,6 +16,7 @@ runtime switches, without requiring application code changes.
 
 At the architecture level, Tango:
 - Evolves directly from the official Go source, ensuring compatibility with the standard library and language features;
+- Provides an optional compile‑time backend based on LLVM, enabled using a prepared TangoLLVM toolchain, `GOEXPERIMENT=tangollvm`, and `-gcflags=all=-beast=llvm=N` (N≥2); by default the official Go compiler backend is used, and the compiled binaries have no runtime dependency on LLVM.
 
 ### Differences from upstream Go
 
@@ -36,6 +37,7 @@ list.
 ### Compiler Enhancements
 - Beast Compilation Mode: a compiler strategy tailored for backend, long‑running services, with the primary goal of generating high‑performance machine code.
 - PGO (Profile‑Guided Optimization) Enhancements: uses runtime performance sampling data to guide compiler optimization strategies—such as hot‑function inlining, basic‑block layout, function placement, and conditional branch optimization—and further strengthens strategies in recursive and stack‑growth scenarios.
+- Optional LLVM Backend: provides a compile‑time alternative backend based on LLVM in addition to the default Go compiler backend, for exploring different code‑generation and optimization strategies.
 
 ### Runtime Enhancements
 - Balanced GC: allocates small objects using bump‑pointer on the per‑G allocation buffer and manages that memory via a moving‑object GC, improving object allocation and reclamation efficiency.
@@ -86,6 +88,17 @@ go build -opt=beast -o my_app main.go
 PGO Enhancements (compile‑time option): use a collected CPU profile file via -pgo perf.pb.gz during compilation.
 ```bash
 go build -pgo perf.pb.gz -gcflags=all='-d=pgorecursive=1,pgostacksize=1' -o my_app main.go
+```
+
+LLVM Backend (experimental): first build a matching TangoLLVM toolchain using
+the [TangoLLVM repository](https://github.com/bytedance/tangollvm), as described
+in [Building TangoLLVM](doc/tangollvm.md).
+A normal `make.bash` build does not contain the prepared LLVM bindings or SDK.
+Then use the prepared toolchain:
+```bash
+env -u GOROOT GOEXPERIMENT=tangollvm \
+  /path/to/tango-llvm-build/bin/go build \
+  -gcflags='all=-beast=llvm=3,optimize=3,inline=1' -o my_app_llvm main.go
 ```
 
 Balanced GC (runtime option): enable Balanced GC by setting GODEBUG=gab=2.

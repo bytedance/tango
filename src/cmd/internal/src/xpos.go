@@ -1,6 +1,9 @@
 // Copyright 2016 The Go Authors. All rights reserved.
+// Copyright (c) 2025 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2025-06-26.
 
 // This file implements the compressed encoding of source
 // positions using a lookup table.
@@ -168,6 +171,15 @@ func (t *PosTable) Pos(p XPos) Pos {
 		base = t.baseList[p.index]
 	}
 	return Pos{base, p.lico}
+}
+
+// +TANGOLLVM
+// FileIndex returns the index of the given filename(symbol) in the PosTable, or -1 if not found.
+func (t *PosTable) FileIndex(filename string) int {
+	if v, ok := t.nameMap[filename]; ok {
+		return v
+	}
+	return -1
 }
 
 // FileTable returns a slice of all files used to build this package.

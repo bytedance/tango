@@ -42,6 +42,7 @@ package ld
 import (
 	"bufio"
 	"cmd/internal/goobj"
+	"cmd/internal/llvm"
 	"cmd/internal/objabi"
 	"cmd/internal/quoted"
 	"cmd/internal/sys"
@@ -51,6 +52,7 @@ import (
 	"internal/buildcfg"
 	"log"
 	"os"
+	"path/filepath"
 	"runtime"
 	"runtime/pprof"
 	"strconv"
@@ -121,6 +123,7 @@ var (
 	flagRandLayout    = flag.Int64("randlayout", 0, "randomize function layout")
 	flagAllErrors     = flag.Bool("e", false, "no limit on number of errors reported")
 	flagBeast         = flag.Bool("enablebeast", false, "enable beast mode")
+	flagFullLTO       = flag.Bool("full-lto", false, "enable TangoLLVM full link-time optimization")
 
 	cpuprofile        = flag.String("cpuprofile", "", "write cpu profile to `file`")
 	memprofile        = flag.String("memprofile", "", "write memory profile to `file`")
@@ -179,7 +182,6 @@ func Main(arch *sys.Arch, theArch Arch) {
 	thearch = theArch
 	ctxt := linknew(arch)
 	ctxt.Bso = bufio.NewWriter(os.Stdout)
-
 	// For testing behavior of go command when tools crash silently.
 	// Undocumented, not in standard flag parser to avoid
 	// exposing in usage message.
@@ -376,6 +378,19 @@ func Main(arch *sys.Arch, theArch Arch) {
 		addlibpath(ctxt, "command line", "command line", flag.Arg(0), *flagPluginPath, "", zerofp)
 	default:
 		addlibpath(ctxt, "command line", "command line", flag.Arg(0), "main", "", zerofp)
+	}
+	if buildcfg.Experiment.TangoLLVM && *flagFullLTO {
+		bench.Start("build-lto")
+		tools, err := llvm.DefaultTools(ctxt.Debugvlog)
+		if err != nil {
+			Exitf("initialize TangoLLVM tools: %v", err)
+		}
+		tools.SetDir(filepath.Dir(*flagOutfile))
+		archives := []string{flag.Arg(0)}
+		for _, archive := range ctxt.PackageFile {
+			archives = append(archives, archive)
+		}
+		tools.RunLTO(archives)
 	}
 	bench.Start("loadlib")
 	ctxt.loadlib()

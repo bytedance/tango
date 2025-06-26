@@ -1,6 +1,9 @@
 // Copyright 2015 The Go Authors. All rights reserved.
+// Copyright (c) 2025 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2025-06-26.
 
 //go:build ignore
 
@@ -32,6 +35,7 @@ import (
 )
 
 func main() {
+	gen("amd64", tagsTangoLLVM, zeroAMD64, copyAMD64)
 	gen("386", notags, zero386, copy386)
 	gen("arm", notags, zeroARM, copyARM)
 	gen("ppc64x", tagsPPC64x, zeroPPC64x, copyPPC64x)
@@ -58,6 +62,11 @@ func gen(arch string, tags, zero, copy func(io.Writer)) {
 
 func notags(w io.Writer) { fmt.Fprintln(w) }
 
+func tagsTangoLLVM(w io.Writer) {
+	fmt.Fprintln(w, "//go:build goexperiment.tangollvm")
+	fmt.Fprintln(w)
+}
+
 func zeroAMD64(w io.Writer) {
 	// X15: zero
 	// DI: ptr to memory to be zeroed
@@ -71,6 +80,19 @@ func zeroAMD64(w io.Writer) {
 		fmt.Fprintln(w, "\tLEAQ\t64(DI),DI") // We use lea instead of add, to avoid clobbering flags
 		fmt.Fprintln(w)
 	}
+	fmt.Fprintln(w, "\tRET")
+
+	// TANGOLLVM
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "\t// +TANGOLLVM")
+	fmt.Fprintln(w, "\t// The AVX version of duffzero.")
+	for i := 0; i < 16; i++ {
+		fmt.Fprintln(w, "\tVMOVUPS\tY15,(DI)")
+		fmt.Fprintln(w, "\tVMOVUPS\tY15,32(DI)")
+		fmt.Fprintln(w, "\tLEAQ\t64(DI),DI")
+		fmt.Fprintln(w)
+	}
+	fmt.Fprintln(w, "\tVZEROUPPER")
 	fmt.Fprintln(w, "\tRET")
 }
 
@@ -89,6 +111,20 @@ func copyAMD64(w io.Writer) {
 		fmt.Fprintln(w, "\tADDQ\t$16, DI")
 		fmt.Fprintln(w)
 	}
+	fmt.Fprintln(w, "\tRET")
+
+	// TANGOLLVM
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "\t// +TANGOLLVM")
+	fmt.Fprintln(w, "\t// The AVX version of duffcopy.")
+	for i := 0; i < 32; i++ {
+		fmt.Fprintln(w, "\tVMOVUPS\t(SI), Y0")
+		fmt.Fprintln(w, "\tADDQ\t$32, SI")
+		fmt.Fprintln(w, "\tVMOVUPS\tY0, (DI)")
+		fmt.Fprintln(w, "\tADDQ\t$32, DI")
+		fmt.Fprintln(w)
+	}
+	fmt.Fprintln(w, "\tVZEROUPPER")
 	fmt.Fprintln(w, "\tRET")
 }
 

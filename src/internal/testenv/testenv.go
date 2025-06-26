@@ -557,3 +557,10 @@ func isBeastModeEnabled() bool
 func IsBeastModeEnabled() bool {
 	return isBeastModeEnabled()
 }
+
+//go:linkname isLLVMEnabled runtime.isLLVMEnabled
+func isLLVMEnabled() bool
+
+func IsLLVMEnabled() bool {
+	return isLLVMEnabled()
+}

@@ -1,6 +1,9 @@
 // Copyright 2019 The Go Authors. All rights reserved.
+// Copyright (c) 2025 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2025-07-30.
 
 // Package bootstrap_test verifies that the current GOROOT can be used to bootstrap
 // itself.

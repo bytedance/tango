@@ -1,11 +1,19 @@
 // Copyright 2015 The Go Authors. All rights reserved.
+// Copyright (c) 2025 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2025-06-26.
 
 package ssa
 
+import "internal/buildcfg"
+
 // convert to machine-dependent ops.
 func lower(f *Func) {
+	if buildcfg.Experiment.TangoLLVM && f.CompileLLVM && f.LLVMBuilder != nil {
+		f.LLVMBuilder.BuildLLVM()
+	}
 	// repeat rewrites until we find no more rewrites
 	applyRewrite(f, f.Config.lowerBlock, f.Config.lowerValue, removeDeadValues)
 }

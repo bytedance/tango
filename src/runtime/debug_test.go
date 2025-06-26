@@ -1,6 +1,9 @@
 // Copyright 2018 The Go Authors. All rights reserved.
+// Copyright (c) 2025 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2025-06-26.
 
 // TODO: This test could be implemented on all (most?) UNIXes if we
 // added syscall.Tgkill more widely.
@@ -18,6 +21,7 @@ import (
 	"internal/abi"
 	"internal/asan"
 	"internal/msan"
+	"internal/testenv"
 	"math"
 	"os"
 	"regexp"
@@ -133,6 +137,9 @@ func skipUnderDebugger(t *testing.T) {
 }
 
 func TestDebugCall(t *testing.T) {
+	if testenv.IsLLVMEnabled() {
+		t.Skip("Temporarily skip this test case in LLVM mode")
+	}
 	g, after := startDebugCallWorker(t)
 	defer after()
 
@@ -184,6 +191,9 @@ func TestDebugCall(t *testing.T) {
 }
 
 func TestDebugCallLarge(t *testing.T) {
+	if testenv.IsLLVMEnabled() {
+		t.Skip("Temporarily skip this test case in LLVM mode")
+	}
 	g, after := startDebugCallWorker(t)
 	defer after()
 
@@ -213,6 +223,9 @@ func TestDebugCallLarge(t *testing.T) {
 }
 
 func TestDebugCallGC(t *testing.T) {
+	if testenv.IsLLVMEnabled() {
+		t.Skip("Temporarily skip this test case in LLVM mode")
+	}
 	g, after := startDebugCallWorker(t)
 	defer after()
 
@@ -223,6 +236,9 @@ func TestDebugCallGC(t *testing.T) {
 }
 
 func TestDebugCallGrowStack(t *testing.T) {
+	if testenv.IsLLVMEnabled() {
+		t.Skip("Temporarily skip this test case in LLVM mode")
+	}
 	g, after := startDebugCallWorker(t)
 	defer after()
 

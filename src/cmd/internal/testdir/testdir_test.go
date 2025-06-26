@@ -1,6 +1,9 @@
 // Copyright 2012 The Go Authors. All rights reserved.
+// Copyright (c) 2025 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2025-06-26.
 
 // Package testdir_test runs tests in the GOROOT/test directory.
 package testdir_test
@@ -443,10 +446,18 @@ func (ctxt *context) match(name string) bool {
 // or else the commands will rebuild any needed packages (like runtime)
 // over and over.
 func (test) goGcflags() string {
+	llvmTest := os.Getenv("TANGO_LLVM_TEST") == "1"
+	if llvmTest {
+		return "-gcflags=all=" + os.Getenv("TANGO_GCFLAGS")
+	}
 	return "-gcflags=all=" + os.Getenv("GO_GCFLAGS")
 }
 
 func (test) goGcflagsIsEmpty() bool {
+	llvmTest := os.Getenv("TANGO_LLVM_TEST") == "1"
+	if llvmTest {
+		return "" == os.Getenv("TANGO_GCFLAGS")
+	}
 	return "" == os.Getenv("GO_GCFLAGS")
 }
 

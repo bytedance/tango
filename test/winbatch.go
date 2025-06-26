@@ -1,8 +1,11 @@
 // run
 
 // Copyright 2020 The Go Authors. All rights reserved.
+// Copyright (c) 2025 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2025-06-26.
 
 // Check that batch files are maintained as CRLF files (consistent
 // behavior on all operating systems). See golang.org/issue/37791.
@@ -37,6 +40,9 @@ func main() {
 		if path == filepath.Join(runtime.GOROOT(), "pkg") {
 			// GOROOT/pkg is known to contain generated artifacts, not source code.
 			// Skip it to avoid false positives. (Also see golang.org/issue/37929.)
+			return filepath.SkipDir
+		}
+		if strings.Contains(path, "llvm-project") {
 			return filepath.SkipDir
 		}
 		if filepath.Ext(d.Name()) == ".bat" {

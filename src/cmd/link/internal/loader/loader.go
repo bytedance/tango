@@ -1,6 +1,9 @@
 // Copyright 2019 The Go Authors. All rights reserved.
+// Copyright (c) 2025 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2025-06-26.
 
 package loader
 
@@ -15,6 +18,7 @@ import (
 	"debug/elf"
 	"fmt"
 	"internal/abi"
+	"internal/buildcfg"
 	"io"
 	"iter"
 	"log"
@@ -293,10 +297,15 @@ type extSymPayload struct {
 	size   int64
 	ver    int
 	kind   sym.SymKind
+	flag   uint8  // see goobj/objfile.go Sym.Flag. mark symbol attributes
+	flag2  uint8  // see goobj/objfile.go Sym.Flag2. mark symbol attributes
 	objidx uint32 // index of original object if sym made by cloneToExternal
 	relocs []goobj.Reloc
 	data   []byte
 	auxs   []goobj.Aux
+
+	// Mark it used for LTO-based modification
+	ltoModified bool
 }
 
 const (
@@ -631,6 +640,10 @@ func (l *Loader) getPayload(i Sym) *extSymPayload {
 	return l.payloads[pi]
 }
 
+func (l *Loader) Payload(i Sym) *extSymPayload {
+	return l.getPayload(i)
+}
+
 // allocPayload allocates a new payload.
 func (l *Loader) allocPayload() *extSymPayload {
 	batch := l.payloadBatch
@@ -655,6 +668,98 @@ func (ms *extSymPayload) Grow(siz int64) {
 		ms.data = ms.data[0:cl]
 	}
 	ms.data = ms.data[:siz]
+}
+
+func (l *Loader) Auxs(i Sym) []goobj.Aux {
+	pp := l.getPayload(i)
+	if pp == nil || !pp.ltoModified {
+		panic("must be a modified symbol")
+	}
+	return pp.auxs
+}
+
+func (l *Loader) IterateAllGoSyms(fn func(name string, ver int, s Sym)) {
+	for _, o := range l.objs[goObjStart:] {
+		for li, gi := range o.syms {
+			osym := o.Sym(uint32(li))
+			name := osym.Name(o.Reader)
+			v := abiToVer(osym.ABI(), o.version)
+			fn(name, v, gi)
+		}
+	}
+}
+
+func (l *Loader) MakeMutableForLTO(i Sym) {
+	pp := l.getPayload(i)
+	if pp != nil && pp.ltoModified {
+		return
+	}
+	if pp.objidx == 0 {
+		if len(pp.auxs) != 0 {
+			panic("i must be a symbol from a goobj if it has aux")
+		}
+		// it must be a newly created static symbol
+		return
+	}
+	// get unmodifiable aux and reader
+	r, auxs := l.objs[pp.objidx], pp.auxs
+	if len(auxs) == 0 {
+		pp.ltoModified = true
+		return
+	}
+	pp.auxs = append([]goobj.Aux(nil), auxs...)
+	for j := range pp.auxs {
+		a := &pp.auxs[j]
+		s := l.resolve(r, a.Sym())
+		if s == 0 {
+			continue
+		}
+		// make sure s is global
+		if !l.IsExternal(s) {
+			l.cloneToExternal(s)
+		}
+		// update to global sym
+		a.SetSym(goobj.SymRef{PkgIdx: uint32(0), SymIdx: uint32(s)})
+	}
+	pp.ltoModified = true
+}
+
+func (l *Loader) GoAux(i Sym, t uint8) *goobj.Aux {
+	_, auxs := l.auxs(i)
+	for j := range auxs {
+		a := &auxs[j]
+		if a.Type() == t {
+			return a
+		}
+	}
+	return nil
+}
+
+func (l *Loader) GenAndCopyNewSym(old Sym) Sym {
+	if old == 0 {
+		return l.CreateExtSym("", 0)
+	}
+	if !l.IsExternal(old) {
+		// panic("only external could copy pay load.")
+		l.cloneToExternal(old)
+	}
+	new := l.CreateExtSym(l.SymName(old), 0)
+	oldPayload := l.getPayload(old)
+	newPayload := l.getPayload(new)
+	newPayload.name = oldPayload.name
+	newPayload.size = oldPayload.size
+	newPayload.ver = oldPayload.ver
+	newPayload.kind = oldPayload.kind
+	newPayload.flag = oldPayload.flag
+	newPayload.flag2 = oldPayload.flag2
+	newPayload.auxs = oldPayload.auxs
+	newPayload.data = oldPayload.data
+	newPayload.objidx = oldPayload.objidx
+	// DupOk is important for
+	if l.AttrDuplicateOK(old) {
+		l.SetAttrDuplicateOK(new, true)
+	}
+	return new
 }
 
 // Convert a local index to a global index.
@@ -846,6 +951,12 @@ func (l *Loader) SymType(i Sym) sym.SymKind {
 // Returns the attributes of the i-th symbol.
 func (l *Loader) SymAttr(i Sym) uint8 {
 	if l.IsExternal(i) {
+		if buildcfg.Experiment.TangoLLVM {
+			pp := l.getPayload(i)
+			if pp != nil && pp.ltoModified {
+				return pp.flag
+			}
+		}
 		// TODO: do something? External symbols have different representation of attributes.
 		// For now, ReflectMethod, NoSplit, GoType, and Typelink are used and they cannot be
 		// set by external symbol.
@@ -1234,6 +1345,12 @@ func (l *Loader) IsTypelink(i Sym) bool {
 // Returns whether this symbol is an itab symbol.
 func (l *Loader) IsItab(i Sym) bool {
 	if l.IsExternal(i) {
+		if buildcfg.Experiment.TangoLLVM {
+			pp := l.getPayload(i)
+			if pp != nil && pp.ltoModified {
+				return pp.flag2&goobj.SymFlagItab != 0
+			}
+		}
 		return false
 	}
 	r, li := l.toLocal(i)
@@ -1243,6 +1360,12 @@ func (l *Loader) IsItab(i Sym) bool {
 // Returns whether this symbol is a dictionary symbol.
 func (l *Loader) IsDict(i Sym) bool {
 	if l.IsExternal(i) {
+		if buildcfg.Experiment.TangoLLVM {
+			pp := l.getPayload(i)
+			if pp != nil && pp.ltoModified {
+				return pp.flag2&goobj.SymFlagDict != 0
+			}
+		}
 		return false
 	}
 	r, li := l.toLocal(i)
@@ -1673,6 +1796,12 @@ func (l *Loader) SetSymLocalentry(i Sym, value uint8) {
 // Returns the number of aux symbols given a global index.
 func (l *Loader) NAux(i Sym) int {
 	if l.IsExternal(i) {
+		if buildcfg.Experiment.TangoLLVM {
+			pp := l.getPayload(i)
+			if pp != nil && pp.ltoModified {
+				return len(pp.auxs)
+			}
+		}
 		return 0
 	}
 	r, li := l.toLocal(i)
@@ -1682,6 +1811,16 @@ func (l *Loader) NAux(i Sym) int {
 // Returns the "handle" to the j-th aux symbol of the i-th symbol.
 func (l *Loader) Aux(i Sym, j int) Aux {
 	if l.IsExternal(i) {
+		if buildcfg.Experiment.TangoLLVM {
+			pp := l.getPayload(i)
+			if pp != nil && pp.ltoModified {
+				a := &pp.auxs[j]
+				if a.Sym().PkgIdx != 0 {
+					panic("must be global")
+				}
+				return Aux{a, l.extReader, l}
+			}
+		}
 		return Aux{}
 	}
 	r, li := l.toLocal(i)
@@ -1973,6 +2112,11 @@ func (l *Loader) relocs(r *oReader, li uint32) Relocs {
 func (l *Loader) auxs(i Sym) (*oReader, []goobj.Aux) {
 	if l.IsExternal(i) {
 		pp := l.getPayload(i)
+		if buildcfg.Experiment.TangoLLVM {
+			if pp != nil && pp.ltoModified {
+				return l.extReader, pp.auxs
+			}
+		}
 		return l.objs[pp.objidx], pp.auxs
 	} else {
 		r, li := l.toLocal(i)
@@ -1993,6 +2137,30 @@ func (l *Loader) aux1(i Sym, t uint8) Sym {
 }
 
 func (l *Loader) Pcsp(i Sym) Sym { return l.aux1(i, goobj.AuxPcsp) }
+
+func (l *Loader) DataAuxs(i Sym, t uint8, tmp []*goobj.Aux) []*goobj.Aux {
+	_, auxs := l.auxs(i)
+	tmp = tmp[:0]
+	for j := range auxs {
+		a := &auxs[j]
+		if a.Type() == t {
+			tmp = append(tmp, a)
+		}
+	}
+	return tmp
+}
+
+func (l *Loader) Pcdata(i Sym, tmp []Sym) []Sym {
+	r, auxs := l.auxs(i)
+	tmp = tmp[:0]
+	for j := range auxs {
+		a := &auxs[j]
+		if a.Type() == goobj.AuxPcdata {
+			tmp = append(tmp, l.resolve(r, a.Sym()))
+		}
+	}
+	return tmp
+}
 
 // Returns all aux symbols of per-PC data for symbol i.
 // tmp is a scratch space for the pcdata slice.
@@ -2044,6 +2212,46 @@ func (l *Loader) Funcdata(i Sym, tmp []Sym) []Sym {
 	return fd
 }
 
+func (l *Loader) LocalSymVersion(i Sym) int {
+	pp := l.getPayload(i)
+	if pp == nil || !pp.ltoModified {
+		panic("must be LTO modified")
+	}
+	if pp.objidx == 0 {
+		panic("LTO modified data must have a local objidx")
+	}
+	return l.objs[pp.objidx].version
+}
+
+func (l *Loader) EnsureFuncdata(i Sym, tmp []Sym, fid int) []Sym {
+	if !l.IsExternal(i) {
+		panic("must be external first")
+	}
+	fd := tmp[:0]
+	r, auxs := l.auxs(i)
+	for j := range auxs {
+		a := &auxs[j]
+		if a.Type() == goobj.AuxFuncdata {
+			fd = append(fd, l.resolve(r, a.Sym()))
+		}
+	}
+	if fid < len(fd) {
+		return fd
+	}
+
+	// We must append it to the auxs.
+	pi := l.extIndex(i)
+	pl := l.payloads[pi]
+	for j := len(fd); j <= fid; j++ {
+		fd = append(fd, 0)
+		var a goobj.Aux
+		a.SetType(goobj.AuxFuncdata)
+		a.SetSym(goobj.SymRef{PkgIdx: uint32(0), SymIdx: uint32(0)})
+		pl.auxs = append(pl.auxs, a)
+	}
+	return fd
+}
+
 // Returns the number of funcdata for symbol i.
 func (l *Loader) NumFuncdata(i Sym) int {
 	n := 0
@@ -2063,6 +2271,8 @@ type FuncInfo struct {
 	r       *oReader
 	data    []byte
 	lengths goobj.FuncInfoLengths
+	sym     Sym
+	funcsym goobj.SymRef
 }
 
 func (fi *FuncInfo) Valid() bool { return fi.r != nil }
@@ -2085,6 +2295,10 @@ func (fi *FuncInfo) FuncFlag() abi.FuncFlag {
 
 func (fi *FuncInfo) StartLine() int32 {
 	return (*goobj.FuncInfo)(nil).ReadStartLine(fi.data)
+}
+
+func (fi *FuncInfo) FuncInfoSym() Sym {
+	return fi.l.resolve(fi.r, fi.funcsym)
 }
 
 // Preload has to be called prior to invoking the various methods
@@ -2148,8 +2362,15 @@ func (l *Loader) FuncInfo(i Sym) FuncInfo {
 	for j := range auxs {
 		a := &auxs[j]
 		if a.Type() == goobj.AuxFuncInfo {
-			b := r.Data(a.Sym().SymIdx)
-			return FuncInfo{l, r, b, goobj.FuncInfoLengths{}}
+			var b []byte
+			if buildcfg.Experiment.TangoLLVM {
+				sym := l.resolve(r, a.Sym())
+				b = l.Data(sym)
+				return FuncInfo{l, r, b, goobj.FuncInfoLengths{}, i, a.Sym()}
+			} else {
+				b = r.Data(a.Sym().SymIdx)
+				return FuncInfo{l: l, r: r, data: b, lengths: goobj.FuncInfoLengths{}}
+			}
 		}
 	}
 	return FuncInfo{}
@@ -2584,11 +2805,20 @@ func (l *Loader) cloneToExternal(symIdx Sym) *extSymPayload {
 	sname := osym.Name(r.Reader)
 	sver := abiToVer(osym.ABI(), r.version)
 	skind := sym.AbiSymKindToSymKind[objabi.SymKind(osym.Type())]
+	var flag, flag2 uint8
+	if buildcfg.Experiment.TangoLLVM {
+		flag = osym.Flag()
+		flag2 = osym.Flag2()
+	}
 
 	// Create new symbol, update version and kind.
 	pi := l.newPayload(sname, sver)
 	pp := l.payloads[pi]
 	pp.kind = skind
+	if buildcfg.Experiment.TangoLLVM {
+		pp.flag = flag
+		pp.flag2 = flag2
+	}
 	pp.ver = sver
 	pp.size = int64(osym.Siz())
 	pp.objidx = r.objidx

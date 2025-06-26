@@ -30,3 +30,18 @@ Go
     src/runtime/memdebug.go
       adapts stack frame traversal from src/runtime/symtab.go for
       large-allocation diagnostics without allocating during traversal.
+
+TinyGo
+  src/cmd/compile/internal/ssagen/llvm.go contains portions adapted from
+  compiler/compiler.go and compiler/atomic.go in
+  https://github.com/tinygo-org/tinygo, version v0.25.0. Adapted portions
+  include compiler configuration and context declarations, debug metadata,
+  LLVM type construction, atomic operations, and related comments and helpers.
+  These portions and their modifications retain BSD 3-Clause terms. The original TinyGo copyright is retained in the source header;
+  the complete license is in src/cmd/compile/internal/ssagen/LICENSE-TinyGo.
+
+TangoLLVM
+  Optional bindings and SDK files are copied from
+  https://github.com/bytedance/tangollvm by its preparation script.
+  Their source notices and licenses are retained when copied into Tango;
+  copying them does not change their licenses to Tango's BSD license.

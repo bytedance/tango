@@ -1598,6 +1598,41 @@ func cmdbootstrap() {
 		copyfile(pathf("%s/compile3", tooldir), pathf("%s/compile", tooldir), writeExec)
 	}
 
+	if os.Getenv("BUILD_TANGOLLVM") == "1" && goos == "linux" && goarch == "amd64" {
+		// override previously set of CGO_ENABLED any way
+		xprintf("Building TangoLLVM toolchain3 using go_bootstrap and Go toolchain2.\n")
+		env := toolenv()
+		llvmGoexperiment := "tangollvm"
+		if goexperiment != "" {
+			llvmGoexperiment = goexperiment + "," + llvmGoexperiment
+		}
+		env = append(env,
+			"CGO_ENABLED=1",
+			"GOEXPERIMENT="+llvmGoexperiment,
+			"BUILDING_TANGOLLVM_TOOLS=1",
+		)
+		llvmCopyFile := func(dst, src string) {
+			copyfile(pathf("%s/%s", tooldir, dst), pathf("%s/%s", tooldir, src), writeExec)
+		}
+		llvmCopyFile("compile_org", "compile")
+		llvmCopyFile("link_org", "link")
+		restoreTools := true
+		xatexit(func() {
+			if restoreTools {
+				llvmCopyFile("compile", "compile_org")
+				llvmCopyFile("link", "link_org")
+			}
+		})
+		goInstall(env, goBootstrap, []string{"-a", "cmd/compile", "cmd/link"}...)
+		llvmCopyFile("llvm_compile", "compile")
+		llvmCopyFile("llvm_link", "link")
+		llvmCopyFile("compile", "compile_org")
+		llvmCopyFile("link", "link_org")
+		restoreTools = false
+		xremove(pathf("%s/compile_org", tooldir))
+		xremove(pathf("%s/link_org", tooldir))
+	}
+
 	// Now that toolchain3 has been built from scratch, its compiler and linker
 	// should have accurate build IDs suitable for caching.
 	// Now prime the build cache with the rest of the standard library for

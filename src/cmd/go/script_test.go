@@ -1,6 +1,9 @@
 // Copyright 2018 The Go Authors. All rights reserved.
+// Copyright (c) 2025 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2025-06-26.
 
 // Script-driven tests.
 // See testdata/script/README for an overview.
@@ -122,6 +125,10 @@ func TestScript(t *testing.T) {
 			}
 
 			s, err := script.NewState(tbContext(ctx, t), workdir, env)
+			// This test case passes the 'goexperiment' parameter to 'compile',
+			// which triggers a version check failure. To prevent this, we bypass the
+			// check using this environment variable.
+			s.Setenv("TESTING_TANGOLLVM", os.Getenv("TESTING_TANGOLLVM"))
 			if err != nil {
 				t.Fatal(err)
 			}

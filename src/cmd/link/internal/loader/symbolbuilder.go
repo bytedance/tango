@@ -1,6 +1,9 @@
 // Copyright 2019 The Go Authors. All rights reserved.
+// Copyright (c) 2025 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2025-06-26.
 
 package loader
 
@@ -117,6 +120,10 @@ func (sb *SymbolBuilder) AddBytes(data []byte) {
 
 func (sb *SymbolBuilder) Relocs() Relocs {
 	return sb.l.Relocs(sb.symIdx)
+}
+
+func (sb *SymbolBuilder) RelocsCount() int {
+	return len(sb.relocs)
 }
 
 // ResetRelocs removes all relocations on this symbol.

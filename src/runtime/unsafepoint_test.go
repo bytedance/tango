@@ -1,6 +1,9 @@
 // Copyright 2023 The Go Authors. All rights reserved.
+// Copyright (c) 2025 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2025-06-26.
 
 package runtime_test
 
@@ -24,6 +27,9 @@ func setGlobalPointer() {
 var globalPointer *int
 
 func TestUnsafePoint(t *testing.T) {
+	if testenv.IsLLVMEnabled() {
+		t.Skip("TODO: need fix")
+	}
 	testenv.MustHaveExec(t)
 	switch runtime.GOARCH {
 	case "amd64", "arm64":

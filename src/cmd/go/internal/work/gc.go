@@ -649,6 +649,9 @@ func (gcToolchain) ld(b *Builder, root *Action, targetPath, importcfg, mainpkg s
 	// enabled at runtime can read it.
 	if beastStr := flag_beast.GetBeastFlag(root.Package.Internal.Gcflags); beastStr != "" {
 		ldflags = append(ldflags, "-X=runtime.beastFlag="+beastStr)
+		if buildcfg.Experiment.TangoLLVM && flag_beast.ParseBeastArguments(beastStr)["full-lto"] == 1 {
+			ldflags = append(ldflags, "-full-lto")
+		}
 	}
 	ldflags, err := setextld(ldflags, compiler)
 	if err != nil {

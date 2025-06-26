@@ -10,6 +10,15 @@
 //	Portions Copyright © 2005-2007 C H Forsyth (forsyth@terzarima.net)
 //	Revisions Copyright © 2000-2007 Lucent Technologies Inc. and others
 //	Portions Copyright © 2009 The Go Authors. All rights reserved.
+// Copyright (c) 2025 ByteDance Ltd. and/or its affiliates.
+// SPDX-License-Identifier: MIT
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2025-06-26.
+//
+// Original file was released under the MIT License, with the full license text
+// available below.
+//
+// This modified file is released under the same license.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -35,6 +44,7 @@ import (
 	"cmd/internal/goobj"
 	"cmd/internal/hash"
 	"cmd/internal/objabi"
+	"crypto/md5"
 	"encoding/base64"
 	"encoding/binary"
 	"fmt"
@@ -42,6 +52,7 @@ import (
 	"log"
 	"math"
 	"sort"
+	"strings"
 )
 
 func Linknew(arch *LinkArch) *Link {
@@ -208,6 +219,18 @@ func (ctxt *Link) Int128Sym(hi, lo int64) *LSym {
 			s.WriteInt(ctxt, 8, 8, lo)
 		}
 		s.Type = typ
+		s.Set(AttrLocal, true)
+		s.Set(AttrContentAddressable, true)
+		ctxt.constSyms = append(ctxt.constSyms, s)
+	})
+}
+
+func (ctxt *Link) ByteArraySym(data []byte, align uint64) *LSym {
+	name := fmt.Sprintf("$bytes..a%d.·%x", align, md5.Sum(data))
+	return ctxt.LookupInit(name, func(s *LSym) {
+		s.Size = int64(len(data))
+		s.WriteBytes(ctxt, 0, data)
+		s.Type = objabi.SRODATA
 		s.Set(AttrLocal, true)
 		s.Set(AttrContentAddressable, true)
 		ctxt.constSyms = append(ctxt.constSyms, s)
@@ -487,6 +510,18 @@ func (ctxt *Link) traverseFuncAux(flag traverseFlag, fsym *LSym, fn func(parent 
 			}
 		}
 	}
+
+	// TODO: LLVM and Go backend may produce different set of debug info
+	if buildcfg.Experiment.TangoLLVM && fninfo.FuncInfoSym != nil {
+		// LLVM will create the sym before but still need to update sym id afterwards.
+		// Need to check file symbols and func symbols
+		// TODO: check file symbols
+		for _, sym := range fninfo.InlineTreeLSym {
+			if sym != nil {
+				fn(fsym, sym)
+			}
+		}
+	}
 }
 
 // Traverse aux symbols, calling fn for each sym/aux pair.
@@ -507,4 +542,47 @@ func (ctxt *Link) traverseAuxSyms(flag traverseFlag, fn func(parent *LSym, aux *
 			}
 		}
 	}
+}
+
+// +TANGOLLVM
+func (ctxt *Link) LookupLLVMGoSymbol(name string, fn func(*Link, string) *LSym) *LSym {
+	var s *LSym
+	if strings.HasSuffix(name, "..abi0") {
+		name = name[:len(name)-6]
+		ctxt.hashmu.Lock()
+		s = ctxt.hash[name]
+		ctxt.hashmu.Unlock()
+		return s
+	}
+	ctxt.hashmu.Lock()
+	s0 := ctxt.hash[name]
+	s1 := ctxt.funchash[name]
+	if s1 == nil {
+		s = s0
+	} else {
+		s = s1
+	}
+	ctxt.hashmu.Unlock()
+	if s == nil && fn != nil {
+		s = fn(ctxt, name)
+	}
+	return s
+}
+
+// +TANGOLLVM
+func (ctxt *Link) LookupLLVMGoSymbolABI(name string, abi ABI) *LSym {
+	var hash map[string]*LSym
+	switch abi {
+	case ABI0:
+		hash = ctxt.hash
+	case ABIInternal:
+		hash = ctxt.funchash
+	default:
+		panic("unknown ABI")
+	}
+
+	ctxt.hashmu.Lock()
+	s := hash[name]
+	ctxt.hashmu.Unlock()
+	return s
 }

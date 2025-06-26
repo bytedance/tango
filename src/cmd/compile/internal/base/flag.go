@@ -159,21 +159,55 @@ type CmdFlags struct {
 			AmdVersion    int
 			FmtRewrite    int
 			Conv          int // replace deepcopy library in inline.rcPackages with tango/conv
+
+			// LLVM=1: go:llvm pragma only
+			// LLVM=2: enable if checkFeasibility = true && no runtime package
+			// LLVM=3: enable if checkFeasibility = true
+			// LLVM=4: force enable llvm on all functions
+			LLVM               int
+			LLVMMaxFuncCount   int
+			Optimize           int
+			Inline             int
+			LoopOpt            int
+			AMD64TargetFeature int
+			IntrinsifyMemmove  int
+			FullLTO            int
+			OPConvert          int
 		}
 	}
 }
 
 func parseBeastOption(beastStr string) {
 	beastVars := map[string]*int{
-		"bce":           &Flag.Cfg.BeastOpt.Bce,
-		"inlbudget":     &Flag.Cfg.BeastOpt.MaxInlbudget,
-		"gabinline":     &Flag.Cfg.BeastOpt.GabInline,
-		"intrinsic":     &Flag.Cfg.BeastOpt.Intrinsic,
-		"amdver":        &Flag.Cfg.BeastOpt.AmdVersion,
-		"verbose":       &Flag.Cfg.BeastOpt.Verbose,
-		"makeslicecopy": &Flag.Cfg.BeastOpt.MakeSliceCopy,
-		"fmtrewrite":    &Flag.Cfg.BeastOpt.FmtRewrite,
-		"conv":          &Flag.Cfg.BeastOpt.Conv,
+		"bce":               &Flag.Cfg.BeastOpt.Bce,
+		"inlbudget":         &Flag.Cfg.BeastOpt.MaxInlbudget,
+		"gabinline":         &Flag.Cfg.BeastOpt.GabInline,
+		"intrinsic":         &Flag.Cfg.BeastOpt.Intrinsic,
+		"amdver":            &Flag.Cfg.BeastOpt.AmdVersion,
+		"verbose":           &Flag.Cfg.BeastOpt.Verbose,
+		"makeslicecopy":     &Flag.Cfg.BeastOpt.MakeSliceCopy,
+		"fmtrewrite":        &Flag.Cfg.BeastOpt.FmtRewrite,
+		"conv":              &Flag.Cfg.BeastOpt.Conv,
+		"llvm":              &Flag.Cfg.BeastOpt.LLVM,
+		"llvm_max":          &Flag.Cfg.BeastOpt.LLVMMaxFuncCount,
+		"optimize":          &Flag.Cfg.BeastOpt.Optimize,
+		"inline":            &Flag.Cfg.BeastOpt.Inline,
+		"loopopt":           &Flag.Cfg.BeastOpt.LoopOpt,
+		"amd64feature":      &Flag.Cfg.BeastOpt.AMD64TargetFeature,
+		"intrinsifymemmove": &Flag.Cfg.BeastOpt.IntrinsifyMemmove,
+		"full-lto":          &Flag.Cfg.BeastOpt.FullLTO,
+		"opconvert":         &Flag.Cfg.BeastOpt.OPConvert,
+	}
+
+	if buildcfg.Experiment.TangoLLVM {
+		// defaults Inline to 1, user can overwrite
+		Flag.Cfg.BeastOpt.Inline = 1
+		// Keep runtime.memmove calls by default. LLVM can silently drop a
+		// memmove intrinsic that it cannot lower under Go ABIInternal.
+		Flag.Cfg.BeastOpt.IntrinsifyMemmove = 0
+		Flag.Cfg.BeastOpt.AMD64TargetFeature = 3
+		Flag.Cfg.BeastOpt.FullLTO = 0
+		Flag.Cfg.BeastOpt.OPConvert = 0
 	}
 	for oname, val := range flag_beast.ParseBeastArguments(beastStr) {
 		if opt, ok := beastVars[oname]; ok {
@@ -190,6 +224,31 @@ func addEnv(s string) {
 		log.Fatal("-env argument must be of the form key=value")
 	}
 	os.Setenv(s[:i], s[i+1:])
+}
+
+// some go dist test cases set 'GOEXPERIMENT' and rebuild 'compile',
+// which cause the go version changes. ref: TestScript
+// so remove 'tangollvm' flag when testing it to ensure the cases pass.
+func removeTangollvmInFlag(s string) string {
+	if os.Getenv("TESTING_TANGOLLVM") != "1" {
+		return s
+	}
+	elems := strings.Split(s, " X:")
+	if len(elems) != 2 {
+		return s
+	}
+	flags := strings.Split(elems[1], ",")
+	newFlag := make([]string, 0, len(flags))
+	for _, flag := range flags {
+		if flag != "tangollvm" {
+			newFlag = append(newFlag, flag)
+		}
+	}
+	if len(newFlag) == 0 {
+		return elems[0]
+	} else {
+		return elems[0] + " X:" + strings.Join(newFlag, ",")
+	}
 }
 
 // ParseFlags parses the command-line flags into Flag.
@@ -351,8 +410,10 @@ func ParseFlags() {
 		usage()
 	}
 
-	if Flag.GoVersion != "" && Flag.GoVersion != runtime.Version() {
-		fmt.Printf("compile: version %q does not match go tool version %q\n", runtime.Version(), Flag.GoVersion)
+	rV := removeTangollvmInFlag(runtime.Version())
+	fV := removeTangollvmInFlag(Flag.GoVersion)
+	if Flag.GoVersion != "" && fV != rV {
+		fmt.Printf("compile: version %q does not match go tool version %q\n", rV, fV)
 		Exit(2)
 	}
 
@@ -546,6 +607,11 @@ func concurrentBackendAllowed() bool {
 	}
 	// TODO: fix races and enable the following flags
 	if Ctxt.Flag_dynlink || Flag.Race {
+		return false
+	}
+
+	// TODO: add concurrent support for LLVM
+	if buildcfg.Experiment.TangoLLVM {
 		return false
 	}
 	return true

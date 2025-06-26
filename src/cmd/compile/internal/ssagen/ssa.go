@@ -193,7 +193,8 @@ func InitConfig() {
 	ir.Syms.GetGId = typecheck.LookupRuntimeFunc("getGId")
 	ir.Syms.GetPId = typecheck.LookupRuntimeFunc("getPId")
 
-	if Arch.LinkArch.Family == sys.Wasm {
+	if useDirectBoundsCheckFuncs(Arch.LinkArch.Family,
+		buildcfg.Experiment.TangoLLVM, base.Flag.Cfg.BeastOpt.LLVM) {
 		BoundsCheckFunc[ssa.BoundsIndex] = typecheck.LookupRuntimeFunc("goPanicIndex")
 		BoundsCheckFunc[ssa.BoundsIndexU] = typecheck.LookupRuntimeFunc("goPanicIndexU")
 		BoundsCheckFunc[ssa.BoundsSliceAlen] = typecheck.LookupRuntimeFunc("goPanicSliceAlen")
@@ -218,6 +219,16 @@ func InitConfig() {
 	ir.Syms.WasmTruncS = typecheck.LookupRuntimeVar("wasmTruncS")
 	ir.Syms.WasmTruncU = typecheck.LookupRuntimeVar("wasmTruncU")
 	ir.Syms.SigPanic = typecheck.LookupRuntimeFunc("sigpanic")
+
+	if buildcfg.Experiment.TangoLLVM && base.Flag.Cfg.BeastOpt.LLVM != 0 {
+		InitLLVM()
+	}
+}
+
+func useDirectBoundsCheckFuncs(
+	family sys.ArchFamily, tangoLLVM bool, llvmMode int,
+) bool {
+	return family == sys.Wasm || tangoLLVM && llvmMode != 0
 }
 
 func InitTables() {
@@ -366,6 +377,14 @@ func buildssa(fn *ir.Func, worker int, isPgoHot bool) *ssa.Func {
 	s.f.Type = fn.Type()
 	s.f.Name = name
 	s.f.PrintOrHtmlSSA = printssa
+
+	if buildcfg.Experiment.TangoLLVM {
+		s.f.CompileLLVM = base.Flag.Cfg.BeastOpt.LLVM >= 2
+		if s.f.CompileLLVM {
+			s.f.LLVMBuilder = newLLVMBuilder(&s)
+		}
+	}
+
 	if fn.Pragma&ir.Nosplit != 0 {
 		s.f.NoSplit = true
 	}

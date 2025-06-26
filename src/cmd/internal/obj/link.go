@@ -9,6 +9,15 @@
 //	Portions Copyright © 2005-2007 C H Forsyth (forsyth@terzarima.net)
 //	Revisions Copyright © 2000-2007 Lucent Technologies Inc. and others
 //	Portions Copyright © 2009 The Go Authors. All rights reserved.
+// Copyright (c) 2025 ByteDance Ltd. and/or its affiliates.
+// SPDX-License-Identifier: MIT
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2025-06-26.
+//
+// Original file was released under the MIT License, with the full license text
+// available below.
+//
+// This modified file is released under the same license.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -506,6 +515,10 @@ type FuncInfo struct {
 	WasmExport *WasmExport
 
 	sehUnwindInfoSym *LSym
+
+	// +TANGOLLVM
+	// Used by NumberSyms and StringTable etc.
+	InlineTreeLSym []*LSym
 }
 
 // JumpTable represents a table used for implementing multi-way

@@ -373,6 +373,10 @@ func Main(archInit func(*ssagen.ArchInfo)) {
 	// Write object data to disk.
 	base.Timer.Start("be", "dumpobj")
 	dumpdata()
+
+	if buildcfg.Experiment.TangoLLVM && base.Flag.Cfg.BeastOpt.LLVM != 0 {
+		ssagen.CompleteLLVM()
+	}
 	base.Ctxt.NumberSyms()
 	dumpobj()
 	if base.Flag.AsmHdr != "" {

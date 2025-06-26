@@ -1,6 +1,9 @@
 // Copyright 2013 The Go Authors. All rights reserved.
+// Copyright (c) 2025 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2025-06-26.
 
 // Writing Go object files.
 
@@ -17,12 +20,15 @@ import (
 	"encoding/binary"
 	"fmt"
 	"internal/abi"
+	"internal/buildcfg"
 	"io"
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -394,6 +400,17 @@ func (w *writer) Sym(s *LSym) {
 		case strings.HasPrefix(name, "gclocals·"):
 			// It has 32-bit fields.
 			align = 4
+		case strings.Contains(name, "..a") && buildcfg.Experiment.TangoLLVM:
+			re := regexp.MustCompile(`\.\.a(\d+)\.`)
+			matches := re.FindAllStringSubmatch(name, -1)
+			if len(matches) != 1 {
+				panic("The symbol name doesn't have substring \"..a<NUM>.\" at all or have multiple substrings matching that pattern.")
+			}
+			num, err := strconv.ParseUint(matches[0][1], 10, 32)
+			if err != nil {
+				panic("The string cannot be converted into a number.")
+			}
+			align = uint32(num)
 		default:
 			switch {
 			case w.ctxt.Arch.PtrSize == 8 && s.Size%8 == 0:
@@ -766,35 +783,53 @@ func genFuncInfoSyms(ctxt *Link) {
 		if fn == nil {
 			continue
 		}
-		o := goobj.FuncInfo{
-			Args:      uint32(fn.Args),
-			Locals:    uint32(fn.Locals),
-			FuncID:    fn.FuncID,
-			FuncFlag:  fn.FuncFlag,
-			StartLine: fn.StartLine,
-		}
-		pc := &fn.Pcln
-		i := 0
-		o.File = make([]goobj.CUFileIndex, len(pc.UsedFiles))
-		for f := range pc.UsedFiles {
-			o.File[i] = f
-			i++
-		}
-		sort.Slice(o.File, func(i, j int) bool { return o.File[i] < o.File[j] })
-		o.InlTree = make([]goobj.InlTreeNode, len(pc.InlTree.nodes))
-		for i, inl := range pc.InlTree.nodes {
-			f, l := ctxt.getFileIndexAndLine(inl.Pos)
-			o.InlTree[i] = goobj.InlTreeNode{
-				Parent:   int32(inl.Parent),
-				File:     goobj.CUFileIndex(f),
-				Line:     l,
-				Func:     makeSymRef(inl.Func),
-				ParentPC: inl.ParentPC,
+		var p []byte
+		if buildcfg.Experiment.TangoLLVM && fn.FuncInfoSym != nil {
+			if fn.FuncInfoSym.Indexed() {
+				panic("temporal symbol should not be indexed")
 			}
-		}
+			for _, r := range fn.FuncInfoSym.R {
+				if r.Sym == nil {
+					panic("Oops, no symbol")
+				}
+				if r.Sym.PkgIdx == 0 || !r.Sym.Indexed() {
+					panic("Oops, symbol not indexed")
+				}
+				binary.LittleEndian.PutUint32(fn.FuncInfoSym.P[r.Off:], uint32(r.Sym.PkgIdx))
+				binary.LittleEndian.PutUint32(fn.FuncInfoSym.P[r.Off+4:], uint32(r.Sym.SymIdx))
+			}
+			p = fn.FuncInfoSym.P
+		} else {
+			o := goobj.FuncInfo{
+				Args:      uint32(fn.Args),
+				Locals:    uint32(fn.Locals),
+				FuncID:    fn.FuncID,
+				FuncFlag:  fn.FuncFlag,
+				StartLine: fn.StartLine,
+			}
+			pc := &fn.Pcln
+			i := 0
+			o.File = make([]goobj.CUFileIndex, len(pc.UsedFiles))
+			for f := range pc.UsedFiles {
+				o.File[i] = f
+				i++
+			}
+			sort.Slice(o.File, func(i, j int) bool { return o.File[i] < o.File[j] })
+			o.InlTree = make([]goobj.InlTreeNode, len(pc.InlTree.nodes))
+			for i, inl := range pc.InlTree.nodes {
+				f, l := ctxt.getFileIndexAndLine(inl.Pos)
+				o.InlTree[i] = goobj.InlTreeNode{
+					Parent:   int32(inl.Parent),
+					File:     goobj.CUFileIndex(f),
+					Line:     l,
+					Func:     makeSymRef(inl.Func),
+					ParentPC: inl.ParentPC,
+				}
+			}
 
-		o.Write(&b)
-		p := b.Bytes()
+			o.Write(&b)
+			p = b.Bytes()
+		}
 		isym := &LSym{
 			Type:   objabi.SDATA, // for now, I don't think it matters
 			PkgIdx: goobj.PkgIdxSelf,

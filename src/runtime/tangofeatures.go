@@ -4,7 +4,11 @@
 
 package runtime
 
-import _ "unsafe"
+import (
+	"internal/bytealg"
+	"internal/goexperiment"
+	_ "unsafe"
+)
 
 //go:linkname isGabEnabled
 func isGabEnabled() bool {
@@ -15,6 +19,20 @@ func isGabEnabled() bool {
 func isBeastModeEnabled() bool {
 	// TODO: change it to optmode == "standard" when beast default enable.
 	return optmode == "beast"
+}
+
+//go:linkname isLLVMEnabled
+func isLLVMEnabled() bool {
+	if !goexperiment.TangoLLVM {
+		return false
+	}
+	switch GOARCH {
+	case "amd64":
+		return bytealg.IndexString(beastFlag, "llvm=") >= 0 &&
+			bytealg.IndexString(beastFlag, "llvm=0") < 0
+	default:
+		return false
+	}
 }
 
 //go:linkname isAdaptSchedEnabled

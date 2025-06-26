@@ -48,6 +48,10 @@ func cmdtest() {
 	flag.BoolVar(&t.asan, "asan", false, "run in address sanitizer builder mode")
 	flag.BoolVar(&t.json, "json", false, "report test results in JSON")
 
+	// +TANGOLLVM
+	flag.StringVar(&t.tangollvm, "tl", "", "compiler flags for TangoLLVM tests, e.g. -beast=llvm=3,optimize=3,inline=1")
+	flag.Func("env", "environment assignment for TangoLLVM tests; repeat for multiple variables", t.addEnv)
+
 	xflagparse(-1) // any number of args
 	if noRebuild {
 		t.rebuild = false
@@ -82,6 +86,19 @@ type tester struct {
 	timeoutScale int
 
 	worklist []*work
+
+	// +TANGOLLVM
+	tangollvm string   // options for tangollvm
+	env       []string // environment assignments for tangollvm
+}
+
+func (t *tester) addEnv(value string) error {
+	key, _, ok := strings.Cut(value, "=")
+	if !ok || key == "" || strings.ContainsRune(value, 0) {
+		return fmt.Errorf("invalid environment assignment %q; want NAME=value", value)
+	}
+	t.env = append(t.env, value)
+	return nil
 }
 
 // work tracks command execution for a test.
@@ -562,6 +579,8 @@ var (
 	benchMatches []string
 
 	ranTangoTest bool
+
+	ranLLVMTest bool
 )
 
 func (t *tester) registerStdTest(pkg string) {
@@ -601,17 +620,29 @@ func (t *tester) registerStdTestInBeastMode(pkg string) {
 
 	testName := testPrefix + pkg
 
+	t.registerStdTestInCustomMode(testName, heading, []string{}, gogcflags, &ranTangoTest)
+}
+
+func (t *tester) registerStdTestInLLVMMode(pkg string) {
+	heading := "Testing packages with beast option and TangoLLVM."
+	testPrefix := "tangollvm_test:"
+	gcflags := strings.TrimSpace(gogcflags + " " + t.tangollvm)
+	testName := testPrefix + pkg
+	t.registerStdTestInCustomMode(testName, heading, t.env, gcflags, &ranLLVMTest)
+}
+
+func (t *tester) registerStdTestInCustomMode(name string, heading string, env []string, gcflags string, ranflag *bool) {
 	t.tests = append(t.tests, distTest{
-		name:    testName,
+		name:    name,
 		heading: heading,
 		fn: func(dt *distTest) error {
-			if ranTangoTest {
+			if *ranflag {
 				return nil
 			}
 			t.runPending(dt)
 			timelog("start", dt.name)
 			defer timelog("end", dt.name)
-			ranTangoTest = true
+			*ranflag = true
 
 			timeoutSec := 480 * time.Second
 			for _, pkg := range stdMatches {
@@ -622,6 +653,8 @@ func (t *tester) registerStdTestInBeastMode(pkg string) {
 			}
 
 			return (&goTest{
+				env:     env,
+				gcflags: gcflags,
 				timeout: timeoutSec,
 				beast:   true,
 				pkgs:    stdMatches,
@@ -728,6 +761,11 @@ func (t *tester) registerTests() {
 		if !t.race {
 			for _, pkg := range pkgs {
 				t.registerStdTestInBeastMode(pkg)
+			}
+			if t.tangollvm != "" {
+				for _, pkg := range pkgs {
+					t.registerStdTestInLLVMMode(pkg)
+				}
 			}
 		}
 

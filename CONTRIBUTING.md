@@ -28,6 +28,23 @@ This ensures better clarity and makes it easier to backport upstream changes.
 Run the tests relevant to your change and check that the standard Tango build
 continues to work with optional enhancements disabled.
 
+## TangoLLVM Changes
+
+For TangoLLVM changes, also validate a separately prepared LLVM-enabled
+toolchain; setting `GOEXPERIMENT` alone does not prepare its bindings or SDK.
+
+Keep the Tango-maintained Go-to-LLVM translator and compiler/linker dispatch in
+Tango. Parts of the translator were originally adapted from TinyGo; see
+[LICENSE-TinyGo](src/cmd/compile/internal/ssagen/LICENSE-TinyGo). LLVM-derived
+bindings, the C bridge, and SDK preparation belong in the
+[TangoLLVM repository](https://github.com/bytedance/tangollvm). Do not commit
+copied build-directory files into Tango. When changing compiler or ABI
+interfaces, review the paired TangoLLVM changes and validate each target Tango
+branch. Include both repository revisions, the reproducer, and test results in
+your contribution.
+
+See [Building TangoLLVM](doc/tangollvm.md) for the current build and test workflow.
+
 ## Issues
 
 We use GitHub issues to track public bugs. Please ensure your description is

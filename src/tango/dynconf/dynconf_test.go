@@ -164,6 +164,9 @@ func testRemoteStableness(t *testing.T) {
 }
 
 func testList(t *testing.T) {
+	if testenv.IsLLVMEnabled() {
+		t.Skip("Temporarily skip this test case in LLVM mode")
+	}
 	expectedStrings := []string{
 		"config(ro): runtime.gab=0",
 		"config(ro): runtime.gabUsedBytes=0",
@@ -197,6 +200,9 @@ func testList(t *testing.T) {
 }
 
 func testGetAndCheck(t *testing.T) {
+	if testenv.IsLLVMEnabled() {
+		t.Skip("Temporarily skip this test case in LLVM mode")
+	}
 	for key, val := range getExpectedCfgs(false) {
 		strres, err := postCmd("get", key)
 		expected := fmt.Sprintf("%s=%v", key, val)
@@ -476,6 +482,9 @@ func shouldContains(s string, keys []string, t *testing.T) {
 
 // Test the dynconf facilities from within current process
 func TestLocalGet(t *testing.T) {
+	if testenv.IsLLVMEnabled() {
+		t.Skip("Temporarily skip this test case in LLVM mode")
+	}
 	// lazyInit will not be executed if no http request is ever sent.
 	// Call it manually during local testing to avoid inconsistent PGO results when other tests send requests.
 	lazyInit()

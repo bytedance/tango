@@ -11,6 +11,7 @@ Tango 是一个增强版 Go 语言发行版，作为社区标准 Go SDK 的超�
 Tango 的核心原则是 **兼容优先**。Tango 会保留已有的对外行为，包括默认启用部分经过验证的稳定集成；其他增强能力通过编译选项或运行时开关显式启用，无需修改业务代码。
 在架构层面，Tango：
 - 基于官方 Go 源码演进，保证对标准库和语言特性的兼容性；
+- 提供基于 LLVM 的可选编译期后端，需使用准备后的 TangoLLVM 工具链，设置 `GOEXPERIMENT=tangollvm` 并传入 `-gcflags=all=-beast=llvm=N`（N≥2）才能启用；默认仍使用官方 Go 编译器后端，编译产物在运行时不依赖 LLVM。
 
 ### 与上游 Go 的默认行为差异
 
@@ -28,6 +29,7 @@ Tango 按编译器、运行时、诊断以及标准库与 API 四类提供增强
 ### 编译器增强
 - **Beast 编译模式**：针对性优化后端、长期执行服务的编译器策略，生成高性能机器码。
 - **PGO（Profile-Guided Optimization）增强**：采用运行期的性能采样数据指导编译器调整优化策略，如热点函数内联、基本块布局、函数布局、条件分支优化等，进一步增强了 recursive 以及 栈扩容场景下的优化策略。
+- **可选 LLVM 后端**：在默认 Go 编译器后端之外提供基于 LLVM 的可选编译期后端，用于探索不同的代码生成和优化策略。
 ### 运行时增强
 - **Balanced GC**：将小对象通过 bump pointer 的方式在 per-g allocation buffer 上分配，并使用移动对象 GC 管理这部分内存，提高对象分配和回收效率。
 ### 诊断与可观测性
@@ -66,6 +68,14 @@ go build -opt=beast -o my_app main.go
 - **PGO 增强**（编译期选项）：使用采集好的 CPU profile 文件，通过 `-pgo perf.pb.gz` 参与编译。
 ```bash
 go build -pgo perf.pb.gz -gcflags=all='-d=pgorecursive=1,pgostacksize=1' -o my_app main.go
+```
+- **LLVM 编译后端（实验性）**：先按照 [TangoLLVM 构建说明](doc/tangollvm.md)，
+使用 [TangoLLVM 仓库](https://github.com/bytedance/tangollvm) 构建匹配的工具链。普通 `make.bash` 构建不包含
+准备后的 LLVM 绑定和 SDK。随后使用生成的工具链：
+```bash
+env -u GOROOT GOEXPERIMENT=tangollvm \
+  /path/to/tango-llvm-build/bin/go build \
+  -gcflags='all=-beast=llvm=3,optimize=3,inline=1' -o my_app_llvm main.go
 ```
 - **Balanced GC**（运行期选项）：通过设置 `GODEBUG=gab=2` 启用 Balanced GC。
 ```bash

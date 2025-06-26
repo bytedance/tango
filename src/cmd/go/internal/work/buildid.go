@@ -1,6 +1,9 @@
 // Copyright 2017 The Go Authors. All rights reserved.
+// Copyright (c) 2025 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2025-07-30.
 
 package work
 
@@ -170,7 +173,7 @@ func (b *Builder) toolID(name string) string {
 
 		line := stdout.String()
 		f := strings.Fields(line)
-		if len(f) < 3 || f[0] != name && path != VetTool || f[1] != "version" || strings.Contains(f[2], "devel") && !strings.HasPrefix(f[len(f)-1], "buildID=") {
+		if len(f) < 3 || f[0] != name && f[0] != "llvm_"+name && path != VetTool || f[1] != "version" || strings.Contains(f[2], "devel") && !strings.HasPrefix(f[len(f)-1], "buildID=") {
 			base.Fatalf("go: parsing buildID from %s -V=full: unexpected output:\n\t%s", desc, line)
 		}
 		if strings.Contains(f[2], "devel") {

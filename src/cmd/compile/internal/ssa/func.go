@@ -1,6 +1,9 @@
 // Copyright 2015 The Go Authors. All rights reserved.
+// Copyright (c) 2025 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2025-06-26.
 
 package ssa
 
@@ -16,6 +19,11 @@ import (
 	"math"
 	"strings"
 )
+
+// +TANGOLLVM
+type LLVMBuilder interface {
+	BuildLLVM()
+}
 
 // A Func represents a Go func declaration (or function literal) and its body.
 // This package compiles each Func independently.
@@ -85,6 +93,10 @@ type Func struct {
 
 	auxmap    auxmap             // map from aux values to opaque ids used by CSE
 	constants map[int64][]*Value // constants cache, keyed by constant value; users must check value's Op and Type
+
+	// +TANGOLLVM
+	CompileLLVM bool
+	LLVMBuilder
 }
 
 type LocalSlotSplitKey struct {
