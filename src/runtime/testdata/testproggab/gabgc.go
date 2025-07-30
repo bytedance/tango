@@ -97,7 +97,7 @@ func testMemSim() {
 		concAlloc int           // number of concurrent backgroup allocating goroutines
 		gcAlot    bool          // if starts a separate goroutine to trigger many GCs
 		dur       time.Duration // total duration of testing, 10s by default
-		ended     bool          // if testing ended
+		ended     atomic.Bool   // if testing ended
 	)
 	testEnvs := os.Getenv("GAB_TEST_ENV")
 	fs := flag.NewFlagSet("testMemSim", flag.ExitOnError)
@@ -121,14 +121,14 @@ func testMemSim() {
 		// Use a holder to hold pointers so that GAB evacuation can happen
 		holder := make(map[unsafe.Pointer]struct{})
 		idx := 0
-		for !ended {
+		for !ended.Load() {
 			holder[alloc(rand.Int()%gabLimit)] = struct{}{}
 			idx++
 		}
 	}
 
 	taskGCTrigger := func() {
-		for !ended {
+		for !ended.Load() {
 			runtime.GC()
 			time.Sleep(500 * time.Millisecond)
 		}
@@ -146,12 +146,12 @@ func testMemSim() {
 
 	// The controller state
 	tmEnd := time.Now().Add(dur)
-	for !ended {
+	for !ended.Load() {
 		n := time.Now()
 		if n.Before(tmEnd) {
 			time.Sleep(tmEnd.Sub(n))
 		} else {
-			ended = true
+			ended.Store(true)
 		}
 	}
 }
@@ -428,7 +428,7 @@ func testConcGCBitsClean() {
 			defer wg.Done()
 			for j := 0; j < length*10; j++ {
 				buf := allocBuf()
-				refsUsedBytes[i%Length] = unsafe.Pointer(&buf)
+				refsUsedBytes[i%length] = unsafe.Pointer(&buf)
 			}
 		}(i)
 	}
@@ -463,7 +463,8 @@ func testFindBlockFast() {
 func testGabMarkStacks() {
 	const length = 1 << 12
 	const cap = 8
-	flag := true
+	flag := atomic.Bool{}
+	flag.Store(true)
 
 	genRandom := func() int {
 		return rand.Intn(100)
@@ -496,7 +497,7 @@ func testGabMarkStacks() {
 
 	go func() {
 		time.Sleep(30 * time.Second)
-		flag = false
+		flag.Store(false)
 	}()
 
 	var wg sync.WaitGroup
@@ -508,7 +509,7 @@ func testGabMarkStacks() {
 		wg.Add(1)
 		i := i
 		go func() {
-			for flag {
+			for flag.Load() {
 				val, _ := strconv.Atoi(strHolders[i])
 				x.Add(int64(val))
 				time.Sleep(1 * time.Millisecond)
@@ -518,7 +519,7 @@ func testGabMarkStacks() {
 
 		wg.Add(1)
 		go func() {
-			for flag {
+			for flag.Load() {
 				vals := intHolders[i]
 				for j := 0; j < len(vals); j++ {
 					x.Add(int64(vals[j]))

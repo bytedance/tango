@@ -1625,7 +1625,6 @@ func scanConservative(b, n uintptr, ptrmask *uint8, gcw *gcWork, state *stackSca
 		obj := span.base() + idx*span.elemsize
 		if !tryDeferToSpanScan(obj, gcw) {
 			greyobject(obj, b, i, span, gcw, idx)
-
 			if isEvacEnabled() && span.doEvacuation() {
 				span.gabPinObj(obj)
 			}

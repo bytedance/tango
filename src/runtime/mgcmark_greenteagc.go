@@ -926,6 +926,9 @@ func scanSpan(p objptr, gcw *gcWork) {
 		if !tryDeferToSpanScan(p, gcw) {
 			if obj, span, objIndex := findObject(p, 0, 0); obj != 0 {
 				greyobject(obj, 0, 0, span, gcw, objIndex)
+				if isEvacEnabled() && span.doEvacuation() {
+					span.gabPinObj(obj)
+				}
 			}
 		}
 	}
@@ -1010,6 +1013,9 @@ func scanObjectSmall(spanBase, b, objSize uintptr, gcw *gcWork) {
 		if !tryDeferToSpanScan(p, gcw) {
 			if obj, span, objIndex := findObject(p, 0, 0); obj != 0 {
 				greyobject(obj, 0, 0, span, gcw, objIndex)
+				if isEvacEnabled() && span.doEvacuation() {
+					span.gabPinObj(obj)
+				}
 			}
 		}
 	}
@@ -1058,6 +1064,9 @@ func scanObjectsSmall(base, objSize uintptr, elems uint16, gcw *gcWork, scans *g
 		if !tryDeferToSpanScan(p, gcw) {
 			if obj, span, objIndex := findObject(p, 0, 0); obj != 0 {
 				greyobject(obj, 0, 0, span, gcw, objIndex)
+				if isEvacEnabled() && span.doEvacuation() {
+					span.gabPinObj(obj)
+				}
 			}
 		}
 	}
@@ -1273,7 +1282,7 @@ func scanObject(b uintptr, gcw *gcWork) {
 			// heap. In this case, we know the object was
 			// just allocated and hence will be marked by
 			// allocation itself.
-			if !tryDeferToSpanScan(obj, gcw) {
+			if (isEvacEnabled() && !pinned) || !tryDeferToSpanScan(obj, gcw) {
 				src := obj
 				if obj, span, objIndex := findObject(obj, b, addr-b); obj != 0 {
 					greyobject(obj, b, addr-b, span, gcw, objIndex)
