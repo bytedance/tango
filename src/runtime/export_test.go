@@ -2190,7 +2190,7 @@ func IsFrozenObj(p uintptr) bool {
 			" s.limit=", hex(s.limit), " s.spanclass=", s.spanclass, " s.elemsize=", s.elemsize, "\n")
 		return false
 	}
-	if s.frozenBits == nil {
+	if s.loadFrozenBits() == nil {
 		println(s, "do not have frozenBits")
 		return false
 	}

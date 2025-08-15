@@ -725,7 +725,7 @@ func (sl *sweepLocked) sweep(preserve bool) bool {
 			if isEvacEnabled() {
 				s.gabPinBits = newMarkBits(uintptr(s.nelems))
 			}
-		} else if s.frozenBits != nil {
+		} else if s.loadFrozenBits() != nil {
 			s.updateFrozenBits()
 		}
 	}

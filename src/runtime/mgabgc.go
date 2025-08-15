@@ -628,19 +628,19 @@ func frozenBitsForAddr(p uintptr) markBits {
 }
 
 func (s *mspan) frozenBitsForIndex(objIndex uintptr) markBits {
-	if s.frozenBits == nil {
+	if s.loadFrozenBits() == nil {
 		lock(&s.frozenBitsLock)
-		if s.frozenBits == nil {
+		if s.loadFrozenBits() == nil {
 			s.newFrozenBits()
 		}
 		unlock(&s.frozenBitsLock)
 	}
-	bytep, mask := s.frozenBits.bitp(objIndex)
+	bytep, mask := s.loadFrozenBits().bitp(objIndex)
 	return markBits{bytep, mask, objIndex}
 }
 
 func (s *mspan) shouldBePinned(addr uintptr) bool {
-	if s.frozenBits != nil {
+	if s.loadFrozenBits() != nil {
 		return frozenBitsForAddr(addr).isMarked()
 	}
 	return false
@@ -666,15 +666,15 @@ func (s *mspan) newFrozenBits() {
 	lock(&mheap_.frozenAllocLock)
 	// Calculate the size of frozenBits in bytes
 	// This logic should be aligned with newMarkBits()
-	// TODO Assure the atomicity and sequential consistency of updating frozenBytes and frozenBits
+	// Assure the atomicity and sequential consistency of updating frozenBytes and frozenBits
 	// A race condition may occur when newFrozenBits() and updateFrozenBits()
 	// run concurrently. Update frozenBytes first then frozenBits. If frozenBits
 	// is not nil, then the up-to-date value of frozenBytes must be visible.
-	// Note that this only holds on total store ordering (TSO) architecture.
 	blocksNeeded := (uintptr(s.nelems) + 63) / 64
 	s.frozenBytes = blocksNeeded * 8
-	s.frozenBits = (*gcBits)(mheap_.frozenBitAlloc.alloc())
+	s.storeFrozenBits((*gcBits)(mheap_.frozenBitAlloc.alloc()))
 	unlock(&mheap_.frozenAllocLock)
+
 }
 
 // frozenBits are freed when the corresponding mspan is freed.
@@ -682,7 +682,7 @@ func (s *mspan) freeFrozenBits() {
 	lock(&mheap_.frozenAllocLock)
 	mheap_.frozenBitAlloc.free(unsafe.Pointer(s.frozenBits))
 	unlock(&mheap_.frozenAllocLock)
-	s.frozenBits = nil
+	s.storeFrozenBits(nil)
 }
 
 // Bitwise AND with allocBits after sweeping so that the frozenBits

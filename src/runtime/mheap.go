@@ -564,6 +564,23 @@ func (s *mspan) layout() (size, n, total uintptr) {
 	return
 }
 
+func (s *mspan) loadFrozenBits() *gcBits {
+	if GOARCH == "amd64" {
+		return s.frozenBits
+	} else {
+		return (*gcBits)(atomic.Loadp(unsafe.Pointer(&s.frozenBits)))
+
+	}
+}
+
+func (s *mspan) storeFrozenBits(p *gcBits) {
+	if GOARCH == "amd64" {
+		s.frozenBits = p
+	} else {
+		atomic.StorepNoWB(unsafe.Pointer(&s.frozenBits), unsafe.Pointer(p))
+	}
+}
+
 // recordspan adds a newly allocated span to h.allspans.
 //
 // This only happens the first time a span is allocated from
@@ -1838,7 +1855,7 @@ func (h *mheap) freeSpanLocked(s *mspan, typ spanAllocType) {
 		if isGabEnabled() {
 			if s.objStartBits != nil {
 				s.freeObjStartBits()
-			} else if s.frozenBits != nil {
+			} else if s.loadFrozenBits() != nil {
 				s.freeFrozenBits()
 			}
 		}

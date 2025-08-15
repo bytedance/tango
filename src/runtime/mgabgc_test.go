@@ -14,6 +14,7 @@ import (
 	"math/rand"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
@@ -628,5 +629,57 @@ func TestGabMapClone(t *testing.T) {
 	clonedMap3 = maps.Clone(m3)
 	if runtime.CheckSwissMapFrozenBit(clonedMap3) {
 		t.Fatal("The cloned map bucket is expected not to be pinned.")
+	}
+}
+
+func TestGab2MemoryOrderingOnArm64(t *testing.T) {
+	if runtime.GOARCH != "arm64" {
+		t.Skip("skipping on non-arm64")
+	}
+
+	testenv.MustHaveGoBuild(t)
+	testenv.MustHaveExec(t)
+
+	dir := t.TempDir()
+	src := []byte("package main\n\nfunc main() {}\n")
+	if err := os.WriteFile(filepath.Join(dir, "main.go"), src, 0o644); err != nil {
+		t.Fatalf("failed to write main.go: %v", err)
+	}
+
+	exe := "main"
+	build := testenv.CleanCmdEnv(testenv.Command(t, testenv.GoToolPath(t), "build", "-o", exe, "main.go"))
+	build.Dir = dir
+	if out, err := build.CombinedOutput(); err != nil {
+		t.Fatalf("go build failed: %v\n%s", err, out)
+	}
+
+	cases := []struct {
+		pattern string
+		wants   []string
+	}{
+		{`runtime\.\(\*sweepLocked\)\.sweep`, []string{"LDAR"}},
+		{`runtime\.\(\*mspan\)\.frozenBitsForIndex`, []string{"LDAR"}},
+		{`runtime\.\(\*mspan\)\.newFrozenBits`, []string{"STLR"}},
+		{`runtime\.\(\*mspan\)\.freeFrozenBits`, []string{"STLR"}},
+	}
+
+	var failed []string
+	for _, c := range cases {
+		objdump := testenv.CleanCmdEnv(testenv.Command(t, testenv.GoToolPath(t), "tool", "objdump", "-s", c.pattern, exe))
+		objdump.Dir = dir
+		out, err := objdump.CombinedOutput()
+		if err != nil {
+			t.Fatalf("go tool objdump failed for pattern %q: %v\n%s", c.pattern, err, out)
+		}
+		text := string(out)
+		for _, want := range c.wants {
+			if !strings.Contains(text, want) {
+				failed = append(failed, fmt.Sprintf("pattern %q missing %q", c.pattern, want))
+			}
+		}
+	}
+
+	if len(failed) > 0 {
+		t.Fatalf("objdump output does not contain expected instructions:\n  %s", strings.Join(failed, "\n  "))
 	}
 }

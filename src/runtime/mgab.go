@@ -121,8 +121,8 @@ func gabConfigInit() {
 		return
 	}
 
-	if isEvacEnabled() && !(GOARCH == "amd64" && (GOOS == "linux" || GOOS == "darwin")) {
-		println("Only on linux/amd64 and darwin/amd64 is balanced GC supported. Downgrade to gab=1.")
+	if isEvacEnabled() && !((GOARCH == "amd64" || GOARCH == "arm64") && (GOOS == "linux" || GOOS == "darwin")) {
+		println("Only on linux/{amd64,arm64} and darwin/{amd64,arm64} is balanced GC supported. Downgrade to gab=1.")
 		debug.gab = 1
 	}
 
