@@ -1481,7 +1481,15 @@ func mallocgcSmallNoscan(size uintptr, typ *_type, needzero, isgab bool) (unsafe
 	// using the whole allocation slot.
 	c.nextSample -= int64(size)
 	if c.nextSample < 0 || MemProfileRate != c.memProfRate {
-		profilealloc(mp, x, size)
+		if isEvacEnabled() && isgab && getg() != mp.curg {
+			// When balanced GC is enabled, the gab refill func will call mallocgc1
+			// in the systemstack, it will cause the user stack to be lost in the
+			// mem profile.
+			// So the mem profile should handle the systemstack specially.
+			profileAllocGab(mp, x, size, mp.curg)
+		} else {
+			profilealloc(mp, x, size)
+		}
 	}
 	mp.mallocing = 0
 	releasem(mp)
