@@ -2412,3 +2412,187 @@ func SetArtsOpt(opt int32) int32 {
 func ArtsOptEnabled(opt int32) bool {
 	return artsOptEnabled(opt)
 }
+
+func GetStructRtype(t *any) uintptr {
+	i := efaceOf(t)
+	typ := i._type
+	return uintptr(unsafe.Pointer(&typ.StructType().Type))
+}
+
+var (
+	mockedModulesSliceSorted **[]*moduledata = &modulesSliceSorted
+	mockedPluginSliceSorted  **[]*moduledata = &pluginSliceSorted
+)
+
+type MockModuleData struct {
+	Minpc, Maxpc  uintptr
+	End           uintptr
+	Types, Etypes uintptr
+	Gofunc        uintptr
+
+	Pluginpath string
+	Modulename string
+	Hasmain    uint8 // 1 if module contains the main function, 0 otherwise
+	Bad        bool  // module failed to load and should be ignored
+}
+
+var (
+	tmpAllocCount = 0
+	tmpModuledata [100]moduledata
+)
+
+// moduledata can't be allocated in Go, use global var to mock it.
+func mockNewModuleData() *moduledata {
+	if tmpAllocCount >= len(tmpModuledata) {
+		panic("tmpModuledata overflow")
+		return nil
+	}
+	res := &tmpModuledata[tmpAllocCount]
+	tmpAllocCount++
+	return res
+}
+
+func convertMockModuleDataToModuleData(input *MockModuleData) *moduledata {
+	md := mockNewModuleData()
+	md.minpc = input.Minpc
+	md.maxpc = input.Maxpc
+	md.end = input.End
+	md.types = input.Types
+	md.etypes = input.Etypes
+	md.gofunc = input.Gofunc
+	md.pluginpath = input.Pluginpath
+	md.modulename = input.Modulename
+	md.hasmain = input.Hasmain
+	md.bad = input.Bad
+	return md
+
+}
+
+func convertModuleDataToMockModuleData(input *moduledata) *MockModuleData {
+	return &MockModuleData{
+		Minpc:      input.minpc,
+		Maxpc:      input.maxpc,
+		End:        input.end,
+		Types:      input.types,
+		Etypes:     input.etypes,
+		Gofunc:     input.gofunc,
+		Pluginpath: input.pluginpath,
+		Modulename: input.modulename,
+		Hasmain:    input.hasmain,
+		Bad:        input.bad,
+	}
+}
+
+func MockInitModuleDataOpt(mds []*MockModuleData) {
+	convMds := make([]*moduledata, 0, len(mds))
+	for _, md := range mds {
+		convMds = append(convMds, convertMockModuleDataToModuleData(md))
+	}
+	modules := new([]*moduledata)
+	plugins := new([]*moduledata)
+	for _, md := range convMds {
+		if md.bad {
+			continue
+		}
+		*modules = append(*modules, md)
+		if md.pluginpath != "" || md.hasmain == 1 {
+			*plugins = append(*plugins, md)
+		}
+	}
+	quickSort(*modules)
+	if len(*plugins) > 0 {
+		quickSort(*plugins)
+	}
+	atomicstorep(unsafe.Pointer(mockedModulesSliceSorted), unsafe.Pointer(modules))
+	if len(*plugins) > 0 {
+		atomicstorep(unsafe.Pointer(mockedPluginSliceSorted), unsafe.Pointer(plugins))
+	}
+}
+
+func MockResetModuleDataOpt() {
+	atomicstorep(unsafe.Pointer(mockedModulesSliceSorted), nil)
+	atomicstorep(unsafe.Pointer(mockedPluginSliceSorted), nil)
+}
+
+func MockInsertModuleDataOpt(mds []*MockModuleData) {
+	convMds := make([]*moduledata, 0, len(mds))
+	for _, md := range mds {
+		convMds = append(convMds, convertMockModuleDataToModuleData(md))
+	}
+
+	modules := new([]*moduledata)
+	plugins := new([]*moduledata)
+
+	newMods := make([]*moduledata, 0, len(mds))
+	newPlugins := make([]*moduledata, 0, 5)
+
+	for _, md := range convMds {
+		if md.bad {
+			continue
+		}
+		newMods = append(newMods, md)
+		if md.pluginpath != "" {
+			newPlugins = append(newPlugins, md)
+		}
+	}
+	// Sort new added moduledata.
+	if len(newMods) > 1 {
+		quickSort(newMods)
+	}
+	if len(newPlugins) > 1 {
+		quickSort(newPlugins)
+	}
+	// Two sorted slice, merge sort.
+	oldModule := *(*[]*moduledata)(atomic.Loadp(unsafe.Pointer(mockedModulesSliceSorted)))
+	modules = mergeSortedModuleData(oldModule, newMods)
+	if len(newPlugins) > 0 {
+		oldPlugins := *(*[]*moduledata)(atomic.Loadp(unsafe.Pointer(mockedPluginSliceSorted)))
+		plugins = mergeSortedModuleData(oldPlugins, newPlugins)
+	}
+	atomicstorep(unsafe.Pointer(mockedModulesSliceSorted), unsafe.Pointer(modules))
+	if len(*plugins) > 0 {
+		atomicstorep(unsafe.Pointer(mockedPluginSliceSorted), unsafe.Pointer(plugins))
+	}
+}
+
+func MockGetModuleDataOpt() (modules, plugins []*MockModuleData) {
+	convModules := *(*[]*moduledata)(atomic.Loadp(unsafe.Pointer(mockedModulesSliceSorted)))
+	convPlugins := *(*[]*moduledata)(atomic.Loadp(unsafe.Pointer(mockedPluginSliceSorted)))
+	modules = make([]*MockModuleData, 0, len(convModules))
+	plugins = make([]*MockModuleData, 0, len(convPlugins))
+	for _, v := range convModules {
+		modules = append(modules, convertModuleDataToMockModuleData(v))
+	}
+	for _, v := range convPlugins {
+		plugins = append(plugins, convertModuleDataToMockModuleData(v))
+	}
+	return
+}
+
+func FindModuledataByPc(pc uintptr) *MockModuleData {
+	md := findModuledataByPc(pc)
+	if md == nil {
+		return nil
+	}
+	return convertModuleDataToMockModuleData(md)
+}
+
+func FindModuledataByType(pc uintptr) *MockModuleData {
+	md := findModuledataByType(pc)
+	if md == nil {
+		return nil
+	}
+	return convertModuleDataToMockModuleData(md)
+}
+
+func FindModuledataByGCdata(pc uintptr) *MockModuleData {
+	md := findModuledataByGCdata(pc)
+	if md == nil {
+		return nil
+	}
+	return convertModuleDataToMockModuleData(md)
+}
+
+func IsModuleDataOptEnabled() bool {
+	return isModuleDataOptEnabled()
+}

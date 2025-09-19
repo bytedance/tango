@@ -376,6 +376,9 @@ var debug struct {
 
 	gcadaptive      int32
 	gcadaptivetrace int32
+
+	moduledataopt   int32
+	moduledatadebug int32
 }
 
 var dbgvars = []*dbgVar{
@@ -420,6 +423,8 @@ var dbgvars = []*dbgVar{
 	{name: "gcadaptivetrace", value: &debug.gcadaptivetrace},
 	{name: "adapt", value: &debug.adapt},
 	{name: "adapttrace", value: &debug.adapttrace},
+	{name: "moduledataopt", value: &debug.moduledataopt},
+	{name: "moduledatadebug", value: &debug.moduledatadebug},
 }
 
 func parseRuntimeDebugVars(godebug string) {

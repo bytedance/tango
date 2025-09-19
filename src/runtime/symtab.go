@@ -1,6 +1,9 @@
 // Copyright 2014 The Go Authors. All rights reserved.
+// Copyright (c) 2025 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2025-09-19.
 
 package runtime
 
@@ -863,6 +866,11 @@ func (f *Func) startLine() int32 {
 //
 //go:nosplit
 func findmoduledatap(pc uintptr) *moduledata {
+	if debug.moduledataopt > 0 {
+		if datap := findModuledataByPc(pc); datap != nil {
+			return datap
+		}
+	}
 	for datap := &firstmoduledata; datap != nil; datap = datap.next {
 		if datap.minpc <= pc && pc < datap.maxpc {
 			return datap

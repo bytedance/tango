@@ -119,6 +119,7 @@ func getExpectedCfgs(local bool) map[string]any {
 		"runtime.memoryLimit":      int64(math.MaxInt64),
 		"runtime.gcadaptive":       int32(0),
 		"runtime.gcadaptivetrace":  int32(0),
+		"runtime.moduledataOpt":    int32(0),
 	}
 
 	if local {
@@ -187,6 +188,7 @@ func testList(t *testing.T) {
 		"config(ro): runtime.gabThreshold=",
 		"config(ro): runtime.memoryLimit=",
 		"config(ro): runtime.artsOpts=none",
+		"config(rw): runtime.moduledataOpt=0",
 		"task: runtime.GC",
 	}
 	listAndCheck(t, expectedStrings, "")

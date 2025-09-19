@@ -1554,6 +1554,9 @@ func gcMarkTermination(stw worldStop) {
 	if debug.gab > 0 {
 		gabNoteGCEnd()
 	}
+	if debug.moduledataopt > 0 {
+		checkUpdateSortedModuleData()
+	}
 
 	if work.goroutineLeak.enabled {
 		// Restore the elem and c fields of all sudogs to their original values.

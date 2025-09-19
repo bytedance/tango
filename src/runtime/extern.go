@@ -234,6 +234,14 @@ It is a comma-separated list of name=val pairs setting these named variables:
 	because it also disables the conservative stack scanning used
 	for asynchronously preempted goroutines.
 
+	moduledataopt: moduledataopt=X controls sorted moduledata lookup.
+	moduledataopt>0 optimizes minpc/maxpc searches, moduledataopt>1
+	optimizes types/etypes searches, and moduledataopt>2 optimizes
+	gofunc/end searches.
+
+	moduledatadebug: moduledatadebug=X prints moduledata cache updates
+	and lookup hit/miss diagnostics.
+
 The [net] and [net/http] packages also refer to debugging variables in GODEBUG.
 See the documentation for those packages for details.
 

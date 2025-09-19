@@ -31,3 +31,8 @@ func getBeastModeInfo() string {
 func getAdaptSchedOptsInfo() string {
 	return artsOpts
 }
+
+//go:linkname isModuleDataOptEnabled
+func isModuleDataOptEnabled() bool {
+	return debug.moduledataopt > 0
+}

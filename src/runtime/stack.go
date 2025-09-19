@@ -1360,16 +1360,21 @@ type stackObjectRecord struct {
 func (r *stackObjectRecord) gcdata() (uintptr, *byte) {
 	ptr := uintptr(unsafe.Pointer(r))
 	var mod *moduledata
-	for datap := &firstmoduledata; datap != nil; datap = datap.next {
-		// The normal case: stackObjectRecord is in funcdata.
-		if datap.gofunc <= ptr && ptr < datap.epclntab {
-			mod = datap
-			break
-		}
-		// A special case: methodValueCallFrameObjs.
-		if datap.noptrbss <= ptr && ptr < datap.enoptrbss {
-			mod = datap
-			break
+	if debug.moduledataopt > 2 {
+		mod = findModuledataByGCdata(ptr)
+	}
+	if mod == nil {
+		for datap := &firstmoduledata; datap != nil; datap = datap.next {
+			// The normal case: stackObjectRecord is in funcdata.
+			if datap.gofunc <= ptr && ptr < datap.epclntab {
+				mod = datap
+				break
+			}
+			// A special case: methodValueCallFrameObjs.
+			if datap.noptrbss <= ptr && ptr < datap.enoptrbss {
+				mod = datap
+				break
+			}
 		}
 	}
 	// If you get a panic here due to a nil mod,

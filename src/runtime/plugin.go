@@ -1,6 +1,9 @@
 // Copyright 2016 The Go Authors. All rights reserved.
+// Copyright (c) 2025 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2025-09-19.
 
 package runtime
 
@@ -27,6 +30,9 @@ func plugin_lastmoduleinit() (path string, syms map[string]any, initTasks []*ini
 	}
 	if md.typemap != nil {
 		return "", nil, nil, "plugin already loaded"
+	}
+	if debug.moduledatadebug > 0 {
+		addPluginDebug(md)
 	}
 
 	for _, pmd := range activeModules() {

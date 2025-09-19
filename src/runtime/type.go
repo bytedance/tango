@@ -1,6 +1,9 @@
 // Copyright 2009 The Go Authors. All rights reserved.
+// Copyright (c) 2025 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2025-09-19.
 
 // Runtime type representation.
 
@@ -296,6 +299,14 @@ func resolveNameOff(ptrInModule unsafe.Pointer, off nameOff) name {
 		return name{}
 	}
 	base := uintptr(ptrInModule)
+	if debug.moduledataopt > 1 {
+		if md := findModuledataByType(base); md != nil {
+			res := md.types + uintptr(off)
+			if res <= md.etypes {
+				return name{Bytes: (*byte)(unsafe.Pointer(res))}
+			}
+		}
+	}
 	for md := &firstmoduledata; md != nil; md = md.next {
 		if base >= md.types && base < md.etypes {
 			res := md.types + uintptr(off)
@@ -333,10 +344,15 @@ func resolveTypeOff(ptrInModule unsafe.Pointer, off typeOff) *_type {
 	}
 	base := uintptr(ptrInModule)
 	var md *moduledata
-	for next := &firstmoduledata; next != nil; next = next.next {
-		if base >= next.types && base < next.etypes {
-			md = next
-			break
+	if debug.moduledataopt > 1 {
+		md = findModuledataByType(base)
+	}
+	if md == nil {
+		for next := &firstmoduledata; next != nil; next = next.next {
+			if base >= next.types && base < next.etypes {
+				md = next
+				break
+			}
 		}
 	}
 	if md == nil {
@@ -375,10 +391,15 @@ func (t rtype) textOff(off textOff) unsafe.Pointer {
 	}
 	base := uintptr(unsafe.Pointer(t.Type))
 	var md *moduledata
-	for next := &firstmoduledata; next != nil; next = next.next {
-		if base >= next.types && base < next.etypes {
-			md = next
-			break
+	if debug.moduledataopt > 1 {
+		md = findModuledataByType(base)
+	}
+	if md == nil {
+		for next := &firstmoduledata; next != nil; next = next.next {
+			if base >= next.types && base < next.etypes {
+				md = next
+				break
+			}
 		}
 	}
 	if md == nil {

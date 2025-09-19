@@ -282,6 +282,9 @@ func bgsweep(c chan int) {
 	goparkunlock(&sweep.lock, waitReasonGCSweepWait, traceBlockGCSweep, 1)
 
 	for {
+		if debug.moduledataopt > 0 {
+			updateSortedModuleData()
+		}
 		// bgsweep attempts to be a "low priority" goroutine by intentionally
 		// yielding time. It's OK if it doesn't run, because goroutines allocating
 		// memory will sweep and ensure that all spans are swept before the next
