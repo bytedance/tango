@@ -379,6 +379,9 @@ var debug struct {
 
 	moduledataopt   int32
 	moduledatadebug int32
+
+	// heap THP optimization
+	heaphugepage int32
 }
 
 var dbgvars = []*dbgVar{
@@ -425,6 +428,7 @@ var dbgvars = []*dbgVar{
 	{name: "adapttrace", value: &debug.adapttrace},
 	{name: "moduledataopt", value: &debug.moduledataopt},
 	{name: "moduledatadebug", value: &debug.moduledatadebug},
+	{name: "heaphugepage", value: &debug.heaphugepage},
 }
 
 func parseRuntimeDebugVars(godebug string) {

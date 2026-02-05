@@ -64,6 +64,7 @@ var rtCfgMap = map[string]any{
 	"runtime.gcadaptiveThrptGoalLower,rw": ptrGcThrptGoalLower,     // setting gc throughput goal lower
 	"runtime.gcadaptiveSigmoidKValue,rw":  ptrGcThrptSigmoidKValue, // setting sigmoid k value
 	"runtime.moduledataOpt,rw":            &debug.moduledataopt,
+	"runtime.heapHugePage,ro":             &debug.heaphugepage,
 }
 
 //go:linkname rtCfgListAll

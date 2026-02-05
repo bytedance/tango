@@ -1,6 +1,9 @@
 // Copyright 2010 The Go Authors. All rights reserved.
+// Copyright (c) 2026 ByteDance Ltd. and/or its affiliates.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// This file has been modified by ByteDance Ltd. and/or its affiliates on 2026-02-05.
 
 package runtime
 
@@ -179,6 +182,19 @@ func sysMapOS(v unsafe.Pointer, n uintptr, vmaName string) {
 		throw("runtime: cannot map pages in arena address space")
 	}
 	setVMAName(p, n, vmaName)
+
+	// if enable heap THP optimization
+	if debug.heaphugepage != 0 && debug.disablethp == 0 {
+		if physHugePageSize != 0 {
+			// Round v up to a huge page boundary.
+			beg := alignUp(uintptr(v), physHugePageSize)
+			// Round v+n down to a huge page boundary.
+			end := alignDown(uintptr(v)+n, physHugePageSize)
+			if beg < end {
+				madvise(unsafe.Pointer(beg), end-beg, _MADV_HUGEPAGE)
+			}
+		}
+	}
 
 	// Disable huge pages if the GODEBUG for it is set.
 	//

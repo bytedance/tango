@@ -120,6 +120,7 @@ func getExpectedCfgs(local bool) map[string]any {
 		"runtime.gcadaptive":       int32(0),
 		"runtime.gcadaptivetrace":  int32(0),
 		"runtime.moduledataOpt":    int32(0),
+		"runtime.heapHugePage":     int32(0),
 	}
 
 	if local {
@@ -189,6 +190,7 @@ func testList(t *testing.T) {
 		"config(ro): runtime.memoryLimit=",
 		"config(ro): runtime.artsOpts=none",
 		"config(rw): runtime.moduledataOpt=0",
+		"config(ro): runtime.heapHugePage=0",
 		"task: runtime.GC",
 	}
 	listAndCheck(t, expectedStrings, "")
@@ -713,4 +715,18 @@ func testLargeAllocTrace(t *testing.T) {
 	if iv2 != size {
 		t.Fatalf("Expecting %d, but got %d\n", size, iv2)
 	}
+}
+
+func TestPprofDynconfWithHeapHugePageEnv(t *testing.T) {
+	clear := buildAndRunDynconfServer(t, nil, []string{
+		"GODEBUG=heaphugepage=1",
+	})
+
+	defer clear()
+
+	expectedStrings := []string{
+		"config(ro): runtime.heapHugePage=1",
+	}
+
+	listAndCheck(t, expectedStrings, "")
 }

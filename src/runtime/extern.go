@@ -242,6 +242,14 @@ It is a comma-separated list of name=val pairs setting these named variables:
 	moduledatadebug: moduledatadebug=X prints moduledata cache updates
 	and lookup hit/miss diagnostics.
 
+	heaphugepage: a runtime debug feature that enables transparent huge page (THP) optimization for
+	Go’s heap on Linux when set via GODEBUG=heaphugepage=1. When enabled and a valid huge page size is
+	available, the runtime aligns newly mapped heap regions to huge page boundaries and hints the kernel
+	with MADV_HUGEPAGE, which can reduce TLB pressure and improve memory-intensive workloads.
+	This feature is off by default and should be enabled only after careful validation,
+	as it may increase physical memory fragmentation and can interact with system-level THP policies in non-trivial ways.
+	when heaphugepage=1 && disablethp==0, heaphugepage feature is enabled.
+
 The [net] and [net/http] packages also refer to debugging variables in GODEBUG.
 See the documentation for those packages for details.
 
