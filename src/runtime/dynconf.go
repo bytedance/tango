@@ -9,7 +9,18 @@ import "unsafe"
 // This variable ignores the atomic inherency of atomic.Int32
 var ptrGCPercent *int32 = (*int32)(unsafe.Pointer(&gcController.gcPercent))
 var ptrMemoryLimit *int64 = (*int64)(unsafe.Pointer(&gcController.memoryLimit))
-var ptrGcThrptGoal *float64 = (*float64)(unsafe.Pointer(&gcAdaptiveController.latestGcThroughputGoal))
+
+// ptrGcThrpt points to gcThroughputRatioEMA, which is used to calculate the current GC throughput.
+var ptrGcThrpt *float64 = (*float64)(unsafe.Pointer(&cpuStatusExtend.gcThroughputRatioEMA))
+
+// ptrGcThrptGoal points to gcThroughputGoalRangeUpper
+var ptrGcThrptGoal *float64 = (*float64)(unsafe.Pointer(&gcAdaptiveController.gcThroughputGoalRangeUpper))
+
+// ptrGcThrptGoalLower points to gcThroughputGoalRangeLower
+var ptrGcThrptGoalLower *float64 = (*float64)(unsafe.Pointer(&gcAdaptiveController.gcThroughputGoalRangeLower))
+
+// ptrGcThrptSigmoidKValue points to sigmoidKValue
+var ptrGcThrptSigmoidKValue *float64 = (*float64)(unsafe.Pointer(&sigmoidKValue))
 
 var pgoSource string
 
@@ -24,27 +35,30 @@ func setPGOSource(value string) {
 }
 
 var rtCfgMap = map[string]any{
-	"runtime.gab,ro":                 &debug.gab,
-	"runtime.gabUsedBytes,ro":        &gabUsedBytes,
-	"runtime.gabThreshold,ro":        &gabState.gabMemLimit,
-	"runtime.gabMemoryPercent,rw":    &gabMemoryPercent,
-	"runtime.gabEnabled,ro":          &gabEnabled,
-	"runtime.gctrace,rw":             &debug.gctrace,
-	"runtime.buildVersion,ro":        &buildVersion,
-	"runtime.tangoVersion,ro":        &tangoVersion,
-	"runtime.optMode,ro":             &optMode,
-	"runtime.pgoSource,ro":           &pgoSource,
-	"runtime.gcPercent,ro":           ptrGCPercent,
-	"runtime.maxHeapBytes,ro":        &maxHeap,
-	"runtime.largeAllocTrace,rw":     &debug.largealloctrace,
-	"runtime.asyncpreemptoff,ro":     &debug.asyncpreemptoff,
-	"runtime.madvdontneed,ro":        &debug.madvdontneed,
-	"runtime.harddecommit,ro":        &debug.harddecommit,
-	"runtime.memoryLimit,ro":         ptrMemoryLimit,
-	"runtime.beastFlag,ro":           &beastFlag,
-	"runtime.gcadaptivetrace,rw":     &debug.gcadaptivetrace,
-	"runtime.gcadaptive,rw":          &debug.gcadaptive,
-	"runtime.gcadaptiveThrptGoal,rw": ptrGcThrptGoal,
+	"runtime.gab,ro":                      &debug.gab,
+	"runtime.gabUsedBytes,ro":             &gabUsedBytes,
+	"runtime.gabThreshold,ro":             &gabState.gabMemLimit,
+	"runtime.gabMemoryPercent,rw":         &gabMemoryPercent,
+	"runtime.gabEnabled,ro":               &gabEnabled,
+	"runtime.gctrace,rw":                  &debug.gctrace,
+	"runtime.buildVersion,ro":             &buildVersion,
+	"runtime.tangoVersion,ro":             &tangoVersion,
+	"runtime.optMode,ro":                  &optMode,
+	"runtime.pgoSource,ro":                &pgoSource,
+	"runtime.gcPercent,ro":                ptrGCPercent,
+	"runtime.maxHeapBytes,ro":             &maxHeap,
+	"runtime.largeAllocTrace,rw":          &debug.largealloctrace,
+	"runtime.asyncpreemptoff,ro":          &debug.asyncpreemptoff,
+	"runtime.madvdontneed,ro":             &debug.madvdontneed,
+	"runtime.harddecommit,ro":             &debug.harddecommit,
+	"runtime.memoryLimit,ro":              ptrMemoryLimit,
+	"runtime.beastFlag,ro":                &beastFlag,
+	"runtime.gcadaptivetrace,rw":          &debug.gcadaptivetrace,
+	"runtime.gcadaptive,rw":               &debug.gcadaptive,
+	"runtime.gcadaptiveThrptEMA,ro":       ptrGcThrpt,              // current GC throughput EMA
+	"runtime.gcadaptiveThrptGoal,rw":      ptrGcThrptGoal,          // setting gc throughput goal upper
+	"runtime.gcadaptiveThrptGoalLower,rw": ptrGcThrptGoalLower,     // setting gc throughput goal lower
+	"runtime.gcadaptiveSigmoidKValue,rw":  ptrGcThrptSigmoidKValue, // setting sigmoid k value
 }
 
 //go:linkname rtCfgListAll

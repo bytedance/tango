@@ -69,6 +69,17 @@ func TestPprofDynconfWithDefaultEnv(t *testing.T) {
 		"config(ro): runtime.memoryLimit=4294967296",
 	}
 	listAndCheck(t, expectedStrings, "")
+	// test gc throughput EMA read.
+	if strres, err := postCmd("get", "runtime.gcadaptiveThrptEMA"); err != nil || !strings.Contains(strres, "runtime.gcadaptiveThrptEMA=") {
+		t.Fatalf("Failed to get runtime.gcadaptiveThrptEMA, error=%v, response=%s", err, strres)
+	} else {
+		// the value should be a float number, which is the GC throughput EMA.
+		strres = strings.TrimSpace(strings.Split(strres, "=")[1])
+		// check strres can be parsed as float64 and is non-negative.
+		if f, err := strconv.ParseFloat(strres, 64); err != nil || f < 0 || f > 100.1 {
+			t.Fatalf("Invalid runtime.gcadaptiveThrptEMA value, error=%v, value=%s", err, strres)
+		}
+	}
 }
 
 func TestPprofDynconfWithGCAdaptiveEnv(t *testing.T) {
@@ -159,6 +170,10 @@ func testList(t *testing.T) {
 		"config(rw): runtime.gctrace=0",
 		"config(rw): runtime.gcadaptive=0",
 		"config(rw): runtime.gcadaptivetrace=0",
+		"config(rw): runtime.gcadaptiveThrptGoal=",
+		"config(rw): runtime.gcadaptiveThrptGoalLower=",
+		"config(rw): runtime.gcadaptiveSigmoidKValue=",
+		"config(ro): runtime.gcadaptiveThrptEMA=",
 		"config(ro): runtime.buildVersion=",
 		"config(ro): runtime.tangoVersion=bm.1.",
 		"config(ro): runtime.pgoSource=none",
@@ -319,6 +334,22 @@ func testSetGetEquals(t *testing.T) {
 
 	key = "runtime.gcadaptiveThrptGoal"
 	fiv := float64(rand.Int()%128) / 10.0
+	s, e = postCmd("set", fmt.Sprintf("%s=%s", key, strconv.FormatFloat(fiv, 'g', -1, 64)))
+	if e != nil {
+		t.Fatalf("Failed to postCmd set, error=%v\n", e)
+	}
+	shouldContains(s, []string{fmt.Sprintf("Successful: %s=%v", key, fiv)}, t)
+
+	key = "runtime.gcadaptiveThrptGoalLower"
+	fiv = float64(rand.Int()%128) / 10.0
+	s, e = postCmd("set", fmt.Sprintf("%s=%s", key, strconv.FormatFloat(fiv, 'g', -1, 64)))
+	if e != nil {
+		t.Fatalf("Failed to postCmd set, error=%v\n", e)
+	}
+	shouldContains(s, []string{fmt.Sprintf("Successful: %s=%v", key, fiv)}, t)
+
+	key = "runtime.gcadaptiveSigmoidKValue"
+	fiv = float64(rand.Int()%128) / 10.0
 	s, e = postCmd("set", fmt.Sprintf("%s=%s", key, strconv.FormatFloat(fiv, 'g', -1, 64)))
 	if e != nil {
 		t.Fatalf("Failed to postCmd set, error=%v\n", e)

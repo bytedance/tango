@@ -331,7 +331,7 @@ func initMetrics() {
 		"/gc/gcadaptive/throughput:percent": {
 			compute: func(in *statAggregate, out *metricValue) {
 				out.kind = metricKindFloat64
-				out.scalar = float64bits(cpuStatusExtend.gcThroughput.Load())
+				out.scalar = float64bits(cpuStatusExtend.gcThroughputRatio.Load())
 			},
 		},
 		"/gc/heap/objects:objects": {

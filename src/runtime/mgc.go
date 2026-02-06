@@ -192,7 +192,12 @@ func gcinit() {
 	goGC, goMemLimit := readGOGC(), readGOMEMLIMIT()
 	gcController.init(goGC, goMemLimit)
 	// Initialize GC adaptive controller state.
-	gcAdaptiveController.init(goGC, readGOGCUPPERLIMIT(), readGOGCTHPRATIO(), goMemLimit)
+	gcAdaptiveController.init(
+		goGC,
+		readGOGCUPPERLIMIT(),
+		goMemLimit,
+		readGOGCTHPRATIO(),
+		readGOGCTHPRATIOALPHA())
 
 	// Set up the cleanup block ptr mask.
 	for i := range cleanupBlockPtrMask {
@@ -526,6 +531,9 @@ type workType struct {
 	// Cumulative estimated CPU usage.
 	cpuStats
 	gabUsedBytes uintptr
+	// forceGcPeriod indicates the current GC cycle was triggered by
+	// gcTriggerTime with forcegcperiod(default 60s * 2).
+	forceGcPeriod bool
 }
 
 // GC runs a garbage collection and blocks the caller until the
@@ -806,6 +814,9 @@ func gcStart(trigger gcTrigger) {
 	// For stats, check if this GC was forced by the user.
 	// Update it under gcsema to avoid gctrace getting wrong values.
 	work.userForced = trigger.kind == gcTriggerCycle
+	// For stats, check if this GC was forced by periodically.
+	// Update it under gcsema to help gc adaptive controller.
+	work.forceGcPeriod = trigger.kind == gcTriggerTime
 
 	trace := traceAcquire()
 	if trace.ok() {
@@ -1476,16 +1487,16 @@ func gcMarkTermination(stw worldStop) {
 	// Update overall GC Throughput.
 	cpuStatusExtend.computeGCThroughput()
 
-	// Adjustment of gc percent in adaptGCThroughput must be called before gcControllerCommit.
+	// Adjustment of gc percent in adaptGCThroughputPolicy must be called before gcControllerCommit.
 	if gcAdaptiveController.gcAdaptiveEnabled {
-		gcAdaptiveController.adaptGCThroughput()
+		gcAdaptiveController.adaptGCThroughputPolicy()
 		// Update GC trigger and pacing, as well as downstream consumers
 		// of this pacing information, for the next cycle.
 		systemstack(gcControllerCommit)
 	}
 
 	// Update adaptive gc throughput control enable flag.
-	gcAdaptiveSwitch()
+	gcAdaptiveController.gcAdaptiveSwitch()
 
 	// Reset assist time and background time stats.
 	//
@@ -1634,7 +1645,7 @@ func gcMarkTermination(stw worldStop) {
 		}
 		print(": ")
 		if debug.gcadaptivetrace == 1 {
-			print(int(cpuStatusExtend.gcThroughput.Load()), "%: ")
+			print(int(cpuStatusExtend.gcThroughputRatio.Load()), "%: ", cpuStatusExtend.gcCpuFractionShortTerm.Load(), "%: ")
 		}
 		prev := work.tSweepTerm
 		for i, ns := range []int64{work.tMark, work.tMarkTerm, work.tEnd} {

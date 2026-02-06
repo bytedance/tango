@@ -919,50 +919,6 @@ func (m *consistentHeapStats) read(out *heapStatsDelta) {
 	releasem(mp)
 }
 
-var cpuStatusExtend cpuStatsExtend
-
-type cpuStatsExtend struct {
-	// Indicates whether the accumulated time has been initialized.
-	accumTimeInitialized bool
-	gcThroughput         atomic.Float64
-	// Accumulated time spent until the previous GC cycle.
-	prevAccumGCTime   int64
-	prevAccumUserTime int64
-	prevAccumScavTime int64
-}
-
-// computeGCThroughput calculates the Garbage Collection (GC) throughput as a percentage.
-//
-// GC throughput is defined as the proportion of time spent executing user code
-// relative to the total time, including user execution time, GC time, and memory scavenging time.
-//
-// Formula:
-//
-//	GC Throughput = (User Time / (User Time + GC Time + Scavenge Time + Alpha * Idle Mark Time)) * 100
-//
-// Where:
-// - userTime: Time spent executing user code.
-// - gcTime: Time spent running the garbage collector.
-// - scavengeTime: Time spent in memory scavenging.
-// - The result is capped at 100.0% to prevent any overflow due to precision errors.
-func (c *cpuStatsExtend) computeGCThroughput() float64 {
-	if c.accumTimeInitialized {
-		// Exclude part of idle CPU time from the GC time calculation.
-		// To balance the relationship between actual GC throughput and business CPU utilization,
-		// the factor of GC idle mark time is also taken into account.
-		gcIdleTime := gcController.idleMarkTime.Load()
-		gcTime := work.cpuStats.GCTotalTime - c.prevAccumGCTime - gcIdleTime
-		userTime := work.cpuStats.UserTime - c.prevAccumUserTime
-		scavengeTime := work.cpuStats.ScavengeTotalTime - c.prevAccumScavTime
-		c.gcThroughput.Store(computeGCThroughput(userTime, gcTime+userTime+scavengeTime+gcIdleTime/gcIdleMarkTimeFactor))
-	}
-	c.prevAccumGCTime = work.cpuStats.GCTotalTime
-	c.prevAccumUserTime = work.cpuStats.UserTime
-	c.prevAccumScavTime = work.cpuStats.ScavengeTotalTime
-	c.accumTimeInitialized = true
-	return c.gcThroughput.Load()
-}
-
 type cpuStats struct {
 	// All fields are CPU time in nanoseconds computed by comparing
 	// calls of nanotime. This means they're all overestimates, because

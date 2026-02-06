@@ -2237,81 +2237,131 @@ const (
 	MaxGOGCAdjustmentStep = 0.40
 	// Base value for GC throughput delta calculation
 	GCThroughputDeltaBase = 30.0
+	SigmoidKDefaultValue  = sigmoidKDefaultValue
 )
 
+var SigmoidApprox = sigmoidApprox
+
+// -----------------------------------------------------------------------------
+// pure functions for testing GC adaptive controller algorithms
 func ComputeGCThroughput(userTime, totalTime int64) float64 {
-	return computeGCThroughput(userTime, totalTime)
+	return gcUserTimePercent(userTime, totalTime)
 }
 
 func ComputeAdjustmentStep(delta float64, base float64) float64 {
 	return calculateAdjustmentStep(delta, base)
 }
 
-// adaptive gc test.
-func BoundGCPercent(gcPercent int32) int32 {
-	return gcAdaptiveController.boundGCPercent(gcPercent)
+func ComputeGCThroughputGoal(gcCpuFraction float64, upper float64, lower float64, k float64) float64 {
+	return sigmoidLinearMapping(
+		gcCpuFraction,
+		k,
+		upper/100,
+		lower/100) * 100.0
 }
 
-func CheckGCAdaptiveIsEnabled() bool {
+func ComputeEMASmoothing(highValue, lightValue float64) float64 {
+	return emaSmoothing(highValue, lightValue)
+}
+
+// -----------------------------------------------------------------------------
+// get gc adaptive controller status
+func IsGCAdaptiveIsEnabled() bool {
 	return gcAdaptiveController.gcAdaptiveEnabled
 }
 
-func CheckGCIsStable() bool {
-	return gcAdaptiveController.gcStable
+func IsGCStable() bool {
+	return gcStateInstance.gcStable
 }
 
-func InitialGCPercent() int32 {
+// -----------------------------------------------------------------------------
+// get initial gc adaptive controller parameters
+func GetInitialGCPercent() int32 {
 	return gcAdaptiveController.initialGCPercent
 }
 
-func InitialMemoryLimit() int64 {
+func GetInitialMemoryLimit() int64 {
 	return gcAdaptiveController.initialMemoryLimit
 }
 
-func GCAdaptiveGOGCUpperLimit() int32 {
+func GetSigmoidValue() float64 {
+	return sigmoidKValue
+}
+
+func GetGCAdaptiveDefaultGCPercent() int32 {
+	return defaultGCPercent
+}
+
+// -----------------------------------------------------------------------------
+// get GOGC related parameters
+func GetGCAdaptiveGOGCUpperLimit() int32 {
 	return gcAdaptiveController.gcGOGCUpperLimit
 }
 
-func GCAdaptiveGOGCLowerLimit() int32 {
+func GetGCAdaptiveGOGCLowerLimit() int32 {
 	return gcAdaptiveController.gcGOGCLowerLimit
-}
-
-func GCThroughputGoal() float64 {
-	return gcAdaptiveController.gcThroughputGoal
-}
-
-func LatestGCThroughputGoal() float64 {
-	return gcAdaptiveController.latestGcThroughputGoal
-}
-
-func GCThroughputUpperGoal() float64 {
-	return gcAdaptiveController.upperBoundGoal
-}
-
-func GCThroughputLowerGoal() float64 {
-	return gcAdaptiveController.lowerBoundGoal
-}
-
-func GCThroughputRatio() float64 {
-	return gcAdaptiveController.gcThroughputRatio
-}
-
-func GCThroughputEMA() float64 {
-	return gcAdaptiveController.gcThroughputEMA
 }
 
 func GetGCPercent() int32 {
 	return gcController.gcPercent.Load()
 }
 
+// -----------------------------------------------------------------------------
+// get gc throughput goal related parameters
+func GetGCThroughputGoal() float64 {
+	return gcAdaptiveController.gcThroughputGoal
+}
+
+func GetGCThroughputGoalLatest() float64 {
+	return gcAdaptiveController.latestGcThroughputGoal
+}
+
+func GetGCThroughputGoalRangeUpper() float64 {
+	return gcAdaptiveController.gcThroughputGoalRangeUpper
+}
+
+func GetGCThroughputGoalRangeLower() float64 {
+	return gcAdaptiveController.gcThroughputGoalRangeLower
+}
+
+func GetGCThroughputGoalRangeAlpha() float64 {
+	return gcAdaptiveController.gcThroughputGoalRangeAlpha
+}
+
+func GetGCThroughputGoalToleranceUpper() float64 {
+	return gcAdaptiveController.upperBoundGoal
+}
+
+func GetGCThroughputGoalToleranceLower() float64 {
+	return gcAdaptiveController.lowerBoundGoal
+}
+
+// -----------------------------------------------------------------------------
+// get gc cpu fraction and gc throughput related parameters
+func GetGCOverheadRatio() float64 {
+	return cpuStatusExtend.gcCpuFractionShortTerm.Load()
+}
+
+func GetGCOverheadRatioEMA() float64 {
+	return cpuStatusExtend.gcCpuFractionShortTermEMA.Load()
+}
+
+func GetGCThroughputRatio() float64 {
+	return cpuStatusExtend.gcThroughputRatio.Load()
+}
+
+func GetGCThroughputRatioEMA() float64 {
+	return cpuStatusExtend.gcThroughputRatioEMA.Load()
+}
+
+// -----------------------------------------------------------------------------
+// get gc statistics
 func GetGCNum() uint32 {
 	return memstats.numgc
 }
 
-func GCAdaptiveDefaultGCPercent() int32 {
-	return defaultGCPercent
-}
-
+// -----------------------------------------------------------------------------
+// set gc adaptive controller parameters
 func SetGCAdaptiveEnabled(flag int32) {
 	setGCAdaptive(flag == 1)
 }
@@ -2320,10 +2370,28 @@ func SetGCThroughputGoal(goal float64) {
 	setGCThroughputGoal(goal)
 }
 
-func GetGCThroughputRatio() float64 {
-	return cpuStatusExtend.gcThroughput.Load()
+func SetGCThroughputGoalRange(upper, alpha float64) {
+	setGCThroughputGoalRange(upper, alpha)
 }
 
+func SetSigmoidValue(k float64) {
+	setSIGMOIDKVALUE(k)
+}
+
+// -----------------------------------------------------------------------------
+// Read gc adaptive controller parameters with env variables.
 func ReadGOGCUPPERLIMIT() int32 {
 	return readGOGCUPPERLIMIT()
+}
+
+func ReadGOGCTHPRATIO() int32 {
+	return readGOGCTHPRATIO()
+}
+
+func ReadGOGCTHPRATIOALPHA() float64 {
+	return readGOGCTHPRATIOALPHA()
+}
+
+func ReadSIGMOIDKVALUE() float64 {
+	return readSIGMOIDKVALUE()
 }
