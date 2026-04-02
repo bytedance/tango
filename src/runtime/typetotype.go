@@ -43,6 +43,14 @@ func tcTypeToType(from, to interface{}, deepCopy bool, replaceFunc uint8) error 
 
 	c := tcGetInitializedConverter(deepCopy)
 	c.replaceFunc = replaceFunc
+	if tcGetDebug() {
+		defer func() {
+			if err := recover(); err != nil {
+				c.reportTrace()
+			}
+		}()
+	}
+
 	var err error
 
 	if tcIsDirectIface(te._type) {
@@ -424,45 +432,56 @@ func (c *tcConverter) structToStruct(from, to unsafe.Pointer, ft, tt *_type) err
 			return nil
 		}
 		sts := c.cachedStructToStructIndex(ft, tt)
+		c.pushTraceByType(ft)
 		for i := range sts.toToFrom {
 			ff := &sts.from.fields[sts.toToFrom[i][1]]
+			c.pushTraceByString(ff.key)
 			tf := &sts.to.fields[sts.toToFrom[i][0]]
 			if c.replaceFunc == tcCopier && ff.ignoreCopier {
+				c.popTrace()
 				continue
 			}
 			if !c.deepCopy && (tcNeedSkip(ff) || tcNeedSkip(tf)) {
 				if c.replaceFunc == tcDeepCopy && ff.structType == tcTimeType {
 					tcHandleTimeField(from, to, ff, tf)
+					c.popTrace()
 					continue
 				}
 				if c.replaceFunc == tcTangoConv || !ff.export {
+					c.popTrace()
 					continue
 				}
 			}
 			fp := tcLoadFieldAddr(from, ff)
 			if fp == nil {
+				c.popTrace()
 				continue // embedded pointer field is nil
 			}
 			tp := tcLoadFieldAddrWithNewObject(to, tf)
 			if !c.deepCopy && tcIsZeroValue(fp, ff.typ) {
+				c.popTrace()
 				continue
 			}
 			if c.replaceFunc == tcCopier {
 				if !ff.export {
 					if tcIsZeroValue(fp, ff.typ) {
+						c.popTrace()
 						continue
 					}
 					// The copier only performs a shallow copy for unexported fields.
 					if ff.typ == tf.typ {
 						typedmemmove(ff.typ, tp, fp)
 					}
+					c.popTrace()
 					continue
 				}
 			}
 			if err := c.typeToType(fp, tp, ff.typ, tf.typ); err != nil {
 				return err
 			}
+			c.popTrace()
 		}
+		c.popTrace()
 	case abi.Interface:
 		return c.handleInterface(from, to, ft, tt)
 	case abi.Pointer:

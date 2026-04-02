@@ -203,16 +203,6 @@ type tcField struct {
 	tophash      uint8
 }
 
-type tcConverter struct {
-	numberKind  uint8
-	deepCopy    bool
-	context     eface
-	ssBuffer    tcBuffer[stringStruct]
-	bBuffer     tcBuffer[byte]
-	replaceFunc uint8
-	stackLevel  uint32
-}
-
 type tcBuffer[T any] struct {
 	b    []T
 	used int
@@ -273,6 +263,13 @@ func tcToStringMap(from interface{}, preferredNumberKind iface, deepCopy bool) (
 		ie  eface
 		err error
 	)
+	if tcGetDebug() {
+		defer func() {
+			if err := recover(); err != nil {
+				c.reportTrace()
+			}
+		}()
+	}
 
 	// Sometimes a type does not implement json.Marshaler itself, but its pointer type implements json.Marshaler,
 	// such as math/big.Int. At this time, when a type is a pointer type, we should pass the type itself to convertAny
@@ -606,15 +603,19 @@ func (c *tcConverter) convertStruct(p unsafe.Pointer, t *_type) (unsafe.Pointer,
 	th := tcAllocMap(fmcStruct.proto, tt)
 	tcHandleUsed(th, fmcStruct.proto)
 
+	c.pushTraceByType(t)
 	for i := range fmcStruct.fields {
 		f := &fmcStruct.fields[i]
+		c.pushTraceByString(f.key)
 		if tcNeedSkip(f) {
+			c.popTrace()
 			continue
 		}
 		index, ttab, tb := tcHandleOverflow(th, f.table, f.bucket, f.index, tt)
 		fp := tcLoadFieldAddr(p, f)
 		if fp == nil || (f.omitEmpty && tcIsEmptyValue(fp, f.typ)) {
-			tcHandleEmpty(tb, index, th, ttab)
+			tcHandleEmpty(tb, index, th, ttab, f.mustDelete)
+			c.popTrace()
 			continue
 		}
 		tcSetHash(tb, index, f.tophash)
@@ -624,10 +625,13 @@ func (c *tcConverter) convertStruct(p unsafe.Pointer, t *_type) (unsafe.Pointer,
 		e := (*eface)(add(tb, tcGetElemOffset(index, tt)))
 		var err error
 		if e.data, e._type, err = c.convertAny(fp, f.typ); err != nil {
+			c.popTrace()
 			return nil, nil, err
 		}
+		c.popTrace()
 	}
 
+	c.popTrace()
 	return th, tcStringEfaceMapType, nil
 }
 
