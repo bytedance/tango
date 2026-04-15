@@ -459,7 +459,7 @@ func tcBuildProtoAndIndex(m map[string]interface{}, fmcStruct *tcStructFields) {
 		if tcNeedSkip(f) {
 			continue
 		}
-		f.table, f.bucket, f.index, f.tophash = tcGetBucketOffset(fmcStruct.proto,
+		f.table, f.bucket, f.index, f.tophash, f.mustDelete = tcGetBucketOffset(fmcStruct.proto,
 			(*abi.MapType)(unsafe.Pointer(tcStringEfaceMapType)),
 			f.key, f.hash)
 	}
@@ -1052,7 +1052,7 @@ func tcEscapeFloat64(f float64) unsafe.Pointer {
 }
 
 //go:linkname tcGetBucketOffset
-func tcGetBucketOffset(h unsafe.Pointer, mt *abi.MapType, key string, hash uintptr) (uintptr, uintptr, uintptr, uint8)
+func tcGetBucketOffset(h unsafe.Pointer, mt *abi.MapType, key string, hash uintptr) (uintptr, uintptr, uintptr, uint8, bool)
 
 //go:linkname tcGetTablePointer
 func tcGetTablePointer(h unsafe.Pointer, idx uintptr) unsafe.Pointer
@@ -1084,7 +1084,7 @@ func tcGetKeyOffset(index uintptr, mt *abi.MapType) uintptr
 func tcGetElemOffset(index uintptr, mt *abi.MapType) uintptr
 
 //go:linkname tcHandleEmpty
-func tcHandleEmpty(tb unsafe.Pointer, index uintptr, th, tt unsafe.Pointer)
+func tcHandleEmpty(tb unsafe.Pointer, index uintptr, th, tt unsafe.Pointer, mustDelete bool)
 
 //go:linkname tcAllocMap
 func tcAllocMap(fh unsafe.Pointer, t *abi.MapType) unsafe.Pointer

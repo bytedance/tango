@@ -10,13 +10,13 @@ import (
 )
 
 //go:linkname tcGetBucketOffset runtime.tcGetBucketOffset
-func tcGetBucketOffset(m *Map, mt *abi.MapType, key string, hash uintptr) (uintptr, uintptr, uintptr, uint8) {
+func tcGetBucketOffset(m *Map, mt *abi.MapType, key string, hash uintptr) (uintptr, uintptr, uintptr, uint8, bool) {
 	if m.dirLen == 0 {
-		index, tophash := tcGetGroupOffset(m.dirPtr, mt, key, hash)
+		index, tophash, mustDelete := tcGetGroupOffset(m.dirPtr, mt, key, hash)
 		if tophash&ctrlEmpty != 0 {
 			panic("should not reach here")
 		}
-		return 0, 0, index, uint8(tophash)
+		return 0, 0, index, uint8(tophash), mustDelete
 	}
 
 	idx := m.directoryIndex(hash)
@@ -25,9 +25,9 @@ func tcGetBucketOffset(m *Map, mt *abi.MapType, key string, hash uintptr) (uintp
 	for ; ; seq = seq.next() {
 		g := tab.groups.group(mt, seq.offset)
 
-		index, tophash := tcGetGroupOffset(g.data, mt, key, hash)
+		index, tophash, mustDelete := tcGetGroupOffset(g.data, mt, key, hash)
 		if tophash&ctrlEmpty == 0 {
-			return idx, uintptr(seq.offset), index, uint8(tophash)
+			return idx, uintptr(seq.offset), index, uint8(tophash), mustDelete
 		}
 
 		if g.ctrls().matchEmpty() != 0 {
@@ -38,7 +38,7 @@ func tcGetBucketOffset(m *Map, mt *abi.MapType, key string, hash uintptr) (uintp
 	}
 }
 
-func tcGetGroupOffset(d unsafe.Pointer, mt *abi.MapType, key string, hash uintptr) (uintptr, ctrl) {
+func tcGetGroupOffset(d unsafe.Pointer, mt *abi.MapType, key string, hash uintptr) (uintptr, ctrl, bool) {
 	g := groupReference{
 		data: d,
 	}
@@ -52,11 +52,11 @@ func tcGetGroupOffset(d unsafe.Pointer, mt *abi.MapType, key string, hash uintpt
 			slotKey = *((*unsafe.Pointer)(slotKey))
 		}
 		if *(*string)(slotKey) == key {
-			return i, g.ctrls().get(i)
+			return i, g.ctrls().get(i), g.ctrls().matchEmpty() == 0
 		}
 		match = match.removeFirst()
 	}
-	return 0, ctrlEmpty
+	return 0, ctrlEmpty, false
 }
 
 //go:linkname tcGetTablePointer runtime.tcGetTablePointer
@@ -149,17 +149,22 @@ func tcAllocMap(fh *Map, t *abi.MapType) *Map {
 }
 
 //go:linkname tcHandleEmpty runtime.tcHandleEmpty
-func tcHandleEmpty(tb unsafe.Pointer, index uintptr, th *Map, tt *table) {
+func tcHandleEmpty(tb unsafe.Pointer, index uintptr, th *Map, tt *table, mustDelete bool) {
 	th.used--
 	if tt != nil {
 		tt.used--
 	}
 	g := groupReference{data: tb}
-	// Since the conversion here is a one-to-one operation based on the position,
-	// which is different from the conventional insertion operation,
-	// for the slot that needs to be deleted, it can only be set as "delete" and cannot be set as "empty".
-	// Otherwise, there may be an error of not being able to find the key during the key query.
-	g.ctrls().set(index, ctrlDeleted)
+	if mustDelete {
+		// We only ever mark the slot as deleted if the entry we want to delete
+		// is in a pack of bucketCnt non-EMPTY buckets.
+		g.ctrls().set(index, ctrlDeleted)
+	} else {
+		if tt != nil {
+			tt.growthLeft++
+		}
+		g.ctrls().set(index, ctrlEmpty)
+	}
 }
 
 type tcConverter struct {
