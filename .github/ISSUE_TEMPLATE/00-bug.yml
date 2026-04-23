@@ -1,7 +1,7 @@
 # https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/configuring-issue-templates-for-your-repository#creating-issue-forms
 # https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/syntax-for-githubs-form-schema
 name: Bugs
-description: The go command, standard library, or anything else
+description: The Tango toolchain, standard library, or anything else
 title: "import/path: issue title"
 
 body:
@@ -15,10 +15,19 @@ body:
     attributes:
       label: Go version
       description: |
-        What version of Go are you using (`go version`)?
+        What version of Tango are you using (`go version`)?
 
         Note: we only [support](https://go.dev/doc/devel/release#policy) the two most recent major releases.
       placeholder: ex. go version go1.20.7 darwin/arm64
+    validations:
+      required: true
+
+  - type: textarea
+    id: tango-version
+    attributes:
+      label: "Output of `go bversion`:"
+      description: Run `go bversion` with the same toolchain that reproduces the issue.
+      render: shell
     validations:
       required: true
 
@@ -76,6 +85,16 @@ body:
       description: "If possible, provide a recipe for reproducing the error. A complete runnable program is good. A link on [go.dev/play](https://go.dev/play) is best."
     validations:
       required: true
+
+  - type: textarea
+    id: tango-settings
+    attributes:
+      label: "Enabled Tango features"
+      description: Include relevant GOEXPERIMENT, compiler options, and runtime settings such as GODEBUG.
+      placeholder: |
+        GOEXPERIMENT=...
+        go build -opt=...
+        GODEBUG=...
 
   - type: textarea
     id: actual-behavior

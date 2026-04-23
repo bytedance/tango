@@ -1,0 +1,32 @@
+Tango source and license notices
+
+Unless otherwise noted, ByteDance contributions use the BSD 3-Clause license
+in LICENSE.
+Upstream and third-party code retains its original copyright and license.
+
+Go
+  Tango is based on https://github.com/golang/go, version go1.26.4.
+  The original Go BSD 3-Clause license is preserved in LICENSE_UPSTREAM.
+  In files copyrighted by The Go Authors, "the LICENSE file" refers to
+  LICENSE_UPSTREAM.
+  The upstream PATENTS file and per-file notices are retained.
+  Files carrying other upstream licenses, including Inferno/MIT, retain them.
+
+  Examples of additional Go-derived portions (non-exhaustive; these
+  portions and their modifications retain BSD 3-Clause terms in LICENSE_UPSTREAM):
+    src/tango/memstats/agent.go
+      adapts HTTP profiling helpers from src/net/http/pprof/pprof.go
+      for the Tango memory statistics endpoint.
+    src/runtime/mgab_prof.go
+      adapts allocation profiling from src/runtime/mprof.go to preserve
+      the allocating goroutine's stack during GAB buffer refills.
+    src/encoding/json/encode_mapconv.go and
+    src/encoding/json/v2/encode_mapconv.go
+      adapt field discovery from src/encoding/json/encode.go (typeFields)
+      for map conversion, with different field selection and tag handling.
+    src/runtime/mgabgc.go
+      adapts allocation and stack scanning portions from
+      src/runtime/malloc.go and src/runtime/mgcmark.go for GAB collection.
+    src/runtime/memdebug.go
+      adapts stack frame traversal from src/runtime/symtab.go for
+      large-allocation diagnostics without allocating during traversal.
