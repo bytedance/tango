@@ -182,3 +182,74 @@ func TestEmptyMap(t *testing.T) {
 		t.Fatal("ConvertStructToMap failed")
 	}
 }
+
+func TestManyField(t *testing.T) {
+	source := `package conv_test
+
+import (
+	"bytes"
+	"encoding/json"
+	"math/rand"
+	"reflect"
+	"tango/conv"
+	"testing"
+	"time"
+)
+
+type S1 struct {
+	%s
+}
+
+func FillRandom(s *S1) {
+    rand.Seed(time.Now().UnixNano())
+
+    v := reflect.ValueOf(s).Elem()
+    for i := 0; i < v.NumField(); i++ {
+        f := v.Field(i)
+        if f.Kind() == reflect.Int {
+            f.SetInt(int64(rand.Intn(101))) // 0~100
+        }
+    }
+}
+
+func TestManyField(t *testing.T) {
+	b := S1{}
+	FillRandom(&b)
+	c := conv.Converter{NumKind: reflect.TypeOf(json.Number(""))}
+	d, err := c.ToStringMap(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	be, err := json.Marshal(b)
+	if err != nil {
+		t.Fatal(be)
+	}
+	var res map[string]interface{}
+	dec := json.NewDecoder(bytes.NewBuffer(be))
+	dec.UseNumber()
+	err = dec.Decode(&res)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(res, d) {
+		t.Fatalf("res is %%v\n d is %%v", res, d)
+	}
+}
+`
+	sb := strings.Builder{}
+	// 3523 is the number of fields that may trigger exceptions.
+	for i := 1; i <= 3523; i++ {
+		sb.WriteString(fmt.Sprintf("\tF%d int `json:\"f%d,omitempty\"`\n", i, i))
+	}
+	wd := t.TempDir()
+	fn := filepath.Join(wd, "conv_test.go")
+	err := os.WriteFile(fn, []byte(fmt.Sprintf(source, sb.String())), 0644)
+	expectEqual(t, err == nil, true, err)
+	for i := 0; i < 50; i++ {
+		cmd := exec.Command(testenv.GoToolPath(t), "test", fn)
+		cmd.Dir = wd
+		out, err := cmd.CombinedOutput()
+		expectEqual(t, err == nil, true, string(out))
+	}
+}

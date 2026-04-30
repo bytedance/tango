@@ -138,9 +138,19 @@ func tcAllocMap(fh *Map, t *abi.MapType) *Map {
 	}
 	directory := make([]*table, fh.dirLen)
 
+	// fh may have undergone rehash. There are pointers pointing to the same table in table slice,
+	// and the same pointer pointing relationship also needs to be maintained in the allocated map.
+	tabIndex := make(map[*table]*table, len(directory))
+
 	for i := range directory {
 		ftab := fh.directoryAt(uintptr(i))
-		directory[i] = newTable(t, uint64(ftab.capacity), ftab.index, ftab.localDepth)
+		if ttab, ok := tabIndex[ftab]; ok {
+			directory[i] = ttab
+		} else {
+			ttab = newTable(t, uint64(ftab.capacity), ftab.index, ftab.localDepth)
+			directory[i] = ttab
+			tabIndex[ftab] = ttab
+		}
 	}
 
 	th.dirPtr = unsafe.Pointer(&directory[0])
