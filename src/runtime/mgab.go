@@ -311,6 +311,14 @@ func isGabDebugStatEnabled() bool {
 	return isGabEnabled() && gabdebug.gabDebugStat > 0
 }
 
+//go:linkname dbgReleaseCurrentGABBuffers
+func dbgReleaseCurrentGABBuffers() {
+	gp := getg()
+	gp.ab.retire()
+	gp.strAB.retire()
+	gp.strHeaderAB.clear()
+}
+
 func shouldPauseGab() bool {
 	return isGabStrAllocEnabled() &&
 		uint64(atomic.Loaduintptr(&gabUsedBytes)) >= gabState.gabMemLimit &&

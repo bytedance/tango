@@ -15,11 +15,23 @@ import (
 	"unsafe"
 )
 
+// boxStringForTest forces the string->interface conversion to happen in this
+// helper instead of at the call site. When the caller passes a string literal,
+// the compiler may lower the conversion to a static readonly object instead of
+// calling runtime.convTstring. Routing the value through a noinline helper with
+// a string parameter keeps the conversion on the normal convTstring path.
+//
+//go:noinline
+func boxStringForTest(val string) any {
+	return val
+}
+
 func init() {
 	register("AllocBasic", testAllocBasic)
 	register("ObjFinalizer", testObjFinalizer)
 	register("AllocStr", testAllocStr)
 	register("AllocStrHeader", testAllocStrHeader)
+	register("GabStringHeaderUsedBytes", testGabStringHeaderUsedBytes)
 	register("ReuseBuffer", testReuseBuffer)
 	register("AllocZeroSizeString", testAllocZeroSizeString)
 	register("MarkStrBody", testMarkStrBody)
@@ -50,7 +62,7 @@ func testAllocBasic() {
 	addr2 := uintptr(refs1[1])
 	// addr1 must reside before addr2
 	var addrDiff uintptr = 16
-	if addr1 > addr2 || addr2-addr1 > addrDiff {
+	if addr1 > addr2 || addr2-addr1 > addrDiff || !isInGabSpan(addr1) || !isInGabSpan(addr2) {
 		fmt.Printf("addr1 (0x%x) addr2 (0x%x) should be in same GAB\n", addr1, addr2)
 	}
 	fmt.Println("OK")
@@ -130,7 +142,7 @@ func testAllocStr() {
 	addr2 := uintptr(refs3[1])
 	// addr1 must reside before addr2
 	var addrDiff uintptr = 16
-	if addr1 > addr2 || addr2-addr1 > addrDiff {
+	if addr1 > addr2 || addr2-addr1 > addrDiff || !isInGabSpan(addr1) || !isInGabSpan(addr2) {
 		fmt.Printf("addr1 (0x%x) addr2 (0x%x) should be in same GAB\n", addr1, addr2)
 	}
 
@@ -140,7 +152,7 @@ func testAllocStr() {
 	addr4 := uintptr(refs3[3])
 	// addr3 must reside before addr4
 	addrDiff = 16
-	if addr3 > addr4 || addr4-addr3 > addrDiff {
+	if addr3 > addr4 || addr4-addr3 > addrDiff || !isInGabSpan(addr3) || !isInGabSpan(addr4) {
 		fmt.Printf("addr3 (0x%x) addr4 (0x%x) should be in same GAB str buffer\n", addr3, addr4)
 	}
 
@@ -182,10 +194,10 @@ func testAllocStrHeader() {
 		str1 = "str1"
 		str2 = "str2"
 	)
-	convObj1 = str1
-	convObj2 = str2
-	refs4[0] = unsafe.Pointer((*[2]uintptr)(unsafe.Pointer(&convObj1))[1])
-	refs4[1] = unsafe.Pointer((*[2]uintptr)(unsafe.Pointer(&convObj2))[1])
+	convObj1 = boxStringForTest(str1)
+	convObj2 = boxStringForTest(str2)
+	refs4[0] = unsafe.Pointer((*[2]unsafe.Pointer)(unsafe.Pointer(&convObj1))[1])
+	refs4[1] = unsafe.Pointer((*[2]unsafe.Pointer)(unsafe.Pointer(&convObj2))[1])
 	refs4[2] = unsafe.Pointer(allocScanObj())
 
 	addr1 := uintptr(refs4[0])
@@ -193,14 +205,84 @@ func testAllocStrHeader() {
 	addr3 := uintptr(refs4[2])
 	// addr1 must reside before addr2
 	var addrDiff uintptr = 16
-	if addr1 > addr2 || addr2-addr1 != addrDiff {
+	if addr1 > addr2 || addr2-addr1 != addrDiff || !isInGabSpan(addr1) || !isInGabSpan(addr2) {
 		fmt.Printf("addr1 (0x%x) addr2 (0x%x) should be in same GAB\n", addr1, addr2)
 	}
 
 	// addr3 must not reside after addr2
 	// the string header should be allocated in a str header buffer, while addr3 is allocated by mallocgc1
-	if addr3-addr2 == addrDiff {
+	if addr3-addr2 == addrDiff || isInGabSpan(addr3) {
 		fmt.Printf("addr2 (0x%x) addr3 (0x%x) should not be in same GAB\n", addr2, addr3)
+	}
+
+	fmt.Println("OK")
+}
+
+func testGabStringHeaderUsedBytes() {
+	refs4 = make([]unsafe.Pointer, 1)
+
+	if !*gabEnabled {
+		panic("gabEnabled should have been turned on")
+	}
+
+	// The first string header GAB refill requests an initial capacity of 1024 bytes.
+	// However, the backing object is a scan object (typ == stringType), so refill
+	// goes through mallocgcSmallScanHeader instead of the noscan GAB path.
+	// On 64-bit platforms this adds mallocHeaderSize and then rounds up to the next
+	// size class, which makes the accounted gabUsedBytes delta 1152 rather than 1024.
+	const wantGabUsedBytesDelta = 1152
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	// Sweep any stale GAB buffers before taking the baseline, so later deltas only
+	// reflect the worker goroutine below.
+	runtime.GC()
+	runtime.GC()
+	prevBytes := *gabUsedBytes
+
+	go func() {
+		defer wg.Done()
+		// Ensure this goroutine starts from a clean GAB state, otherwise a reused
+		// goroutine may already carry a string-header buffer and hide the refill we
+		// want to test.
+		releaseCurrentGABBuffers()
+
+		str := "str-header"
+		convObj1 = boxStringForTest(str)
+		refs4[0] = unsafe.Pointer((*[2]unsafe.Pointer)(unsafe.Pointer(&convObj1))[1])
+
+		// String header buffers are reused by the goroutine they are bound to, so
+		// explicitly release this goroutine's GAB buffers after allocation. The test
+		// assertions and GC verification are still performed outside this goroutine.
+		releaseCurrentGABBuffers()
+	}()
+
+	wg.Wait()
+
+	addr := uintptr(refs4[0])
+	if addr == 0 || !isInGabSpan(addr) {
+		fmt.Printf("string header should be allocated in GAB, got 0x%x\n", addr)
+		return
+	}
+
+	curBytes := *gabUsedBytes
+	delta := curBytes - prevBytes
+	if curBytes <= prevBytes || delta != wantGabUsedBytesDelta {
+		fmt.Printf("expecting %d bytes allocated in gab for string header, but got %d\n", wantGabUsedBytesDelta, delta)
+		return
+	}
+	prevBytes = curBytes
+
+	refs4[0] = nil
+	convObj1 = nil
+	runtime.GC()
+	runtime.GC()
+
+	curBytes = *gabUsedBytes
+	delta = prevBytes - curBytes
+	if prevBytes <= curBytes || delta != wantGabUsedBytesDelta {
+		fmt.Printf("expecting %d bytes sweeped in gab for string header, but got %d\n", wantGabUsedBytesDelta, delta)
+		return
 	}
 
 	fmt.Println("OK")
@@ -316,12 +398,12 @@ func testMarkStrBody() {
 		str1    = newStringOnHeap(makeLongStr(bodyLen), indexForStr1, bodyStateRecords)
 		str2    = newStringOnHeap(makeLongStr(bodyLen), indexForStr2, bodyStateRecords)
 	)
-	convObj1 = str1
-	convObj2 = str2
+	convObj1 = boxStringForTest(str1)
+	convObj2 = boxStringForTest(str2)
 	refs6[0] = unsafe.Pointer((*[2]unsafe.Pointer)(unsafe.Pointer(&convObj1))[1])
 	refs6[1] = unsafe.Pointer((*[2]unsafe.Pointer)(unsafe.Pointer(&convObj2))[1])
 	refs6[2] = unsafe.Pointer(allocScanObj())
-	refs6[3] = unsafe.Pointer(unsafe.Add((*[2]unsafe.Pointer)(unsafe.Pointer(&convObj1))[1], 8))
+	refs6[3] = unsafe.Pointer(unsafe.Add(refs6[0], 8))
 	if *(*int)(refs6[3]) != bodyLen {
 		fmt.Printf("*(*int)(refs6[3]) != bodyLen, refs6[3] should point to the 'len' field of the str header")
 	}
@@ -337,13 +419,13 @@ func testMarkStrBody() {
 	addr3 := uintptr(refs6[2])
 	// check addr1 and addr2 are allocated in a gab str header buffer, addr1 must reside before addr2
 	var addrDiff uintptr = 16
-	if addr1 > addr2 || addr2-addr1 != addrDiff {
+	if addr1 > addr2 || addr2-addr1 != addrDiff || !isInGabSpan(addr1) || !isInGabSpan(addr2) {
 		fmt.Printf("addr1 (0x%x) addr2 (0x%x) should be in same GAB\n", addr1, addr2)
 	}
 
 	// addr3 must not reside after addr2
 	// the string header should be allocated in a str header buffer, while addr3 is allocated by mallocgc1
-	if addr3-addr2 == addrDiff {
+	if addr3-addr2 == addrDiff || isInGabSpan(addr3) {
 		fmt.Printf("addr2 (0x%x) addr3 (0x%x) should not be in same GAB\n", addr2, addr3)
 	}
 
@@ -408,7 +490,7 @@ func testMarkStrBodyWithAllocHeader() {
 	for i := 0; i < objNum; i++ {
 		bodyStates[i] = bodyStateMarked
 		str := newStringOnHeap(makeLongStr(bodyLen), i, bodyStates)
-		convObj = str
+		convObj = boxStringForTest(str)
 		refs7[i] = unsafe.Pointer(unsafe.Add((*[2]unsafe.Pointer)(unsafe.Pointer(&convObj))[1], 8))
 		if *(*int)(refs7[i]) != bodyLen {
 			fmt.Printf("refs7[i] should point to the 'len' field of the str header")

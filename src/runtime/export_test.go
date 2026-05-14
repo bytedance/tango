@@ -2133,6 +2133,13 @@ func GetGABInfo() (base, top, end uintptr) {
 	return uintptr(gp.ab.base), gp.ab.top, gp.ab.end
 }
 
+// ReleaseCurrentGABBuffers releases GAB buffers bound to the current goroutine.
+// The backing objects are not reclaimed immediately; callers should clear live
+// references and trigger GC/sweep if they want to observe gabUsedBytes dropping.
+func ReleaseCurrentGABBuffers() {
+	dbgReleaseCurrentGABBuffers()
+}
+
 // GetGoidOffset return the offset of goid relative to g.
 func GetGoidOffset() uintptr {
 	return unsafe.Offsetof(G{}.goid)

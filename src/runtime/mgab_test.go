@@ -138,6 +138,16 @@ func TestGabAllocStrHeader(t *testing.T) {
 	}
 }
 
+func TestGabStringHeaderUsedBytes(t *testing.T) {
+	for _, env := range getGABAllocStrHeaderEnvs() {
+		output := runTestProg(t, "testproggab", "GabStringHeaderUsedBytes", env...)
+		want := "OK\n"
+		if output != want {
+			t.Errorf("expected %q got %v", want, output)
+		}
+	}
+}
+
 func TestGabObjFinalizer(t *testing.T) {
 	for _, env := range getGABEnvs() {
 		output := runTestProg(t, "testproggab", "ObjFinalizer", env...)

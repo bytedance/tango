@@ -39,6 +39,9 @@ func isGabPinned(p uintptr) bool
 //go:linkname dumpGABObject runtime.dbgDumpGABObject
 func dumpGABObject(label string, p uintptr) bool
 
+//go:linkname releaseCurrentGABBuffers runtime.dbgReleaseCurrentGABBuffers
+func releaseCurrentGABBuffers()
+
 //go:linkname makeGabStrHeaderForWBTest runtime.dbgMakeGabStrHeaderForWBTest
 func makeGabStrHeaderForWBTest() (bodyPtr, headerPtr uintptr)
 
