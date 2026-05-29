@@ -7,7 +7,11 @@ package conv
 import (
 	"encoding/json"
 	"fmt"
+	"internal/testenv"
 	"math/rand"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"

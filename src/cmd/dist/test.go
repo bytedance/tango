@@ -805,7 +805,18 @@ func (t *tester) registerTests() {
 			env:     []string{"GOEXPERIMENT=" + goexperiments("jsonv2")},
 			pkg:     "encoding/json/...",
 		})
+		t.registerTest("GOEXPERIMENT=jsonv2 go test tango/conv/...", &goTest{
+			variant: "jsonv2",
+			env:     []string{"GOEXPERIMENT=" + goexperiments("jsonv2")},
+			pkg:     "tango/conv/...",
+		})
 	}
+
+	t.registerTest("go test -tags tangodebug tango/conv/...", &goTest{
+		variant: "tangodebug",
+		tags:    []string{"tangodebug"},
+		pkg:     "tango/conv/...",
+	})
 
 	// Test GOEXPERIMENT=runtimesecret.
 	if !strings.Contains(goexperiment, "runtimesecret") {
