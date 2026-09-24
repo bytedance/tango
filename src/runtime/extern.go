@@ -234,6 +234,40 @@ It is a comma-separated list of name=val pairs setting these named variables:
 	because it also disables the conservative stack scanning used
 	for asynchronously preempted goroutines.
 
+	adapt: setting adapt=X enables adaptive runtime scheduling optimizations
+	selected by the bit mask X. adapt=1 enables all available optimizations.
+	The available flags are 2 (goroutine stack reuse), 4 (poller goroutine
+	scheduling), and 32 (higher system monitor frequency). Add flag values
+	to combine them; for example, adapt=6 enables both 2 and 4.
+
+	adapttrace: setting adapttrace=2 or higher prints adaptive scheduler
+	state at the end of each garbage collection cycle.
+
+	gab: setting gab=1 enables per-goroutine, bump-pointer allocation
+	buffers for noscan heap objects of at most 128 bytes. Setting gab=2
+	additionally enables Balanced GC, which relocates live GAB objects to
+	reclaim buffers, on linux/amd64, linux/arm64, darwin/amd64, and
+	darwin/arm64. On other platforms, gab=2 is treated as gab=1.
+
+	gcadaptive: setting gcadaptive=1 enables the adaptive GC throughput
+	controller. After the workload becomes stable, it adjusts GOGC within
+	configured bounds to keep application CPU throughput near its target.
+
+	gcadaptivetrace: setting gcadaptivetrace=1 prints GC throughput and
+	GOGC adjustment diagnostics when the adaptive controller evaluates an
+	adjustment.
+
+	gcHeapPercent: setting gcHeapPercent=X limits the runtime heap to X
+	percent of the byte value in the MY_MEM_LIMIT environment variable.
+	Values above 80 are treated as 80. Non-positive values disable this
+	setting. It has no effect if MY_MEM_LIMIT is missing, invalid, or less
+	than 100 MiB.
+
+	largealloctrace: setting largealloctrace=X prints the size, timestamp,
+	and stack of each heap allocation of at least X bytes to standard
+	error. Positive values less than or equal to 32 KiB use an effective
+	threshold of 32 KiB plus one byte. Non-positive values disable tracing.
+
 	moduledataopt: moduledataopt=X controls sorted moduledata lookup.
 	moduledataopt>0 optimizes minpc/maxpc searches, moduledataopt>1
 	optimizes types/etypes searches, and moduledataopt>2 optimizes
